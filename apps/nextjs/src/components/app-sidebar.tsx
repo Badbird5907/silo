@@ -18,6 +18,7 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
+  useSidebar,
 } from "@silo-storage/ui/components/sidebar";
 import {
   Select,
@@ -36,12 +37,16 @@ import { ProjectSwitcher } from "@/components/project-switcher";
 import { useOrganization } from "@/hooks/use-organization";
 import { useTRPC } from "@/trpc/react";
 
-function getMainNavItems(orgSlug: string): NavItem[] {
+function getMainNavItems(
+  orgSlug: string,
+  projectItems: { title: string; url: string }[],
+): NavItem[] {
   return [
     {
       title: "Projects",
       url: `/${orgSlug}`,
       icon: FolderKanban,
+      items: projectItems,
     },
     {
       title: "Settings",
@@ -77,6 +82,7 @@ function getProjectNavItems(projectBasePath: string): NavItem[] {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { state: sidebarState } = useSidebar();
   const pathname = usePathname();
   const router = useRouter();
   const trpc = useTRPC();
@@ -102,15 +108,32 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     ),
   );
 
+  const projectsQuery = useQuery(
+    trpc.project.list.queryOptions(
+      { organizationId },
+      { enabled: !!organizationId && !isInProject },
+    ),
+  );
+
+  const mainProjectItems = React.useMemo(
+    () =>
+      (projectsQuery.data ?? []).map((project) => ({
+        title: project.name,
+        url: `/${orgSlug}/p/${project.id}`,
+      })),
+    [orgSlug, projectsQuery.data],
+  );
+
   const navItems = React.useMemo(
     () =>
       isInProject
         ? getProjectNavItems(projectBasePath)
-        : getMainNavItems(orgSlug ?? ""),
-    [isInProject, orgSlug, projectBasePath],
+        : getMainNavItems(orgSlug ?? "", mainProjectItems),
+    [isInProject, orgSlug, projectBasePath, mainProjectItems],
   );
 
   const navLabel = isInProject ? "Project" : "Navigation";
+  const isSidebarCollapsed = sidebarState === "collapsed";
 
   const handleLogout = async () => {
     await authClient.signOut({
@@ -124,10 +147,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const user = session?.user
     ? {
-        name: session.user.name,
-        email: session.user.email,
-        avatar: session.user.image ?? undefined,
-      }
+      name: session.user.name,
+      email: session.user.email,
+      avatar: session.user.image ?? undefined,
+    }
     : null;
 
   const handleEnvironmentChange = (environmentSlug: string) => {
@@ -149,7 +172,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
         {isInProject ? <ProjectSwitcher /> : <OrganizationSwitcher />}
-        {isInProject && (
+        {isInProject && !isSidebarCollapsed && (
           <div className="px-2 pt-2 space-y-2">
             <Select
               value={currentEnvironmentSlug ?? "__none__"}
@@ -172,6 +195,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               className="w-full"
               size="sm"
               onClick={handleCreateMyDevEnvironment}
+              aria-label="Create my dev environment"
             >
               Create my dev environment
             </Button>

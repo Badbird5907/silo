@@ -5,6 +5,7 @@ import type {
   UploadFileInput,
 } from "@silo-storage/sdk-core";
 import ms from "ms";
+import type { StringValue } from "ms";
 
 import { buildInternalCallbackMetadata } from "./envelope";
 
@@ -315,7 +316,7 @@ function normalizeFileExpiry(
       };
     }
 
-    const ttlMs = ms(fileExpiry.ttl);
+    const ttlMs = ms(fileExpiry.ttl as StringValue);
     if (typeof ttlMs !== "number" || ttlMs <= 0) {
       throw new Error(
         `Invalid fileExpiry.ttl value "${fileExpiry.ttl}". Example: "1 day" or "7d"`,

@@ -105,6 +105,9 @@ function getFileIcon(mimeType: string | null) {
       ) {
         return FileCode;
       }
+      // if (mimeType.includes("pdf")) {
+      //   return FilePdf;
+      // }
       return File;
     default:
       return File;

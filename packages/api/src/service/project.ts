@@ -2,10 +2,49 @@ import type { Db } from "@silo-storage/db/client";
 
 import { eq } from "@silo-storage/db";
 import { projectEnvironments, projects } from "@silo-storage/db/schema";
+import {
+  sanitizeForSlug,
+  validateProjectSlug,
+} from "@silo-storage/shared/slug";
 
 const DEFAULT_ENVIRONMENTS = [
   { name: "Production", slug: "production", type: "production" as const },
 ];
+
+export type ProjectSlugAvailability =
+  | { available: true }
+  | { available: false; reason: "invalid" | "reserved" | "taken" };
+
+export async function checkProjectSlugAvailability(
+  db: Db,
+  rawSlug: string,
+): Promise<ProjectSlugAvailability> {
+  const slug = sanitizeForSlug(rawSlug);
+
+  if (slug !== rawSlug) {
+    return { available: false, reason: "invalid" };
+  }
+
+  const validation = validateProjectSlug(slug);
+  if (!validation.valid) {
+    if (validation.error?.includes("reserved")) {
+      return { available: false, reason: "reserved" };
+    }
+
+    return { available: false, reason: "invalid" };
+  }
+
+  const existingProject = await db.query.projects.findFirst({
+    where: eq(projects.slug, slug),
+    columns: { id: true },
+  });
+
+  if (existingProject) {
+    return { available: false, reason: "taken" };
+  }
+
+  return { available: true };
+}
 
 export async function listProjects(db: Db, organizationId: string) {
   return db.query.projects.findMany({
@@ -22,32 +61,13 @@ export async function getProjectById(db: Db, projectId: string) {
 
 export async function createProject(
   db: Db,
-  input: { name: string; organizationId: string },
+  input: { name: string; slug: string; organizationId: string },
 ) {
-  const baseSlug = input.name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-
-  const existingProjects = await db.query.projects.findMany({
-    where: eq(projects.parentOrganizationId, input.organizationId),
-    columns: { slug: true },
-  });
-
-  const existingSlugs = new Set(existingProjects.map((p) => p.slug));
-  let slug = baseSlug;
-  let counter = 1;
-
-  while (existingSlugs.has(slug)) {
-    slug = `${baseSlug}-${counter}`;
-    counter++;
-  }
-
   const [newProject] = await db
     .insert(projects)
     .values({
       name: input.name,
-      slug,
+      slug: input.slug,
       parentOrganizationId: input.organizationId,
     })
     .returning();

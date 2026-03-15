@@ -4,6 +4,7 @@ import * as React from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Check, Copy, Key, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useDebouncedCallback } from "use-debounce";
 
 import { Button } from "@silo-storage/ui/components/button";
 import {
@@ -74,6 +75,14 @@ export function CreateApiKeyDialog({
     }),
   );
 
+  const debouncedCreateKey = useDebouncedCallback(
+    (input: Parameters<typeof createMutation.mutate>[0]) => {
+      createMutation.mutate(input);
+    },
+    300,
+    { leading: true, trailing: false },
+  );
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !environmentId) return;
@@ -101,7 +110,7 @@ export function CreateApiKeyDialog({
       }
     }
 
-    createMutation.mutate({
+    debouncedCreateKey({
       projectId,
       organizationId,
       name: name.trim(),
@@ -136,6 +145,7 @@ export function CreateApiKeyDialog({
   };
 
   const handleClose = () => {
+    debouncedCreateKey.cancel();
     setOpen(false);
     // Reset form after dialog closes
     setTimeout(() => {
@@ -154,7 +164,9 @@ export function CreateApiKeyDialog({
 
   const environments = environmentsQuery.data ?? [];
   const hasEnvironments = environments.length > 0;
-  const selectedEnvironment = environments.find((env) => env.id === environmentId);
+  const selectedEnvironment = environments.find(
+    (env) => env.id === environmentId,
+  );
 
   React.useEffect(() => {
     if (!open || !hasEnvironments || environmentId) return;
@@ -194,7 +206,8 @@ export function CreateApiKeyDialog({
               <div className="space-y-4">
                 {selectedEnvironment ? (
                   <p className="text-muted-foreground text-xs">
-                    This key is scoped to <strong>{selectedEnvironment.name}</strong>.
+                    This key is scoped to{" "}
+                    <strong>{selectedEnvironment.name}</strong>.
                   </p>
                 ) : null}
                 <div className="space-y-2">
@@ -247,7 +260,7 @@ export function CreateApiKeyDialog({
                   <Label>Environment Snippet</Label>
                   {createdSiloToken ? (
                     <>
-                      <pre className="bg-muted rounded-md border px-3 py-2 font-mono text-xs whitespace-pre-wrap break-all">
+                      <pre className="bg-muted rounded-md border px-3 py-2 font-mono text-xs break-all whitespace-pre-wrap">
                         {`SILO_URL=${typeof window === "undefined" ? "" : window.location.origin}\nSILO_TOKEN=${createdSiloToken}`}
                       </pre>
                       <Button
@@ -270,8 +283,8 @@ export function CreateApiKeyDialog({
                     </>
                   ) : (
                     <p className="text-muted-foreground text-xs">
-                      SILO_TOKEN could not be generated. Delete this key and create
-                      a new key scoped to an environment.
+                      SILO_TOKEN could not be generated. Delete this key and
+                      create a new key scoped to an environment.
                     </p>
                   )}
                 </div>
@@ -328,8 +341,8 @@ export function CreateApiKeyDialog({
                   </SelectContent>
                 </Select>
                 <p className="text-muted-foreground text-xs">
-                  SDK upload tokens are environment-specific. Use one key per deploy
-                  target (dev/staging/prod).
+                  SDK upload tokens are environment-specific. Use one key per
+                  deploy target (dev/staging/prod).
                 </p>
                 {!hasEnvironments ? (
                   <p className="text-xs text-amber-600">
@@ -366,7 +379,9 @@ export function CreateApiKeyDialog({
               </Button>
               <Button
                 type="submit"
-                disabled={createMutation.isPending || !name.trim() || !environmentId}
+                disabled={
+                  createMutation.isPending || !name.trim() || !environmentId
+                }
               >
                 {createMutation.isPending && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

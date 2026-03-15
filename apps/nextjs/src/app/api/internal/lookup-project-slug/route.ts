@@ -23,8 +23,6 @@ export async function POST(request: Request) {
         headers: { "Content-Type": "application/json" },
       });
     }
-    console.log("Looking up project by slug:", slug);
-
     const project = await db.query.projects.findFirst({
       where: eq(projects.slug, slug),
       columns: {
@@ -32,7 +30,6 @@ export async function POST(request: Request) {
         defaultFileAccess: true,
       },
     });
-    console.log(" ->", project);
 
     if (!project) {
       return new Response(JSON.stringify({ error: "Project not found" }), {

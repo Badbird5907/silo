@@ -4,16 +4,19 @@ import * as React from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { FolderKanban, Plus, ArrowRight } from "lucide-react";
+import { ArrowRight, FolderKanban, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@silo-storage/ui/components/button";
 import {
   Card,
+  CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@silo-storage/ui/components/card";
+import { Input } from "@silo-storage/ui/components/input";
 import { Skeleton } from "@silo-storage/ui/components/skeleton";
 
 import { CreateProjectDialog } from "@/components/create-project-dialog";
@@ -22,6 +25,7 @@ import { useTRPC } from "@/trpc/react";
 
 export default function ProjectsPage() {
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState("");
   const trpc = useTRPC();
   const params = useParams<{ orgSlug: string }>();
   const orgSlug = params.orgSlug;
@@ -47,89 +51,156 @@ export default function ProjectsPage() {
     }),
   );
 
-  const handleCreateProject = async (data: { name: string }) => {
+  const handleCreateProject = async (data: { name: string; slug: string }) => {
     await createProjectMutation.mutateAsync({ ...data, organizationId });
   };
+
+  const projects = projectsQuery.data;
+  const totalProjects = projects?.length ?? 0;
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const filteredProjects = React.useMemo(
+    () => {
+      if (!projects) return [];
+      return projects.filter((project) => {
+        if (!normalizedSearch) return true;
+        return (
+          project.name.toLowerCase().includes(normalizedSearch) ||
+          project.slug.toLowerCase().includes(normalizedSearch)
+        );
+      });
+    },
+    [projects, normalizedSearch],
+  );
 
   return (
     <>
       <div className="flex flex-1 flex-col gap-6 p-6">
-        {projectsQuery.isLoading ? (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Card key={i} className="overflow-hidden">
-                <CardHeader className="pb-4">
-                  <Skeleton className="h-8 w-3/4 mb-2" />
-                  <Skeleton className="h-4 w-1/2" />
-                </CardHeader>
-                <div className="px-6 pb-4">
-                  <Skeleton className="h-12 w-full" />
-                </div>
-              </Card>
-            ))}
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Manage projects for{" "}
+              <span className="text-foreground font-medium">
+                {organization?.name ?? "your organization"}
+              </span>
+            </p>
           </div>
-        ) : projectsQuery.data?.length === 0 ? (
+          <Button onClick={() => setCreateDialogOpen(true)}>
+            <Plus className="mr-2 size-4" />
+            New project
+          </Button>
+        </div>
+
+        {projectsQuery.isLoading ? (
+          <div className="space-y-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <Skeleton className="h-6 w-32" />
+                <Skeleton className="h-4 w-64" />
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
+              </CardContent>
+            </Card>
+            <div className="grid gap-4 md:grid-cols-2">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <Card key={i}>
+                  <CardContent className="space-y-2 pt-6">
+                    <Skeleton className="h-4 w-28" />
+                    <Skeleton className="h-8 w-14" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        ) : totalProjects === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-6 py-20">
-            <div className="bg-gradient-to-br from-primary/10 to-primary/5 flex size-20 items-center justify-center rounded-2xl">
+            <div className="from-primary/10 to-primary/5 flex size-20 items-center justify-center rounded-2xl bg-linear-to-br">
               <FolderKanban className="text-primary size-10" />
             </div>
-            <div className="text-center max-w-sm">
-              <h3 className="text-2xl font-bold mb-2">No projects yet</h3>
-              <p className="text-muted-foreground text-base mb-6">
-                Create your first project to start managing your S3 storage and files
+            <div className="max-w-sm text-center">
+              <h3 className="mb-2 text-2xl font-bold">No projects yet</h3>
+              <p className="text-muted-foreground mb-6 text-base">
+                Create your first project to start managing your S3 storage and
+                files.
               </p>
             </div>
             <Button size="lg" onClick={() => setCreateDialogOpen(true)}>
               <Plus className="mr-2 size-5" />
-              Create Your First Project
+              Create your first project
             </Button>
           </div>
         ) : (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {projectsQuery.data?.map((project) => (
-              <Link key={project.id} href={`/${orgSlug}/p/${project.id}`}>
-                <Card className="group overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-lg hover:border-primary/50 h-full flex flex-col">
-                  <CardHeader className="pb-4 flex-1">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="bg-gradient-to-br from-primary/20 to-primary/10 group-hover:from-primary/30 group-hover:to-primary/20 flex size-12 items-center justify-center rounded-xl transition-colors">
-                        <FolderKanban className="text-primary size-6" />
-                      </div>
-                      <ArrowRight className="text-muted-foreground group-hover:text-primary size-5 transition-colors opacity-0 group-hover:opacity-100" />
-                    </div>
-                    <CardTitle className="text-lg group-hover:text-primary transition-colors">
-                      {project.name}
-                    </CardTitle>
-                    <CardDescription className="text-sm">
-                      {project.slug}
-                    </CardDescription>
-                  </CardHeader>
-                  <div className="px-6 pb-4 pt-2 border-t">
-                    <div className="text-xs text-muted-foreground">
-                      Click to view project
-                    </div>
-                  </div>
-                </Card>
-              </Link>
-            ))}
+          <div className="space-y-4">
+            <Card className="gap-0 py-0">
+              <CardHeader className="border-b py-5">
+                <CardTitle>Project list</CardTitle>
+                <CardDescription>
+                  Open a project to view files, analytics, and settings.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="border-b py-4">
+                <Input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search by project name or slug..."
+                  startContent={<Search className="size-4" />}
+                />
+              </CardContent>
 
-            {/* Create new project card */}
-            <Card
-              className="group overflow-hidden cursor-pointer border-dashed transition-all duration-300 hover:border-primary/50 hover:shadow-lg h-full flex flex-col items-center justify-center min-h-[200px]"
-              onClick={() => setCreateDialogOpen(true)}
-            >
-              <div className="flex flex-col items-center gap-3 text-center">
-                <div className="bg-muted group-hover:bg-primary/10 flex size-12 items-center justify-center rounded-xl transition-colors">
-                  <Plus className="text-muted-foreground group-hover:text-primary size-6 transition-colors" />
-                </div>
-                <div>
-                  <p className="font-semibold group-hover:text-primary transition-colors">
-                    New Project
+              {filteredProjects.length === 0 ? (
+                <CardContent className="py-10 text-center">
+                  <p className="text-sm font-medium">No matching projects</p>
+                  <p className="text-muted-foreground mt-1 text-sm">
+                    Try a different search term or clear the filter.
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    Create a new project
-                  </p>
+                  <Button
+                    variant="ghost"
+                    className="mt-4"
+                    onClick={() => setSearchQuery("")}
+                  >
+                    Clear search
+                  </Button>
+                </CardContent>
+              ) : (
+                <div className="divide-y">
+                  {filteredProjects.map((project) => (
+                    <Link
+                      key={project.id}
+                      href={`/${orgSlug}/p/${project.id}`}
+                      className="hover:bg-muted/50 group flex items-center justify-between px-6 py-4 transition-colors"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-3">
+                          <div className="bg-primary/10 text-primary flex size-8 items-center justify-center rounded-md">
+                            <FolderKanban className="size-4" />
+                          </div>
+                          <p className="truncate text-sm font-semibold">
+                            {project.name}
+                          </p>
+                          {/* <Badge variant="outline" className="max-w-full">
+                            <span className="truncate">{project.slug}</span>
+                          </Badge> */}
+                          <p className="text-muted-foreground text-xs">
+                            {project.slug}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-muted-foreground group-hover:text-foreground flex items-center gap-1 text-sm">
+                        Open
+                        <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+                      </div>
+                    </Link>
+                  ))}
                 </div>
-              </div>
+              )}
+              <CardFooter className="text-muted-foreground py-4 text-xs">
+                {filteredProjects.length} of {totalProjects} project
+                {totalProjects === 1 ? "" : "s"} shown
+              </CardFooter>
             </Card>
           </div>
         )}
@@ -138,6 +209,7 @@ export default function ProjectsPage() {
       <CreateProjectDialog
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
+        organizationId={organizationId}
         onSubmit={handleCreateProject}
         isLoading={createProjectMutation.isPending}
       />

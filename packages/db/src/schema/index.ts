@@ -32,7 +32,7 @@ export const projects = pgTable("projects", {
     .primaryKey()
     .$defaultFn(() => nanoid()),
   name: text("name").notNull(),
-  slug: text("slug").notNull(), // unique across org, but not globally
+  slug: text("slug").notNull().unique(),
   defaultFileAccess: fileAccessTypes("default_file_access")
     .notNull()
     .default("private"),
