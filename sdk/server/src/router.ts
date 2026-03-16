@@ -18,8 +18,8 @@ export interface SiloRouteFileConstraint {
 export type SiloRouteConfig = Record<string, SiloRouteFileConstraint>;
 
 export interface SiloRouteOptions {
-  isPublic?: SiloRouteOptionResolver<boolean>;
-  fileExpiry?: SiloRouteOptionResolver<SiloRouteExpiryInput>;
+  isPublic?: SiloRouteOptionResolver<SiloRoutePublicInput>;
+  fileExpiry?: SiloRouteOptionResolver<SiloRouteExpiryInput | undefined>;
 }
 
 export type SiloFileExpiryInput =
@@ -31,6 +31,7 @@ export type SiloFileExpiryInput =
     };
 
 export type SiloRouteExpiryInput = SiloFileExpiryInput | string | Date | null;
+export type SiloRoutePublicInput = boolean | null | undefined;
 
 type CoreFileExpiryInput =
   | {
@@ -53,9 +54,10 @@ type SiloRouteOptionResolver<
   TContext = Record<string, never>,
 > =
   | TValue
+  | undefined
   | ((
       data: SiloRouteOptionResolverArgs<TMiddlewareData, TContext>,
-    ) => Promise<TValue> | TValue);
+    ) => Promise<TValue | undefined> | TValue | undefined);
 
 export interface SiloRouteMiddlewareArgs<
   TRequest,
@@ -170,7 +172,11 @@ interface SiloRouteBuilder<
     TInput
   >;
   public: (
-    isPublic: SiloRouteOptionResolver<boolean, TMiddlewareData, TContext>,
+    isPublic: SiloRouteOptionResolver<
+      SiloRoutePublicInput,
+      TMiddlewareData,
+      TContext
+    >,
   ) => SiloRouteBuilder<
     TRequest,
     TContext,
@@ -180,7 +186,7 @@ interface SiloRouteBuilder<
   >;
   expires: (
     fileExpiry: SiloRouteOptionResolver<
-      SiloRouteExpiryInput,
+      SiloRouteExpiryInput | undefined,
       TMiddlewareData,
       TContext
     >,
