@@ -30,7 +30,7 @@ export type SiloFileExpiryInput =
       expiresAt: string | Date | null;
     };
 
-export type SiloRouteExpiryInput = SiloFileExpiryInput | StringValue | Date;
+export type SiloRouteExpiryInput = SiloFileExpiryInput | string | Date | null;
 
 type CoreFileExpiryInput =
   | {
@@ -396,6 +396,12 @@ function normalizeFileExpiry(
 function normalizeRouteExpiryInput(
   fileExpiry: SiloRouteExpiryInput,
 ): CoreFileExpiryInput {
+  if (fileExpiry === null) {
+    return {
+      expiresAt: null,
+    };
+  }
+
   if (typeof fileExpiry === "string" || fileExpiry instanceof Date) {
     if (fileExpiry instanceof Date) {
       return {
@@ -522,7 +528,7 @@ export async function registerRouteUpload<
 
   const resolvedFileExpiry = input.fileExpiry
     ? normalizeFileExpiry(input.fileExpiry)
-    : routeFileExpiry
+    : routeFileExpiry !== undefined
       ? normalizeRouteExpiryInput(routeFileExpiry)
       : undefined;
 

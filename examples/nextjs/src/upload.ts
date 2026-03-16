@@ -15,6 +15,16 @@ export type UploadCompleteResult = {
   mimeType: string;
 };
 
+const checkAuth = async (userId: string) => {
+  if (!userId) {
+    throw new Error("Unauthorized");
+  }
+  return { userId, paid: true };
+}
+const dbCall = async (userId: string) => {
+  return true;
+}
+
 export const fileRouter = {
   imageUploader: f({
     image: {
@@ -26,13 +36,28 @@ export const fileRouter = {
       if (!context?.userId) {
         throw new Error("Unauthorized");
       }
-
+      const { paid } = await checkAuth(context.userId);
       return {
         userId: context.userId,
+        paid, // idk, if your user paid for something
       };
     })
-    .public(true)
-    .expires("2 minutes")
+    .public(true) // either this, or pass in a function
+    .public(({ paid }) => { // return type from middleware
+      return paid;
+    })
+    .expires("2 minutes") // either this, or pass in a function
+    .expires(async ({ paid, userId }) => { // async works too
+      if (paid) {
+        const someDbCall = await dbCall(userId);
+        if (someDbCall) {
+          const date = new Date("2026-04-20T00:00:00.000Z");
+          return date; // you can also do this
+        }
+        return null
+      }
+      return "2 minutes";
+    })
     .onUploadComplete(async ({ metadata, file }) => {
       console.info("[onUploadComplete]", { metadata, file });
       return {
