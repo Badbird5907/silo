@@ -35,7 +35,7 @@ const uploadCompletedEventSchema = uploadEventEnvelopeSchema.extend({
 
 export interface HandleUploadCallbackInput<
   TRouter extends FileRouter<unknown, TContext>,
-  TContext = undefined,
+  TContext = Record<string, never>,
 > {
   router: TRouter;
   request:
@@ -51,7 +51,7 @@ export interface HandleUploadCallbackInput<
 
 export type HandleUploadCallbackResult<
   TRouter extends FileRouter<unknown, TContext>,
-  TContext = undefined,
+  TContext = Record<string, never>,
 > =
   | {
       status: "ignored";
@@ -70,10 +70,12 @@ export type HandleUploadCallbackResult<
 
 export async function handleUploadCallback<
   TRouter extends FileRouter<unknown, TContext>,
-  TContext = undefined,
+  TContext = Record<string, never>,
 >(
   input: HandleUploadCallbackInput<TRouter, TContext>,
 ): Promise<HandleUploadCallbackResult<TRouter, TContext>> {
+  const resolvedContext = (input.context ?? {}) as TContext;
+
   const envelope = await verifyAndParseUploadCallback({
     request: input.request,
     signingSecret: input.signingSecret,
@@ -109,7 +111,7 @@ export async function handleUploadCallback<
 
   const onUploadCompleteResult = await route.onUploadComplete({
     metadata: internalEnvelope.middlewareData,
-    context: input.context,
+    context: resolvedContext,
     file: completedEvent.data.data,
     event: completedEvent.data,
   });

@@ -21,9 +21,6 @@ export const fileRouter = {
       maxFileSize: "8MB",
       maxFileCount: 4,
     },
-  }, {
-    isPublic: true,
-    fileExpiry: { ttl: "2 minutes" }
   })
     .middleware(async ({ context }) => {
       if (!context?.userId) {
@@ -34,6 +31,8 @@ export const fileRouter = {
         userId: context.userId,
       };
     })
+    .public(true)
+    .expires("2 minutes")
     .onUploadComplete(async ({ metadata, file }) => {
       console.info("[onUploadComplete]", { metadata, file });
       return {

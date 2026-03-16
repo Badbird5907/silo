@@ -18,8 +18,8 @@ export interface SiloRouteFileConstraint {
 export type SiloRouteConfig = Record<string, SiloRouteFileConstraint>;
 
 export interface SiloRouteOptions {
-  isPublic?: boolean;
-  fileExpiry?: SiloFileExpiryInput;
+  isPublic?: SiloRouteOptionResolver<boolean>;
+  fileExpiry?: SiloRouteOptionResolver<SiloRouteExpiryInput>;
 }
 
 export type SiloFileExpiryInput =
@@ -30,6 +30,8 @@ export type SiloFileExpiryInput =
       expiresAt: string | Date | null;
     };
 
+export type SiloRouteExpiryInput = SiloFileExpiryInput | StringValue | Date;
+
 type CoreFileExpiryInput =
   | {
       ttlSeconds: number;
@@ -38,14 +40,31 @@ type CoreFileExpiryInput =
       expiresAt: string | Date | null;
     };
 
+type SiloRouteOptionResolverArgs<
+  TMiddlewareData extends Record<string, unknown>,
+  TContext,
+> = TMiddlewareData & {
+  context: TContext;
+};
+
+type SiloRouteOptionResolver<
+  TValue,
+  TMiddlewareData extends Record<string, unknown> = Record<string, unknown>,
+  TContext = Record<string, never>,
+> =
+  | TValue
+  | ((
+      data: SiloRouteOptionResolverArgs<TMiddlewareData, TContext>,
+    ) => Promise<TValue> | TValue);
+
 export interface SiloRouteMiddlewareArgs<
   TRequest,
   TRouteConfig extends SiloRouteConfig,
-  TContext = undefined,
+  TContext = Record<string, never>,
   TInput = unknown,
 > {
   req: TRequest;
-  context?: TContext;
+  context: TContext;
   input?: TInput;
   files: UploadFileInput[];
   routeConfig: TRouteConfig;
@@ -54,10 +73,10 @@ export interface SiloRouteMiddlewareArgs<
 
 export interface SiloOnUploadCompleteArgs<
   TMiddlewareData,
-  TContext = undefined,
+  TContext = Record<string, never>,
 > {
   metadata: TMiddlewareData;
-  context?: TContext;
+  context: TContext;
   file: {
     environmentId: string;
     projectId: string;
@@ -94,7 +113,7 @@ export type MiddlewareFn<
   TRequest,
   TRouteConfig extends SiloRouteConfig,
   TMiddlewareData extends Record<string, unknown>,
-  TContext = undefined,
+  TContext = Record<string, never>,
   TInput = unknown,
 > = (
   args: SiloRouteMiddlewareArgs<TRequest, TRouteConfig, TContext, TInput>,
@@ -103,7 +122,7 @@ export type MiddlewareFn<
 export type OnUploadCompleteFn<
   TMiddlewareData extends Record<string, unknown>,
   TOutput,
-  TContext = undefined,
+  TContext = Record<string, never>,
 > = (
   args: SiloOnUploadCompleteArgs<TMiddlewareData, TContext>,
 ) => Promise<TOutput> | TOutput;
@@ -150,6 +169,28 @@ interface SiloRouteBuilder<
     TNextMiddlewareData,
     TInput
   >;
+  public: (
+    isPublic: SiloRouteOptionResolver<boolean, TMiddlewareData, TContext>,
+  ) => SiloRouteBuilder<
+    TRequest,
+    TContext,
+    TRouteConfig,
+    TMiddlewareData,
+    TInput
+  >;
+  expires: (
+    fileExpiry: SiloRouteOptionResolver<
+      SiloRouteExpiryInput,
+      TMiddlewareData,
+      TContext
+    >,
+  ) => SiloRouteBuilder<
+    TRequest,
+    TContext,
+    TRouteConfig,
+    TMiddlewareData,
+    TInput
+  >;
   onUploadComplete: <TOutput>(
     onUploadComplete: OnUploadCompleteFn<TMiddlewareData, TOutput, TContext>,
   ) => SiloFileRoute<
@@ -162,7 +203,7 @@ interface SiloRouteBuilder<
   >;
 }
 
-export type FileRouter<TRequest = unknown, TContext = undefined> = Record<
+export type FileRouter<TRequest = unknown, TContext = Record<string, never>> = Record<
   string,
   SiloFileRoute<
     TRequest,
@@ -250,6 +291,15 @@ function createRouteBuilder<
     TInput
   >,
 ): SiloRouteBuilder<TRequest, TContext, TRouteConfig, TMiddlewareData, TInput> {
+  const withRouteOptions = (
+    nextRouteOptions: SiloRouteOptions,
+  ): SiloRouteBuilder<TRequest, TContext, TRouteConfig, TMiddlewareData, TInput> =>
+    createRouteBuilder<TRequest, TContext, TRouteConfig, TMiddlewareData, TInput>(
+      routeConfig,
+      nextRouteOptions,
+      middleware,
+    );
+
   return {
     middleware: <TNextMiddlewareData extends Record<string, unknown>>(
       nextMiddleware: MiddlewareFn<
@@ -267,6 +317,16 @@ function createRouteBuilder<
         TNextMiddlewareData,
         TInput
       >(routeConfig, routeOptions, nextMiddleware),
+    public: (isPublic) =>
+      withRouteOptions({
+        ...routeOptions,
+        isPublic: isPublic as SiloRouteOptions["isPublic"],
+      }),
+    expires: (fileExpiry) =>
+      withRouteOptions({
+        ...routeOptions,
+        fileExpiry: fileExpiry as SiloRouteOptions["fileExpiry"],
+      }),
     onUploadComplete: <TOutput>(
       onUploadComplete: OnUploadCompleteFn<TMiddlewareData, TOutput, TContext>,
     ) => ({
@@ -280,7 +340,7 @@ function createRouteBuilder<
 
 export function createSiloUpload<
   TRequest = Request,
-  TContext = undefined,
+  TContext = Record<string, never>,
   TInput = unknown,
 >() {
   return <TRouteConfig extends SiloRouteConfig>(
@@ -333,11 +393,39 @@ function normalizeFileExpiry(
   };
 }
 
+function normalizeRouteExpiryInput(
+  fileExpiry: SiloRouteExpiryInput,
+): CoreFileExpiryInput {
+  if (typeof fileExpiry === "string" || fileExpiry instanceof Date) {
+    if (fileExpiry instanceof Date) {
+      return {
+        expiresAt: fileExpiry,
+      };
+    }
+    return normalizeFileExpiry({ ttl: fileExpiry });
+  }
+
+  return normalizeFileExpiry(fileExpiry);
+}
+
+function resolveRouteOption<TValue>(
+  option: SiloRouteOptionResolver<TValue> | undefined,
+  data: SiloRouteOptionResolverArgs<Record<string, unknown>, unknown>,
+): Promise<TValue | undefined> {
+  if (typeof option === "function") {
+    const resolver = option as (
+      data: Record<string, unknown>,
+    ) => TValue | Promise<TValue>;
+    return Promise.resolve(resolver(data));
+  }
+  return Promise.resolve(option);
+}
+
 export interface RegisterRouteUploadInput<
   TRouter extends FileRouter<TRequest, TContext>,
   TRouteSlug extends keyof TRouter & string,
   TRequest,
-  TContext = undefined,
+  TContext = Record<string, never>,
 > {
   core: UploadCore;
   router: TRouter;
@@ -367,7 +455,7 @@ export async function registerRouteUpload<
   TRouter extends FileRouter<TRequest, TContext>,
   TRouteSlug extends keyof TRouter & string,
   TRequest,
-  TContext = undefined,
+  TContext = Record<string, never>,
 >(
   input: RegisterRouteUploadInput<TRouter, TRouteSlug, TRequest, TContext>,
 ): Promise<
@@ -378,17 +466,21 @@ export async function registerRouteUpload<
     throw new Error(`Unknown route slug "${input.routeSlug}"`);
   }
 
+  const resolvedContext = (input.context ?? {}) as TContext;
+
+  const routeIsPublic = route.routeOptions?.isPublic;
   const files = input.files.map((file) => ({
     ...file,
-    // Route-level setting is authoritative; client payload cannot override it.
-    isPublic: route.routeOptions?.isPublic,
+    // Route-level boolean setting is authoritative; client payload cannot override it.
+    // Function-based settings are resolved after middleware.
+    isPublic: typeof routeIsPublic === "boolean" ? routeIsPublic : undefined,
   }));
 
   const middlewareData = route.middleware
     ? toRecord(
         await route.middleware({
           req: input.req,
-          context: input.context,
+          context: resolvedContext,
           input: input.input,
           files,
           routeConfig: route.routeConfig,
@@ -403,10 +495,35 @@ export async function registerRouteUpload<
     middlewareData,
   });
 
+  const routeOptionData: SiloRouteOptionResolverArgs<
+    Record<string, unknown>,
+    TContext
+  > = {
+    ...middlewareData,
+    context: resolvedContext,
+  };
+
+  const resolvedIsPublic = await resolveRouteOption(
+    route.routeOptions?.isPublic,
+    routeOptionData,
+  );
+
+  if (typeof resolvedIsPublic === "boolean") {
+    for (const file of files) {
+      // Route-level setting is authoritative; client payload cannot override it.
+      file.isPublic = resolvedIsPublic;
+    }
+  }
+
+  const routeFileExpiry = await resolveRouteOption(
+    route.routeOptions?.fileExpiry,
+    routeOptionData,
+  );
+
   const resolvedFileExpiry = input.fileExpiry
     ? normalizeFileExpiry(input.fileExpiry)
-    : route.routeOptions?.fileExpiry
-      ? normalizeFileExpiry(route.routeOptions.fileExpiry)
+    : routeFileExpiry
+      ? normalizeRouteExpiryInput(routeFileExpiry)
       : undefined;
 
   const registerUploadBatchWithExpiry = input.core.registerUploadBatch as (
@@ -438,7 +555,7 @@ export interface PrepareRouteUploadInput<
   TRouter extends FileRouter<TRequest, TContext>,
   TRouteSlug extends keyof TRouter & string,
   TRequest,
-  TContext = undefined,
+  TContext = Record<string, never>,
 > extends Omit<
   RegisterRouteUploadInput<TRouter, TRouteSlug, TRequest, TContext>,
   "files"
@@ -459,7 +576,7 @@ export async function prepareRouteUpload<
   TRouter extends FileRouter<TRequest, TContext>,
   TRouteSlug extends keyof TRouter & string,
   TRequest,
-  TContext = undefined,
+  TContext = Record<string, never>,
 >(
   input: PrepareRouteUploadInput<TRouter, TRouteSlug, TRequest, TContext>,
 ): Promise<PrepareRouteUploadResult<InferMiddlewareData<TRouter[TRouteSlug]>>> {
