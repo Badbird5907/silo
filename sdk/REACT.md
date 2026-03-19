@@ -51,7 +51,7 @@ callbackMetadata: {
     version: 1;
     routeSlug: string;
     middlewareData: Record<string, unknown>;
-  };
+  }
 }
 ```
 
@@ -66,10 +66,15 @@ Reserved behavior:
 Factory-first usage:
 
 ```ts
-const { useUpload, UploadButton, UploadDropzone, SiloRouterConfigProvider } =
-  createSiloReact<AppFileRouter>({
-    endpoint: "/api/upload",
-  });
+const {
+  useUpload,
+  useStagedUpload,
+  UploadButton,
+  UploadDropzone,
+  SiloRouterConfigProvider,
+} = createSiloReact<AppFileRouter>({
+  endpoint: "/api/upload",
+});
 ```
 
 Hook usage:
@@ -82,17 +87,29 @@ const upload = useUpload({
   onComplete(completions) {}, // typed route output
   onError(error) {},
   onUploadAborted() {},
+  onFileDialogCancel() {},
 });
 
 await upload.uploadFiles(files, { input: { albumId: "abc" } });
 // or:
 await upload.uploadFile(file, { input: { albumId: "abc" } });
+// or:
+await upload.beginUpload({ multiple: true, input: { albumId: "abc" } });
+
+const staged = useStagedUpload({ endpoint: "imageUploader" });
+await staged.openFilePicker();
+await staged.upload();
 ```
 
 `useUpload` returns:
 
-- actions: `uploadFiles`, `uploadFile`, `abort`, `reset`
+- actions: `uploadFiles`, `uploadFile`, `beginUpload`, `abort`, `reset`
 - state: `isUploading`, `isIdle`, `progress`, `error`, `result`
+
+`useStagedUpload` returns:
+
+- actions: `openFilePicker`, `removeFile`, `clearFiles`, `upload`, `abort`, `reset`
+- state: `files`, `isUploading`, `uploadProgress`, `error`, `result`
 
 Type behavior:
 

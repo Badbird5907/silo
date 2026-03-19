@@ -132,9 +132,9 @@ export interface CreateRouteHandlerOptions<
   completionTtlMs?: number;
 }
 
-export function extractRouterConfig<
-  TRouter extends FileRouter<unknown, unknown>,
->(router: TRouter): RouterConfig<TRouter> {
+export function extractRouterConfig<TRouter extends Record<string, unknown>>(
+  router: TRouter,
+): RouterConfig<TRouter> {
   return extractRouterConfigFromServer(router);
 }
 
@@ -147,9 +147,7 @@ export function createRouteHandler<
   function GET() {
     gcCompletions(completionTtlMs);
     return json({
-      routerConfig: extractRouterConfig(
-        options.router as unknown as FileRouter<unknown, unknown>,
-      ),
+      routerConfig: extractRouterConfig(options.router),
     });
   }
 
@@ -160,8 +158,12 @@ export function createRouteHandler<
       : undefined;
 
     if (isCallbackRequest(request)) {
-      const callbackResult = await handleUploadCallback({
-        router: options.router as unknown as FileRouter<unknown, TContext>,
+      const callbackResult = await handleUploadCallback<
+        Request,
+        Awaited<TContext>,
+        TRouter
+      >({
+        router: options.router,
         request,
         signingSecret: options.signingSecret,
         context,

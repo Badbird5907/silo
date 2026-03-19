@@ -3,6 +3,11 @@ import { z } from "zod";
 import { eq } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import { apiKeys, projectEnvironments } from "@silo-storage/db/schema";
+import { normalizeFileRouterInputKey } from "@silo-storage/mime-types";
+import {
+  parseAcceptedMimeTypePatterns,
+  serializeAcceptedMimeTypePatterns,
+} from "@silo-storage/shared/signing";
 
 import { env } from "@/env";
 
@@ -29,6 +34,7 @@ const schema = z.object({
     keyId: z.string(),
     hash: z.string().optional(),
     mimeType: z.string().optional(),
+    acceptedMimeTypes: z.string().optional(),
     expiresAt: z.string().optional(),
     isPublic: z.string().optional(),
   }),
@@ -118,6 +124,30 @@ export async function POST(request: Request) {
     }
 
     const { keyId, signature, payload } = parsed.data;
+
+    let acceptedMimeTypes: string[] | undefined;
+    try {
+      const parsedAcceptedMimeTypes = parseAcceptedMimeTypePatterns(
+        payload.acceptedMimeTypes,
+      );
+      acceptedMimeTypes = parsedAcceptedMimeTypes?.map((value) =>
+        normalizeFileRouterInputKey(value),
+      );
+    } catch (error) {
+      return new Response(
+        JSON.stringify({
+          error:
+            error instanceof Error
+              ? error.message
+              : "Invalid acceptedMimeTypes",
+          valid: false,
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
 
     const apiKey = await db.query.apiKeys.findFirst({
       where: eq(apiKeys.keyPrefix, keyId),
@@ -279,6 +309,10 @@ export async function POST(request: Request) {
     };
     if (payload.hash) payloadForSigning.hash = payload.hash;
     if (payload.mimeType) payloadForSigning.mimeType = payload.mimeType;
+    if (acceptedMimeTypes) {
+      payloadForSigning.acceptedMimeTypes =
+        serializeAcceptedMimeTypePatterns(acceptedMimeTypes) ?? "";
+    }
     if (payload.expiresAt) payloadForSigning.expiresAt = payload.expiresAt;
     if (payload.isPublic) payloadForSigning.isPublic = payload.isPublic;
 
@@ -335,6 +369,7 @@ export async function POST(request: Request) {
         size: parsedSize,
         claimedHash: payload.hash ?? null,
         claimedMimeType: payload.mimeType ?? null,
+        acceptedMimeTypes: acceptedMimeTypes ?? null,
         isPublic: payload.isPublic === "true",
       }),
       {

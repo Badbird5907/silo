@@ -1,7 +1,11 @@
 import type { Bindings } from "../types/bindings";
 import type { TusUploadMetadata } from "../types/tus";
+import {
+  areMimeTypesEquivalent,
+  detectMimeType,
+  isAllowedMimeType,
+} from "../lib/file-types";
 import { readHeaderBytes } from "../lib/hash";
-import { areMimeTypesEquivalent, detectMimeType } from "../lib/mime";
 import { sendUploadCallback } from "../services/callback";
 import {
   abortMultipartUpload,
@@ -27,7 +31,7 @@ const METADATA_KEY = "upload:metadata";
 const DEFAULT_MAX_PATCH_SIZE = 256 * 1024 * 1024;
 
 function getMaxPatchSizeBytes(env: Bindings): number {
-  const raw = env.TUS_MAX_PATCH_SIZE?.trim();
+  const raw = env.TUS_MAX_PATCH_SIZE.trim();
   if (!raw) {
     return DEFAULT_MAX_PATCH_SIZE;
   }
@@ -484,11 +488,32 @@ export class TusStateDO {
     if (
       metadata.claimedMimeType &&
       actualMimeType !== "application/octet-stream" &&
-      !areMimeTypesEquivalent(metadata.claimedMimeType, actualMimeType)
+      !areMimeTypesEquivalent(
+        metadata.claimedMimeType,
+        actualMimeType,
+        metadata.fileName,
+      )
     ) {
       await this.env.R2_BUCKET.delete(metadata.adapterKey);
       await this.deleteMetadata();
       throw Errors.mimeTypeMismatch(metadata.claimedMimeType, actualMimeType);
+    }
+
+    if (
+      metadata.acceptedMimeTypes &&
+      metadata.acceptedMimeTypes.length > 0 &&
+      !isAllowedMimeType(
+        actualMimeType,
+        metadata.acceptedMimeTypes,
+        metadata.fileName,
+      )
+    ) {
+      await this.env.R2_BUCKET.delete(metadata.adapterKey);
+      await this.deleteMetadata();
+      throw Errors.mimeTypeNotAllowed(
+        actualMimeType,
+        metadata.acceptedMimeTypes,
+      );
     }
 
     metadata.callbackDeliveredAt = metadata.callbackDeliveredAt ?? null;

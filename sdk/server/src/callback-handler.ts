@@ -1,11 +1,12 @@
-import { verifyAndParseUploadCallback } from "@silo-storage/sdk-core";
 import { z } from "zod";
 
+import { verifyAndParseUploadCallback } from "@silo-storage/sdk-core";
+
+import type { FileRouter } from "./router";
 import {
   getUserVisibleCallbackMetadata,
   readInternalCallbackEnvelope,
 } from "./envelope";
-import type { FileRouter } from "./router";
 
 const uploadEventEnvelopeSchema = z.object({
   id: z.string(),
@@ -34,8 +35,12 @@ const uploadCompletedEventSchema = uploadEventEnvelopeSchema.extend({
 });
 
 export interface HandleUploadCallbackInput<
-  TRouter extends FileRouter<unknown, TContext>,
+  TRequest = unknown,
   TContext = Record<string, never>,
+  TRouter extends FileRouter<TRequest, TContext> = FileRouter<
+    TRequest,
+    TContext
+  >,
 > {
   router: TRouter;
   request:
@@ -50,8 +55,12 @@ export interface HandleUploadCallbackInput<
 }
 
 export type HandleUploadCallbackResult<
-  TRouter extends FileRouter<unknown, TContext>,
+  TRequest = unknown,
   TContext = Record<string, never>,
+  TRouter extends FileRouter<TRequest, TContext> = FileRouter<
+    TRequest,
+    TContext
+  >,
 > =
   | {
       status: "ignored";
@@ -69,11 +78,15 @@ export type HandleUploadCallbackResult<
     };
 
 export async function handleUploadCallback<
-  TRouter extends FileRouter<unknown, TContext>,
+  TRequest = unknown,
   TContext = Record<string, never>,
+  TRouter extends FileRouter<TRequest, TContext> = FileRouter<
+    TRequest,
+    TContext
+  >,
 >(
-  input: HandleUploadCallbackInput<TRouter, TContext>,
-): Promise<HandleUploadCallbackResult<TRouter, TContext>> {
+  input: HandleUploadCallbackInput<TRequest, TContext, TRouter>,
+): Promise<HandleUploadCallbackResult<TRequest, TContext, TRouter>> {
   const resolvedContext = (input.context ?? {}) as TContext;
 
   const envelope = await verifyAndParseUploadCallback({
@@ -85,7 +98,9 @@ export async function handleUploadCallback<
   const internalEnvelope = readInternalCallbackEnvelope(envelope.metadata);
   const parsedEvent = uploadEventEnvelopeSchema.safeParse(envelope.data);
   if (!parsedEvent.success) {
-    throw new Error(`Invalid upload callback event payload: ${parsedEvent.error.message}`);
+    throw new Error(
+      `Invalid upload callback event payload: ${parsedEvent.error.message}`,
+    );
   }
 
   if (parsedEvent.data.type !== "upload.completed") {

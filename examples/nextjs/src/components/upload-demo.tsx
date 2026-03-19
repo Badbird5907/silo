@@ -17,10 +17,12 @@ type UploadedItem = {
 export function UploadDemo() {
   const [uploaded, setUploaded] = React.useState<UploadedItem[]>([]);
   const [lastError, setLastError] = React.useState<string | null>(null);
-  const [loadingDownloadFor, setLoadingDownloadFor] = React.useState<string | null>(null);
+  const [loadingDownloadFor, setLoadingDownloadFor] = React.useState<
+    string | null
+  >(null);
 
   const upload = useUpload({
-    endpoint: "imageUploader",
+    endpoint: "imageOrVideoUploader",
     onComplete: (completions) => {
       setLastError(null);
       setUploaded(
@@ -64,10 +66,12 @@ export function UploadDemo() {
       // }
 
       // window.open(data.url, "_blank", "noopener,noreferrer");
-      const url = `http://silo-test.lvh.me:8787/f/${item.accessKey}`
+      const url = `http://silo-test.lvh.me:8787/f/${item.accessKey}`;
       window.open(url, "_blank", "noopener,noreferrer");
     } catch (error) {
-      setLastError(error instanceof Error ? error.message : "Failed to download file");
+      setLastError(
+        error instanceof Error ? error.message : "Failed to download file",
+      );
     } finally {
       setLoadingDownloadFor(null);
     }
@@ -75,33 +79,29 @@ export function UploadDemo() {
 
   return (
     <div className="space-y-4">
-      <label
+      <button
+        type="button"
         className="inline-flex cursor-pointer items-center rounded-md border px-3 py-2 text-sm"
-        htmlFor="upload-input"
+        disabled={upload.isUploading}
+        onClick={() => {
+          void upload.beginUpload({
+            multiple: true,
+            accept: "image/*",
+          });
+        }}
       >
         {upload.isUploading ? "Uploading..." : "Choose image(s)"}
-      </label>
-      <input
-        id="upload-input"
-        type="file"
-        accept="image/*"
-        multiple
-        className="hidden"
-        onChange={(event) => {
-          const files = Array.from(event.target.files ?? []);
-          if (files.length === 0) return;
-          void upload.uploadFiles(files);
-          event.currentTarget.value = "";
-        }}
-      />
+      </button>
 
       {upload.isUploading ? (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           Upload progress: {Math.round(upload.progress.aggregatePercent)}%
         </p>
       ) : null}
 
-      {lastError ? <p className="text-sm text-red-500">Error: {lastError}</p> : null}
+      {lastError ? (
+        <p className="text-sm text-red-500">Error: {lastError}</p>
+      ) : null}
 
       {uploaded.length > 0 ? (
         <ul className="space-y-3 text-sm">
@@ -113,7 +113,7 @@ export function UploadDemo() {
               <p className="text-muted-foreground">
                 {item.mimeType} - uploaded by {item.uploadedBy}
               </p>
-              <p className="text-xs text-muted-foreground">{item.fileKeyId}</p>
+              <p className="text-muted-foreground text-xs">{item.fileKeyId}</p>
               <button
                 type="button"
                 className="mt-2 inline-flex cursor-pointer items-center rounded-md border px-3 py-1.5 text-xs"
@@ -122,7 +122,9 @@ export function UploadDemo() {
                   void handleDownload(item);
                 }}
               >
-                {loadingDownloadFor === item.fileKeyId ? "Preparing..." : "Download"}
+                {loadingDownloadFor === item.fileKeyId
+                  ? "Preparing..."
+                  : "Download"}
               </button>
             </li>
           ))}

@@ -13,6 +13,7 @@ export interface TusUploadMetadata {
   isPublic: boolean;
   claimedHash?: string;
   claimedMimeType?: string;
+  acceptedMimeTypes?: string[];
   claimedSize?: number;
   createdAt: string;
   expiresAt: string;

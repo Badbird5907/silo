@@ -24,6 +24,7 @@
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
+    "@silo-storage/mime-types": "workspace:*",
     "@silo-storage/shared": "workspace:*",
     "nanoid": "^5.1.6",
     "zod": "catalog:"

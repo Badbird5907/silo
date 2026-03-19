@@ -1,7 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { createSiloCoreFromToken, parseSiloToken } from "@silo-storage/sdk-core";
 import { createRouteHandler } from "@silo-storage/sdk-next";
-import type { FileRouter } from "@silo-storage/sdk-server";
 
 import { fileRouter } from "@/upload";
 
@@ -22,7 +21,7 @@ const core = createSiloCoreFromToken({
 });
 
 export const { GET, POST } = createRouteHandler({
-  router: fileRouter as unknown as FileRouter<Request, { userId: string | null }>,
+  router: fileRouter,
   core,
   signingSecret: parsedToken.signingSecret,
   resolveContext: async () => {

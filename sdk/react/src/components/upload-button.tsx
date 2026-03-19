@@ -34,6 +34,7 @@ export function UploadButton<
     onComplete,
     onError,
     onUploadAborted,
+    onFileDialogCancel,
     disabled,
     multiple,
     input,
@@ -48,8 +49,11 @@ export function UploadButton<
     onComplete,
     onError,
     onUploadAborted,
+    onFileDialogCancel,
   });
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const isDisabled = disabled === true || upload.isUploading;
+  const handleClick = () => inputRef.current?.click();
 
   return (
     <>
@@ -58,6 +62,7 @@ export function UploadButton<
         hidden
         type="file"
         multiple={multiple}
+        accept={upload.accept}
         onChange={(event) => {
           const selected = Array.from(event.target.files ?? []);
           if (selected.length === 0) return;
@@ -69,13 +74,31 @@ export function UploadButton<
           event.currentTarget.value = "";
         }}
       />
-      <button
-        type="button"
-        disabled={disabled === true || upload.isUploading}
-        onClick={() => inputRef.current?.click()}
-      >
-        {children ?? "Upload"}
-      </button>
+      {React.isValidElement(children) ? (
+        React.cloneElement(
+          children as React.ReactElement<{
+            disabled?: boolean;
+            onClick?: React.MouseEventHandler;
+          }>,
+          {
+            disabled:
+              isDisabled ||
+              (children.props as { disabled?: boolean }).disabled === true,
+            onClick: (event: React.MouseEvent) => {
+              (
+                children.props as { onClick?: React.MouseEventHandler }
+              ).onClick?.(event);
+              if (!event.defaultPrevented) {
+                handleClick();
+              }
+            },
+          },
+        )
+      ) : (
+        <button type="button" disabled={isDisabled} onClick={handleClick}>
+          {children ?? "Upload"}
+        </button>
+      )}
     </>
   );
 }

@@ -31,11 +31,12 @@ export type AnyFileRouterLike = Record<
   string,
   {
     routeConfig: unknown;
-    onUploadComplete: (args: unknown) => unknown;
+    onUploadComplete(args: unknown): unknown;
   }
 >;
 
-export type RouteSlug<TRouter extends AnyFileRouterLike> = keyof TRouter & string;
+export type RouteSlug<TRouter extends AnyFileRouterLike> = keyof TRouter &
+  string;
 
 export type RouteOutputBySlug<
   TRouter extends AnyFileRouterLike,
@@ -67,26 +68,18 @@ export interface UseUploadResult<
   };
   error: SiloUploadError | null;
   result: UploadCompletion<TRouter, TEndpoint>[] | null;
+  accept?: string;
   uploadFiles: (
     files: File[],
-    options?: {
-      input?: unknown;
-      requestMetadata?: Record<string, unknown>;
-      expiresIn?: number;
-      protocol?: "http" | "https";
-      awaitTimeoutMs?: number;
-    },
+    options?: UploadRequestOptions,
   ) => Promise<UploadCompletion<TRouter, TEndpoint>[]>;
   uploadFile: (
     file: File,
-    options?: {
-      input?: unknown;
-      requestMetadata?: Record<string, unknown>;
-      expiresIn?: number;
-      protocol?: "http" | "https";
-      awaitTimeoutMs?: number;
-    },
+    options?: UploadRequestOptions,
   ) => Promise<UploadCompletion<TRouter, TEndpoint>>;
+  beginUpload: (
+    options?: OpenFilePickerOptions & UploadRequestOptions,
+  ) => Promise<UploadCompletion<TRouter, TEndpoint>[]>;
   abort: () => void;
   reset: () => void;
 }
@@ -101,6 +94,51 @@ export interface UseUploadOptions<
   onComplete?: (result: UploadCompletion<TRouter, TEndpoint>[]) => void;
   onError?: (error: SiloUploadError) => void;
   onUploadAborted?: () => void;
+  onFileDialogCancel?: () => void;
+}
+
+export interface OpenFilePickerOptions {
+  multiple?: boolean;
+  accept?: string;
+}
+
+export interface UploadRequestOptions {
+  input?: unknown;
+  requestMetadata?: Record<string, unknown>;
+  expiresIn?: number;
+  protocol?: "http" | "https";
+  awaitTimeoutMs?: number;
+}
+
+export interface UseStagedUploadOptions<
+  TRouter extends AnyFileRouterLike,
+  TEndpoint extends RouteSlug<TRouter>,
+>
+  extends
+    UseUploadOptions<TRouter, TEndpoint>,
+    UploadRequestOptions,
+    OpenFilePickerOptions {
+  clearOnUploadComplete?: boolean;
+}
+
+export interface UseStagedUploadResult<
+  TRouter extends AnyFileRouterLike,
+  TEndpoint extends RouteSlug<TRouter>,
+> {
+  files: File[];
+  isUploading: boolean;
+  uploadProgress: number;
+  error: SiloUploadError | null;
+  result: UploadCompletion<TRouter, TEndpoint>[] | null;
+  accept?: string;
+  openFilePicker: (options?: OpenFilePickerOptions) => Promise<File[]>;
+  removeFile: (fileOrIndex: File | number) => void;
+  clearFiles: () => void;
+  upload: (
+    options?: UploadRequestOptions,
+  ) => Promise<UploadCompletion<TRouter, TEndpoint>[]>;
+  abort: () => void;
+  reset: () => void;
 }
 
 export type RouterConfigLike = Record<string, unknown>;

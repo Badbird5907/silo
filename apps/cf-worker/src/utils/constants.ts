@@ -59,6 +59,7 @@ export const ERROR_CODES = {
   PROJECT_NOT_FOUND: "project_not_found",
   HASH_MISMATCH: "hash_mismatch",
   MIME_TYPE_MISMATCH: "mime_type_mismatch",
+  MIME_TYPE_NOT_ALLOWED: "mime_type_not_allowed",
   SIZE_MISMATCH: "size_mismatch",
   UPLOAD_TOO_LARGE: "upload_too_large",
 } as const;

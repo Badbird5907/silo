@@ -5,13 +5,19 @@ React SDK for Silo.
 ## Quick start
 
 ```ts
-import { createSiloReact } from "@silo-storage/sdk-react";
 import type { AppFileRouter } from "@/app/api/upload/core";
 
-export const { useUpload, UploadButton, UploadDropzone, SiloRouterConfigProvider } =
-  createSiloReact<AppFileRouter>({
-    endpoint: "/api/upload",
-  });
+import { createSiloReact } from "@silo-storage/sdk-react";
+
+export const {
+  useUpload,
+  useStagedUpload,
+  UploadButton,
+  UploadDropzone,
+  SiloRouterConfigProvider,
+} = createSiloReact<AppFileRouter>({
+  endpoint: "/api/upload",
+});
 ```
 
 `useUpload` supports:
@@ -21,6 +27,7 @@ export const { useUpload, UploadButton, UploadDropzone, SiloRouterConfigProvider
 - `onComplete` (typed from route `onUploadComplete` output)
 - `onError`
 - `onUploadAborted`
+- `onFileDialogCancel`
 
 Bulk and single uploads:
 
@@ -29,7 +36,32 @@ const upload = useUpload({ endpoint: "imageUploader" });
 await upload.uploadFiles(files, { input: { albumId: "abc" } });
 // or
 await upload.uploadFile(file, { input: { albumId: "abc" } });
+// or open a file picker and auto-upload selected files
+await upload.beginUpload({ multiple: true, input: { albumId: "abc" } });
 ```
+
+Staged upload (chat/messaging-style UI):
+
+```ts
+const staged = useStagedUpload({
+  endpoint: "imageUploader",
+  onUploadProgress: (event) => {
+    console.log(event.aggregatePercent);
+  },
+});
+
+await staged.openFilePicker();
+await staged.upload();
+```
+
+`useStagedUpload` returns:
+
+- `files`
+- `openFilePicker`
+- `removeFile` / `clearFiles`
+- `upload`
+- `isUploading`
+- `uploadProgress`
 
 Headless components:
 

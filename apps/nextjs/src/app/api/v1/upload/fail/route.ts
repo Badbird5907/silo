@@ -101,8 +101,8 @@ export async function POST(request: Request) {
     return new Response(
       JSON.stringify({
         success: true,
-        fileKeyId: updated?.id,
-        accessKey: updated?.accessKey,
+        fileKeyId: updated.id,
+        accessKey: updated.accessKey,
         status: "failed",
       }),
       {

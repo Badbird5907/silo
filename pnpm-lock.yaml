@@ -107,6 +107,9 @@ importers:
 
   apps/cf-worker:
     dependencies:
+      '@silo-storage/mime-types':
+        specifier: workspace:*
+        version: link:../../packages/mime-types
       '@silo-storage/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -159,6 +162,9 @@ importers:
       '@silo-storage/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@silo-storage/mime-types':
+        specifier: workspace:*
+        version: link:../../packages/mime-types
       '@silo-storage/redis':
         specifier: workspace:*
         version: link:../../packages/redis
@@ -434,6 +440,27 @@ importers:
         specifier: 'catalog:'
         version: 5.9.3
 
+  packages/mime-types:
+    devDependencies:
+      '@silo-storage/eslint-config':
+        specifier: workspace:*
+        version: link:../../tooling/eslint
+      '@silo-storage/prettier-config':
+        specifier: workspace:*
+        version: link:../../tooling/prettier
+      '@silo-storage/tsconfig':
+        specifier: workspace:*
+        version: link:../../tooling/typescript
+      eslint:
+        specifier: 'catalog:'
+        version: 9.39.2(jiti@2.6.1)
+      prettier:
+        specifier: 'catalog:'
+        version: 3.8.1
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+
   packages/redis:
     dependencies:
       '@t3-oss/env-core':
@@ -672,6 +699,9 @@ importers:
 
   sdk/core:
     dependencies:
+      '@silo-storage/mime-types':
+        specifier: workspace:*
+        version: link:../../packages/mime-types
       '@silo-storage/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -706,6 +736,9 @@ importers:
 
   sdk/next:
     dependencies:
+      '@silo-storage/mime-types':
+        specifier: workspace:*
+        version: link:../../packages/mime-types
       '@silo-storage/sdk-core':
         specifier: workspace:*
         version: link:../core
@@ -743,6 +776,9 @@ importers:
 
   sdk/react:
     dependencies:
+      '@silo-storage/mime-types':
+        specifier: workspace:*
+        version: link:../../packages/mime-types
       tus-js-client:
         specifier: ^4.3.1
         version: 4.3.1
@@ -777,6 +813,9 @@ importers:
 
   sdk/server:
     dependencies:
+      '@silo-storage/mime-types':
+        specifier: workspace:*
+        version: link:../../packages/mime-types
       '@silo-storage/sdk-core':
         specifier: workspace:*
         version: link:../core

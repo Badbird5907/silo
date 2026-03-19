@@ -34,6 +34,7 @@ export function UploadDropzone<
     onComplete,
     onError,
     onUploadAborted,
+    onFileDialogCancel,
     disabled,
     input,
     requestMetadata,
@@ -48,6 +49,7 @@ export function UploadDropzone<
     onComplete,
     onError,
     onUploadAborted,
+    onFileDialogCancel,
   });
   const [isDragging, setIsDragging] = React.useState(false);
 

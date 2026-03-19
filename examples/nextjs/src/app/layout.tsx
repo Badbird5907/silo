@@ -10,8 +10,11 @@ import {
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
+import { SiloRouterConfigProvider } from "@/lib/upload";
+import { fileRouter } from "@/upload";
+import { extractRouterConfig } from "@silo-storage/sdk-server";
 
-const inter = Inter({subsets:['latin'],variable:'--font-sans'});
+const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -53,7 +56,9 @@ export default function RootLayout({
                 <UserButton />
               </Show>
             </header>
-            {children}
+            <SiloRouterConfigProvider routerConfig={extractRouterConfig(fileRouter)}>
+              {children}
+            </SiloRouterConfigProvider>
           </ClerkProvider>
         </ThemeProvider>
       </body>

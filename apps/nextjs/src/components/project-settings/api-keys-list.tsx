@@ -169,14 +169,14 @@ export function ApiKeysList({ projectId, organizationId }: ApiKeysListProps) {
                     <TableCell>
                       <Badge
                         variant={
-                          apiKey.environment?.type === "production"
+                          apiKey.environment.type === "production"
                             ? "default"
-                            : apiKey.environment?.type === "staging"
+                            : apiKey.environment.type === "staging"
                               ? "secondary"
                               : "outline"
                         }
                       >
-                        {apiKey.environment?.name ?? "Unknown"}
+                        {apiKey.environment.name}
                       </Badge>
                     </TableCell>
                     <TableCell>

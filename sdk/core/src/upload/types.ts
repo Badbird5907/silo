@@ -18,6 +18,7 @@ export interface UploadFileInput {
   fileKeyId?: string;
   hash?: string;
   mimeType?: string;
+  acceptedMimeTypes?: string[]; // shorthand keys (image, video, ...) or exact MIME values
   isPublic?: boolean;
   metadata?: Record<string, unknown>;
 }
@@ -125,6 +126,7 @@ export interface PreparedUploadFile {
   size: number;
   hash?: string;
   mimeType?: string;
+  acceptedMimeTypes?: string[];
   isPublic?: boolean;
   metadata?: Record<string, unknown>;
   expiresAt: string;

@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import { z } from "zod";
+import type { z } from "zod";
 
 import type { UpdateFileExpiryInput, UpdateFileExpiryResult } from "./expiry";
 import type { CreateSiloCoreFromTokenInput } from "./token";
@@ -138,6 +138,7 @@ export function createSiloCore(config: UploadCoreConfig) {
         size: file.size,
         hash: file.hash,
         mimeType: file.mimeType,
+        acceptedMimeTypes: file.acceptedMimeTypes,
         isPublic: file.isPublic,
         metadata: file.metadata,
         expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
@@ -154,6 +155,7 @@ export function createSiloCore(config: UploadCoreConfig) {
         mimeType: file.mimeType,
         hash: file.hash,
         isPublic: file.isPublic,
+        acceptedMimeTypes: file.acceptedMimeTypes,
         metadata: file.metadata,
       })),
       metadata: input.requestMetadata,
@@ -208,6 +210,7 @@ export function createSiloCore(config: UploadCoreConfig) {
             size: file.size,
             hash: file.hash,
             mimeType: file.mimeType,
+            acceptedMimeTypes: file.acceptedMimeTypes,
             isPublic: file.isPublic,
             keyId: resolvedKeyId,
             expiresIn,

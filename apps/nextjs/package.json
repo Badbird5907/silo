@@ -17,6 +17,7 @@
     "@silo-storage/api": "workspace:*",
     "@silo-storage/auth": "workspace:*",
     "@silo-storage/db": "workspace:*",
+    "@silo-storage/mime-types": "workspace:*",
     "@silo-storage/redis": "workspace:*",
     "@silo-storage/shared": "workspace:*",
     "@silo-storage/types": "workspace:*",

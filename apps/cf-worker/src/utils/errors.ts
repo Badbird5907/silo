@@ -145,6 +145,14 @@ export const Errors = {
       { claimed, actual },
     ),
 
+  mimeTypeNotAllowed: (actual: string, allowed: string[]) =>
+    new TusError(
+      "MIME_TYPE_NOT_ALLOWED",
+      HTTP_STATUS.BAD_REQUEST,
+      "File MIME type is not allowed for this upload",
+      { actual, allowed },
+    ),
+
   sizeMismatch: (claimed: number, actual: number) =>
     new TusError(
       "SIZE_MISMATCH",

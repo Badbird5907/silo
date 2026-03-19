@@ -107,6 +107,7 @@ export interface SignatureVerificationRequest {
     keyId: string;
     hash?: string;
     mimeType?: string;
+    acceptedMimeTypes?: string;
     expiresAt?: string;
     isPublic?: string;
   };
@@ -122,6 +123,7 @@ export interface SignatureVerificationResponse {
   size?: number;
   claimedHash?: string | null;
   claimedMimeType?: string | null;
+  acceptedMimeTypes?: string[] | null;
   isPublic?: boolean;
   error?: string;
 }

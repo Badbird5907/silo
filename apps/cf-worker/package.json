@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@silo-storage/mime-types": "workspace:*",
     "@silo-storage/shared": "workspace:*",
     "file-type": "^21.3.0",
     "hono": "^4.7.4",

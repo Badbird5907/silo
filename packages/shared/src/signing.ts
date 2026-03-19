@@ -15,7 +15,6 @@
  * 3. The server has the keyHash stored, so it can derive the same signingSecret
  */
 
-
 export interface SignedUploadUrlParams {
   environmentId: string;
   fileKeyId: string; // client-generated, unique per environment
@@ -28,6 +27,7 @@ export interface SignedUploadUrlParams {
   keyId: string; // API key prefix (sk-silo-xxxx) to identify which key to look up
   isPublic?: boolean; // optional - whether file should be publicly accessible
   protocol?: "http" | "https"; // optional - defaults to https
+  acceptedMimeTypes?: string[]; // optional - shorthand keys or exact MIME values
 }
 
 export interface SignedDownloadUrlParams {
@@ -48,6 +48,7 @@ export interface ParsedSignedUploadUrl {
   mimeType?: string;
   expiresAt?: number;
   keyId: string;
+  acceptedMimeTypes?: string[];
   signature: string;
 }
 
@@ -61,6 +62,55 @@ export interface ParsedSignedDownloadUrl {
 }
 
 export type ParsedSignedUrl = ParsedSignedUploadUrl | ParsedSignedDownloadUrl;
+
+const ACCEPTED_MIME_VALUE_REGEX =
+  /^[a-z0-9!#$&^_.+-]+(?:\/[a-z0-9!#$&^_.+-]+)?$/;
+
+export function normalizeAcceptedMimeTypePattern(pattern: string): string {
+  const normalized = pattern.trim().toLowerCase();
+  if (!ACCEPTED_MIME_VALUE_REGEX.test(normalized)) {
+    throw new Error(
+      `Invalid accepted MIME type value "${pattern}". Expected shorthand keys (e.g. "image") or MIME types (e.g. "application/pdf").`,
+    );
+  }
+  return normalized;
+}
+
+export function normalizeAcceptedMimeTypePatterns(
+  patterns: string[],
+): string[] {
+  if (patterns.length === 0) {
+    throw new Error("acceptedMimeTypes cannot be an empty array");
+  }
+
+  const normalized = patterns.map(normalizeAcceptedMimeTypePattern);
+  return [...new Set(normalized)].sort();
+}
+
+export function serializeAcceptedMimeTypePatterns(
+  patterns: string[] | undefined,
+): string | undefined {
+  if (!patterns) return undefined;
+  const normalized = normalizeAcceptedMimeTypePatterns(patterns);
+  return normalized.join(",");
+}
+
+export function parseAcceptedMimeTypePatterns(
+  value: string | undefined | null,
+): string[] | undefined {
+  if (!value) return undefined;
+
+  const parts = value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (parts.length === 0) {
+    throw new Error("acceptedMimeTypes cannot be empty");
+  }
+
+  return normalizeAcceptedMimeTypePatterns(parts);
+}
 
 /**
  * Derive a signing secret from an API key and master signing secret.
@@ -165,6 +215,12 @@ export async function generateSignedUploadUrl(
   if (params.isPublic !== undefined) {
     payload.isPublic = params.isPublic.toString();
   }
+  const acceptedMimeTypes = serializeAcceptedMimeTypePatterns(
+    params.acceptedMimeTypes,
+  );
+  if (acceptedMimeTypes) {
+    payload.acceptedMimeTypes = acceptedMimeTypes;
+  }
 
   const signature = await createSignature(payload, signingSecret);
 
@@ -216,6 +272,12 @@ export async function generateSignedUploadUrlWithSecret(
   }
   if (params.isPublic !== undefined) {
     payload.isPublic = params.isPublic.toString();
+  }
+  const acceptedMimeTypes = serializeAcceptedMimeTypePatterns(
+    params.acceptedMimeTypes,
+  );
+  if (acceptedMimeTypes) {
+    payload.acceptedMimeTypes = acceptedMimeTypes;
   }
 
   const signature = await createSignature(payload, signingSecret);
@@ -359,6 +421,10 @@ export async function verifySignedUploadUrl(
   const hash = urlObj.searchParams.get("hash");
   const mimeType = urlObj.searchParams.get("mimeType");
   const expiresAtStr = urlObj.searchParams.get("expiresAt");
+  const acceptedMimeTypesParam = urlObj.searchParams.get("acceptedMimeTypes");
+  const acceptedMimeTypes = parseAcceptedMimeTypePatterns(
+    acceptedMimeTypesParam,
+  );
 
   if (!fileName || !sizeStr || !keyId || !accessKey) {
     throw new Error(
@@ -395,6 +461,9 @@ export async function verifySignedUploadUrl(
   if (hash) payload.hash = hash;
   if (mimeType) payload.mimeType = mimeType;
   if (expiresAtStr) payload.expiresAt = expiresAtStr;
+  if (acceptedMimeTypes) {
+    payload.acceptedMimeTypes = acceptedMimeTypes.join(",");
+  }
 
   const expectedSignature = await createSignature(payload, apiKeySecret);
   if (!timingSafeEqual(signature, expectedSignature)) {
@@ -412,6 +481,7 @@ export async function verifySignedUploadUrl(
     mimeType: mimeType ?? undefined,
     expiresAt,
     keyId,
+    acceptedMimeTypes,
     signature,
   };
 }

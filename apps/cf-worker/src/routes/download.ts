@@ -90,7 +90,7 @@ export async function handleDownload(
   const fileKey = await getCachedFileKey(accessKey, projectId, c.env);
 
   if (fileKey.expiresAt) {
-    const expiryDate = new Date(fileKey.expiresAt as string);
+    const expiryDate = new Date(fileKey.expiresAt);
     if (
       !Number.isNaN(expiryDate.getTime()) &&
       expiryDate.getTime() <= Date.now()

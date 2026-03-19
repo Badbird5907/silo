@@ -1,20 +1,17 @@
 import * as React from "react";
 
-import { UploadButton as UploadButtonImpl } from "./components/upload-button";
-import { UploadDropzone as UploadDropzoneImpl } from "./components/upload-dropzone";
-import type {
-  UploadButtonProps,
-} from "./components/upload-button";
-import type {
-  UploadDropzoneProps,
-} from "./components/upload-dropzone";
-import { useUploadInternal } from "./use-upload";
+import type { UploadButtonProps } from "./components/upload-button";
+import type { UploadDropzoneProps } from "./components/upload-dropzone";
 import type {
   AnyFileRouterLike,
-  RouteSlug,
   RouterConfigLike,
+  RouteSlug,
+  UseStagedUploadOptions,
   UseUploadOptions,
 } from "./types";
+import { UploadButton as UploadButtonImpl } from "./components/upload-button";
+import { UploadDropzone as UploadDropzoneImpl } from "./components/upload-dropzone";
+import { useStagedUploadInternal, useUploadInternal } from "./use-upload";
 
 export type {
   AnyFileRouterLike,
@@ -23,6 +20,8 @@ export type {
   SiloProgressEvent,
   SiloUploadErrorShape,
   UploadCompletion,
+  UseStagedUploadOptions,
+  UseStagedUploadResult,
   UseUploadOptions,
   UseUploadResult,
 } from "./types";
@@ -66,10 +65,24 @@ export function createSiloReact<TRouter extends AnyFileRouterLike>(
     );
   }
 
+  function useStagedUpload<TEndpoint extends RouteSlug<TRouter>>(
+    uploadOptions: UseStagedUploadOptions<TRouter, TEndpoint>,
+  ) {
+    return useStagedUploadInternal<TRouter, TEndpoint>(
+      {
+        endpointUrl: options.endpoint,
+        fetchImpl: options.fetch ?? fetch,
+        initialRouterConfig: options.routerConfig,
+      },
+      RouterConfigContext,
+      uploadOptions,
+    );
+  }
+
   function UploadButton<TEndpoint extends RouteSlug<TRouter>>(
     props: Omit<UploadButtonProps<TRouter, TEndpoint>, "useUpload">,
   ) {
-    const component = UploadButtonImpl as unknown as React.JSXElementConstructor<
+    const component = UploadButtonImpl as React.JSXElementConstructor<
       UploadButtonProps<TRouter, TEndpoint>
     >;
     return React.createElement(component, {
@@ -81,7 +94,7 @@ export function createSiloReact<TRouter extends AnyFileRouterLike>(
   function UploadDropzone<TEndpoint extends RouteSlug<TRouter>>(
     props: Omit<UploadDropzoneProps<TRouter, TEndpoint>, "useUpload">,
   ) {
-    const component = UploadDropzoneImpl as unknown as React.JSXElementConstructor<
+    const component = UploadDropzoneImpl as React.JSXElementConstructor<
       UploadDropzoneProps<TRouter, TEndpoint>
     >;
     return React.createElement(component, {
@@ -92,6 +105,7 @@ export function createSiloReact<TRouter extends AnyFileRouterLike>(
 
   return {
     useUpload,
+    useStagedUpload,
     UploadButton,
     UploadDropzone,
     SiloRouterConfigProvider,

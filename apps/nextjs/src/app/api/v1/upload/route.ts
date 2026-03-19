@@ -22,7 +22,7 @@ const schema = z.object({
   hash: z.string().optional(),
   isPublic: z.boolean().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
-  callbackUrl: z.url().optional(),
+  callbackUrl: z.string().url().optional(),
   callbackMetadata: z.record(z.string(), z.unknown()).optional(),
   dev: z.boolean().optional(),
 });

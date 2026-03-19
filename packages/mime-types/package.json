@@ -1,0 +1,33 @@
+{
+  "name": "@silo-storage/mime-types",
+  "private": true,
+  "type": "module",
+  "autoexport": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./application": "./src/application.ts",
+    "./audio": "./src/audio.ts",
+    "./image": "./src/image.ts",
+    "./misc": "./src/misc.ts",
+    "./text": "./src/text.ts",
+    "./video": "./src/video.ts"
+  },
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc",
+    "clean": "git clean -xdf .cache .turbo dist node_modules",
+    "dev": "tsc",
+    "format": "prettier --check . --ignore-path ../../.gitignore",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit --emitDeclarationOnly false"
+  },
+  "devDependencies": {
+    "@silo-storage/eslint-config": "workspace:*",
+    "@silo-storage/prettier-config": "workspace:*",
+    "@silo-storage/tsconfig": "workspace:*",
+    "eslint": "catalog:",
+    "prettier": "catalog:",
+    "typescript": "catalog:"
+  },
+  "prettier": "@silo-storage/prettier-config"
+}

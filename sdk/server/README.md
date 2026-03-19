@@ -2,7 +2,7 @@
 
 Framework-agnostic router runtime for Silo uploads.
 
-This package, inspired by the UploadThing SDK, provides a 
+This package, inspired by the UploadThing SDK, provides a
 framework-agnostic router for defining typed file routes with middleware.
 
 ## What it provides
@@ -18,16 +18,29 @@ framework-agnostic router for defining typed file routes with middleware.
 ## Example
 
 ```ts
-import { createSiloUpload, type FileRouter } from "@silo-storage/sdk-server";
+import type { FileRouter } from "@silo-storage/sdk-server";
+
+import { createSiloUpload } from "@silo-storage/sdk-server";
 
 type Context = { userId: string };
 
 const f = createSiloUpload<Request, Context>();
 
 export const fileRouter = {
-  imageUploader: f({
-    image: { maxFileSize: "4MB", maxFileCount: 1 },
+  profilePicture: f(["image"])
+    .middleware(async ({ req, context, input }) => {
+      const userId = context?.userId ?? req.headers.get("x-user-id");
+      if (!userId) throw new Error("Unauthorized");
+      return { userId, input };
+    })
+    .onUploadComplete(async ({ metadata, file }) => {
+      return { uploadedBy: metadata.userId, fileId: file.fileId };
+    }),
+  mediaPost: f({
+    image: { maxFileSize: "2MB", maxFileCount: 4 },
+    video: { maxFileSize: "256MB", maxFileCount: 1 },
   })
+    .mimeTypes(["image", "video"])
     .middleware(async ({ req, context, input }) => {
       const userId = context?.userId ?? req.headers.get("x-user-id");
       if (!userId) throw new Error("Unauthorized");
@@ -38,3 +51,9 @@ export const fileRouter = {
     }),
 } satisfies FileRouter;
 ```
+
+`mimeTypes(...)` accepts all of these forms:
+
+- `.mimeTypes("image")`
+- `.mimeTypes(["video", "image/jpeg"])`
+- `.mimeTypes(async ({ context }) => (context ? "blob" : ["image", "application/pdf"]))`

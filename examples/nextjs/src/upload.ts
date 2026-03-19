@@ -1,4 +1,4 @@
-import { createSiloUpload } from "@silo-storage/sdk-server";
+import { createSiloUpload, FileRouter } from "@silo-storage/sdk-server";
 
 type UploadContext = {
   userId: string | null;
@@ -20,16 +20,38 @@ const checkAuth = async (userId: string) => {
     throw new Error("Unauthorized");
   }
   return { userId, paid: true };
-}
+};
 const dbCall = async (userId: string) => {
   return true;
-}
+};
 
 export const fileRouter = {
-  imageUploader: f({
+  profilePicture: f(["image"]).onUploadComplete(async ({ metadata, file }) => {
+    return {
+      uploadedBy: metadata.userId,
+      fileKeyId: file.fileKeyId,
+      accessKey: file.accessKey,
+      fileName: file.fileName,
+    };
+  }),
+  powerpointThingy: f(["application/vnd.ms-powerpoint"]).onUploadComplete(
+    async ({ metadata, file }) => {
+      return {
+        uploadedBy: metadata.userId,
+        fileKeyId: file.fileKeyId,
+        accessKey: file.accessKey,
+        fileName: file.fileName,
+      };
+    },
+  ),
+  imageOrVideoUploader: f({
     image: {
       maxFileSize: "8MB",
       maxFileCount: 4,
+    },
+    video: {
+      maxFileSize: "256MB",
+      maxFileCount: 1,
     },
   })
     .middleware(async ({ context }) => {
@@ -43,20 +65,25 @@ export const fileRouter = {
       };
     })
     .public(true) // either this, or pass in a function
-    .public(({ paid }) => { // return type from middleware
+    .public(({ paid }) => {
+      // return type from middleware
       return paid;
     })
-    .expires("2 minutes") // either this, or pass in a function
-    .expires(async ({ paid, userId }) => { // async works too
+    .expires({ ttl: "2 minutes" }) // either this, or pass in a function
+    .expires(async ({ paid, userId }) => {
+      // async works too
       if (paid) {
         const someDbCall = await dbCall(userId);
         if (someDbCall) {
           const date = new Date("2026-04-20T00:00:00.000Z");
           return date; // you can also do this
         }
-        return null
+        return null;
       }
       return "2 minutes";
+    })
+    .mimeTypes(async ({ paid }) => {
+      return paid ? ["image", "video"] : "image";
     })
     .onUploadComplete(async ({ metadata, file }) => {
       console.info("[onUploadComplete]", { metadata, file });
@@ -67,8 +94,8 @@ export const fileRouter = {
         fileName: file.fileName,
         size: file.size,
         mimeType: file.mimeType,
-      } satisfies UploadCompleteResult;
+      };
     }),
-};
+} satisfies FileRouter<Request, UploadContext>;
 
 export type AppFileRouter = typeof fileRouter;

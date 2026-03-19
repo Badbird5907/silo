@@ -2,6 +2,7 @@ import type { Context } from "hono";
 
 import type { Bindings, Variables } from "../types/bindings";
 import type { TusUploadMetadata } from "../types/tus";
+import { isAllowedMimeType } from "../lib/file-types";
 import {
   sendUploadCallback,
   verifyUploadSignature,
@@ -157,6 +158,9 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
           ...(c.req.query("mimeType") && {
             mimeType: c.req.query("mimeType") ?? undefined,
           }),
+          ...(c.req.query("acceptedMimeTypes") && {
+            acceptedMimeTypes: c.req.query("acceptedMimeTypes") ?? undefined,
+          }),
           ...(c.req.query("expiresAt") && {
             expiresAt: c.req.query("expiresAt") ?? undefined,
           }),
@@ -190,6 +194,7 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
       isPublic: verificationResult.isPublic ?? false,
       claimedHash: verificationResult.claimedHash ?? undefined,
       claimedMimeType: verificationResult.claimedMimeType ?? undefined,
+      acceptedMimeTypes: verificationResult.acceptedMimeTypes ?? undefined,
       claimedSize: verificationResult.size,
       createdAt: new Date().toISOString(),
       expiresAt: generateExpirationDate(c.env),
@@ -202,6 +207,20 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
     const uploadUrl = `${url.protocol}//${url.host}/ingest/tus/${uploadId}`;
 
     if (uploadLength === 0) {
+      const zeroByteMimeType = "application/octet-stream";
+      if (
+        verificationResult.acceptedMimeTypes &&
+        !isAllowedMimeType(
+          zeroByteMimeType,
+          verificationResult.acceptedMimeTypes,
+        )
+      ) {
+        throw Errors.mimeTypeNotAllowed(
+          zeroByteMimeType,
+          verificationResult.acceptedMimeTypes,
+        );
+      }
+
       await c.env.R2_BUCKET.put(adapterKey, new Uint8Array(0));
 
       await sendUploadCallback(
@@ -216,7 +235,7 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
             claimedHash: verificationResult.claimedHash ?? null,
             claimedMimeType: verificationResult.claimedMimeType ?? null,
             actualHash: null,
-            actualMimeType: "application/octet-stream",
+            actualMimeType: zeroByteMimeType,
             actualSize: 0,
             adapterKey,
             projectId,

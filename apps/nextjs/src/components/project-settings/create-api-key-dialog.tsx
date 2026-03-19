@@ -162,7 +162,10 @@ export function CreateApiKeyDialog({
     }, 200);
   };
 
-  const environments = environmentsQuery.data ?? [];
+  const environments = React.useMemo(
+    () => environmentsQuery.data ?? [],
+    [environmentsQuery.data],
+  );
   const hasEnvironments = environments.length > 0;
   const selectedEnvironment = environments.find(
     (env) => env.id === environmentId,

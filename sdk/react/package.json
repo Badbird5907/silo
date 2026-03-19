@@ -39,6 +39,7 @@
   },
   "prettier": "@silo-storage/prettier-config",
   "dependencies": {
+    "@silo-storage/mime-types": "workspace:*",
     "tus-js-client": "^4.3.1"
   }
 }
