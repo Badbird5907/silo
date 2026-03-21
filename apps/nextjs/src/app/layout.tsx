@@ -16,20 +16,15 @@ export const metadata: Metadata = {
       ? "https://turbo.t3.gg"
       : "http://localhost:3000",
   ),
-  title: "Turbo Kit",
+  title: "Silo",
   description:
-    "Opinionated full-stack template for quickly bootstrapping a Next.js and turborepo app with tRPC, Drizzle, Shadcn/ui, Better Auth, and more.",
+    "S3 for the modern web.",
   openGraph: {
-    title: "Turbo Kit",
+    title: "Silo",
     description:
-      "Opinionated full-stack template for quickly bootstrapping a Next.js and turborepo app with tRPC, Drizzle, Shadcn/ui, Better Auth, and more.",
-    url: "https://turbo-kit.vercel.app",
-    siteName: "Turbo Kit",
-  },
-  twitter: {
-    card: "summary_large_image",
-    site: "@jullerino",
-    creator: "@jullerino",
+      "S3 for the modern web.",
+    url: "https://silo.evanyu.dev",
+    siteName: "Silo",
   },
 };
 
