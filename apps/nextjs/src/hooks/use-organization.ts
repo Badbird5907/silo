@@ -15,12 +15,12 @@ export function useOrganization() {
   const orgSlug = params.orgSlug;
   const trpc = useTRPC();
 
-  const query = useQuery({
-    ...trpc.organization.getBySlug.queryOptions(
+  const query = useQuery(
+    trpc.organization.getBySlug.queryOptions(
       { slug: orgSlug ?? "" },
       { enabled: !!orgSlug },
     ),
-  });
+  );
 
   return {
     organization: query.data ?? null,

@@ -26,6 +26,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@silo-storage/ui/components/sidebar";
+import Link from "next/link";
 
 export interface User {
   name: string;
@@ -133,7 +134,9 @@ export function NavUser({ user, onLogout }: NavUserProps) {
             <DropdownMenuGroup>
               <DropdownMenuItem className="gap-2">
                 <Settings className="size-4" />
-                <span>Settings</span>
+                <Link href="/settings">
+                  <span>Settings</span>
+                </Link>
               </DropdownMenuItem>
               <ThemeMenuItem />
             </DropdownMenuGroup>

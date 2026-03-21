@@ -80,9 +80,9 @@ export function DangerZone({ projectId, organizationId, orgSlug }: { projectId: 
                       Cancel
                     </Button>
                   </DialogClose>
-                  <Button variant="destructive" onClick={() => deleteMutation.mutate({ id: projectId, organizationId })} disabled={!allowDelete}>
+                  <Button variant="destructive" onClick={() => deleteMutation.mutate({ id: projectId, organizationId })} disabled={!allowDelete || deleteMutation.isPending}>
                     <Trash2 className="h-4 w-4" />
-                    Delete Project
+                    {deleteMutation.isPending ? "Deleting..." : "Delete Project"}
                   </Button>
                 </DialogFooter>
               </DialogContent>

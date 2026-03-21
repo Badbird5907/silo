@@ -3,8 +3,16 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod/v4";
 
 import { and, asc, desc, eq } from "@silo-storage/db";
-import { invitations, members, organizations, users } from "@silo-storage/db/schema";
+import {
+  invitations,
+  members,
+  organizations,
+  projectEnvironments,
+  projects,
+  users,
+} from "@silo-storage/db/schema";
 
+import { deleteEnvironment } from "../service/environment";
 import {
   organizationProcedure,
   protectedProcedure,
@@ -141,4 +149,36 @@ export const organizationRouter = {
       },
     }));
   }),
+
+  /**
+   * Delete all personal development environments owned by the current user
+   * in the specified organization.
+   */
+  deprovisionMyPersonalEnvironments: organizationProcedure.mutation(
+    async ({ ctx }) => {
+      const personalEnvironments = await ctx.db
+        .select({
+          id: projectEnvironments.id,
+          projectId: projectEnvironments.projectId,
+        })
+        .from(projectEnvironments)
+        .innerJoin(projects, eq(projectEnvironments.projectId, projects.id))
+        .where(
+          and(
+            eq(projects.parentOrganizationId, ctx.organizationId),
+            eq(projectEnvironments.type, "development"),
+            eq(projectEnvironments.ownerUserId, ctx.session.user.id),
+          ),
+        );
+
+      for (const environment of personalEnvironments) {
+        if (!environment.projectId) continue;
+        await deleteEnvironment(ctx.db, environment.id, environment.projectId);
+      }
+
+      return {
+        deprovisionedCount: personalEnvironments.length,
+      };
+    },
+  ),
 } satisfies TRPCRouterRecord;
