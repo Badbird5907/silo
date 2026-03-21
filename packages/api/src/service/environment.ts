@@ -244,7 +244,12 @@ export async function rotateEnvironmentWebhookSecret(
   return { environment: updated, secret: newSecret };
 }
 
-export async function deleteEnvironment(db: Db, environmentId: string) {
+export async function deleteEnvironment(db: Db, environmentId: string, projectId: string) {
+  await scheduleEnvironmentObjectDeletion({
+    projectId,
+    environmentId,
+  });
+
   const [deleted] = await db
     .delete(projectEnvironments)
     .where(eq(projectEnvironments.id, environmentId))

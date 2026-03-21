@@ -2,7 +2,6 @@ import { z } from "zod";
 
 import {
   deleteEnvironment,
-  scheduleEnvironmentObjectDeletion,
   updateEnvironment,
 } from "@silo-storage/api/services";
 import { db } from "@silo-storage/db/client";
@@ -106,12 +105,7 @@ export async function DELETE(
   if (existing instanceof Response) return existing;
 
   try {
-    await scheduleEnvironmentObjectDeletion({
-      projectId,
-      environmentId,
-    });
-
-    const deleted = await deleteEnvironment(db, environmentId);
+    const deleted = await deleteEnvironment(db, environmentId, projectId);
     return jsonResponse(deleted);
   } catch (error) {
     console.error("Error deleting environment:", error);

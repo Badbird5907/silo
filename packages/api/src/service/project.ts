@@ -119,12 +119,3 @@ export async function updateProject(
 
   return updated;
 }
-
-export async function deleteProject(db: Db, projectId: string) {
-  const [deleted] = await db
-    .delete(projects)
-    .where(eq(projects.id, projectId))
-    .returning();
-
-  return deleted;
-}

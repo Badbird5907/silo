@@ -12,7 +12,6 @@ import {
   getEnvironmentById,
   listEnvironments,
   rotateEnvironmentWebhookSecret,
-  scheduleEnvironmentObjectDeletion,
   updateEnvironment,
   updateEnvironmentWebhookConfig,
 } from "../service/environment";
@@ -226,11 +225,6 @@ export const environmentRouter = {
         });
       }
 
-      await scheduleEnvironmentObjectDeletion({
-        projectId: environment.projectId,
-        environmentId: environment.id,
-      });
-
-      return deleteEnvironment(ctx.db, input.id);
+      return deleteEnvironment(ctx.db, input.id, environment.projectId);
     }),
 } satisfies TRPCRouterRecord;
