@@ -7,19 +7,23 @@ import { fileAccessTypes } from "@silo-storage/db/schema";
 import {
   checkProjectSlugAvailability,
   createProject,
+  deleteProject,
   getProjectById,
   listProjects,
   updateProject,
 } from "../service/project";
-import { organizationProcedure } from "../trpc";
+import { organizationProcedure, requirePermission } from "../trpc";
 
 export const projectRouter = {
-  list: organizationProcedure.query(async ({ ctx }) => {
-    return listProjects(ctx.db, ctx.organizationId);
-  }),
+  list: organizationProcedure
+    .use(requirePermission({ project: ["read"] }))
+    .query(async ({ ctx }) => {
+      return listProjects(ctx.db, ctx.organizationId);
+    }),
 
   getById: organizationProcedure
     .input(z.object({ id: z.string() }))
+    .use(requirePermission({ project: ["read"] }))
     .query(async ({ ctx, input }) => {
       const project = await getProjectById(ctx.db, input.id);
 
@@ -46,6 +50,7 @@ export const projectRouter = {
         slug: z.string().trim().min(1).max(63),
       }),
     )
+    .use(requirePermission({ project: ["read"] }))
     .query(({ ctx, input }) => {
       return checkProjectSlugAvailability(ctx.db, input.slug);
     }),
@@ -57,6 +62,7 @@ export const projectRouter = {
         slug: z.string().trim().min(1, "Slug is required").max(63),
       }),
     )
+    .use(requirePermission({ project: ["create"] }))
     .mutation(async ({ ctx, input }) => {
       const slugCheck = await checkProjectSlugAvailability(ctx.db, input.slug);
 
@@ -103,6 +109,7 @@ export const projectRouter = {
           .optional(),
       }),
     )
+    .use(requirePermission({ project: ["update"] }))
     .mutation(async ({ ctx, input }) => {
       const project = await getProjectById(ctx.db, input.id);
 
@@ -126,5 +133,25 @@ export const projectRouter = {
         defaultFileAccess: input.defaultFileAccess,
         pendingUploadFailAfterHours: input.pendingUploadFailAfterHours,
       });
+    }),
+
+  delete: organizationProcedure
+    .input(z.object({ id: z.string() }))
+    .use(requirePermission({ project: ["delete"] }))
+    .mutation(async ({ ctx, input }) => {
+      const project = await getProjectById(ctx.db, input.id);
+      if (!project) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
+      }
+      if (project.parentOrganizationId !== input.organizationId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You don't have access to this project",
+        });
+      }
+      return deleteProject(input.id);
     }),
 } satisfies TRPCRouterRecord;

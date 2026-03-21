@@ -17,7 +17,7 @@ import { z } from "zod/v4";
 import { fileKeys, files, projectEnvironments, projects } from "@silo-storage/db/schema";
 
 import { markUploadAsFailed, UploadFailureError } from "../service/fileKey";
-import { organizationProcedure } from "../trpc";
+import { organizationProcedure, requirePermission } from "../trpc";
 
 const sortFieldSchema = z.enum(["createdAt", "size", "mimeType", "fileName"]);
 const sortOrderSchema = z.enum(["asc", "desc"]);
@@ -38,6 +38,7 @@ export const fileKeyRouter = {
         sortOrder: sortOrderSchema.default("desc"),
       }),
     )
+    .use(requirePermission({ fileKey: ["read"] }))
     .query(async ({ ctx, input }) => {
       const project = await ctx.db.query.projects.findFirst({
         where: eq(projects.id, input.projectId),
@@ -186,6 +187,7 @@ export const fileKeyRouter = {
         environmentId: z.string().optional(),
       }),
     )
+    .use(requirePermission({ fileKey: ["read"] }))
     .query(async ({ ctx, input }) => {
       const project = await ctx.db.query.projects.findFirst({
         where: eq(projects.id, input.projectId),
@@ -267,6 +269,7 @@ export const fileKeyRouter = {
         environmentId: z.string().optional(),
       }),
     )
+    .use(requirePermission({ fileKey: ["read"] }))
     .query(async ({ ctx, input }) => {
       const project = await ctx.db.query.projects.findFirst({
         where: eq(projects.id, input.projectId),
@@ -341,6 +344,7 @@ export const fileKeyRouter = {
 
   getById: organizationProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
+    .use(requirePermission({ fileKey: ["read"] }))
     .query(async ({ ctx, input }) => {
       const project = await ctx.db.query.projects.findFirst({
         where: eq(projects.id, input.projectId),
@@ -382,6 +386,7 @@ export const fileKeyRouter = {
         isPublic: z.boolean(),
       }),
     )
+    .use(requirePermission({ fileKey: ["update"] }))
     .mutation(async ({ ctx, input }) => {
       const project = await ctx.db.query.projects.findFirst({
         where: eq(projects.id, input.projectId),
@@ -424,6 +429,7 @@ export const fileKeyRouter = {
         projectId: z.string(),
       }),
     )
+    .use(requirePermission({ fileKey: ["delete"] }))
     .mutation(async ({ ctx, input }) => {
       const project = await ctx.db.query.projects.findFirst({
         where: eq(projects.id, input.projectId),
@@ -463,6 +469,7 @@ export const fileKeyRouter = {
         projectId: z.string(),
       }),
     )
+    .use(requirePermission({ fileKey: ["update"] }))
     .mutation(async ({ ctx, input }) => {
       const project = await ctx.db.query.projects.findFirst({
         where: eq(projects.id, input.projectId),

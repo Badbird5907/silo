@@ -5,11 +5,12 @@ import { z } from "zod/v4";
 
 import { files, projects } from "@silo-storage/db/schema";
 
-import { organizationProcedure } from "../trpc";
+import { organizationProcedure, requirePermission } from "../trpc";
 
 export const fileRouter = {
   getById: organizationProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
+    .use(requirePermission({ fileKey: ["read"] }))
     .query(async ({ ctx, input }) => {
       const project = await ctx.db.query.projects.findFirst({
         where: eq(projects.id, input.projectId),

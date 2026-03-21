@@ -5,7 +5,11 @@ import { z } from "zod/v4";
 import { and, asc, desc, eq } from "@silo-storage/db";
 import { invitations, members, organizations, users } from "@silo-storage/db/schema";
 
-import { organizationProcedure, protectedProcedure } from "../trpc";
+import {
+  organizationProcedure,
+  protectedProcedure,
+  requirePermission,
+} from "../trpc";
 
 export const organizationRouter = {
   /**
@@ -61,50 +65,49 @@ export const organizationRouter = {
    * Get pending invitations for the specified organization
    * Only returns invitations if user is admin/owner
    */
-  getPendingInvitations: organizationProcedure.query(async ({ ctx }) => {
-    // Check user's role
-    if (!["admin", "owner"].includes(ctx.membership.role)) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "Only admins and owners can view invitations",
-      });
-    }
+  getPendingInvitations: organizationProcedure
+    .use(
+      requirePermission(
+        { invitation: ["read"] },
+        "Only admins and owners can view invitations",
+      ),
+    )
+    .query(async ({ ctx }) => {
+      // Fetch invitations with inviter info using a join
+      const pendingInvitations = await ctx.db
+        .select({
+          id: invitations.id,
+          email: invitations.email,
+          role: invitations.role,
+          status: invitations.status,
+          expiresAt: invitations.expiresAt,
+          createdAt: invitations.createdAt,
+          inviterName: users.name,
+          inviterEmail: users.email,
+        })
+        .from(invitations)
+        .innerJoin(users, eq(invitations.inviterId, users.id))
+        .where(
+          and(
+            eq(invitations.organizationId, ctx.organizationId),
+            eq(invitations.status, "pending"),
+          ),
+        )
+        .orderBy(desc(invitations.createdAt));
 
-    // Fetch invitations with inviter info using a join
-    const pendingInvitations = await ctx.db
-      .select({
-        id: invitations.id,
-        email: invitations.email,
-        role: invitations.role,
-        status: invitations.status,
-        expiresAt: invitations.expiresAt,
-        createdAt: invitations.createdAt,
-        inviterName: users.name,
-        inviterEmail: users.email,
-      })
-      .from(invitations)
-      .innerJoin(users, eq(invitations.inviterId, users.id))
-      .where(
-        and(
-          eq(invitations.organizationId, ctx.organizationId),
-          eq(invitations.status, "pending"),
-        ),
-      )
-      .orderBy(desc(invitations.createdAt));
-
-    return pendingInvitations.map((inv) => ({
-      id: inv.id,
-      email: inv.email,
-      role: inv.role,
-      status: inv.status,
-      expiresAt: inv.expiresAt,
-      createdAt: inv.createdAt,
-      inviter: {
-        name: inv.inviterName,
-        email: inv.inviterEmail,
-      },
-    }));
-  }),
+      return pendingInvitations.map((inv) => ({
+        id: inv.id,
+        email: inv.email,
+        role: inv.role,
+        status: inv.status,
+        expiresAt: inv.expiresAt,
+        createdAt: inv.createdAt,
+        inviter: {
+          name: inv.inviterName,
+          email: inv.inviterEmail,
+        },
+      }));
+    }),
 
   /**
    * Get all members with user details for the specified organization

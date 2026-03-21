@@ -6,6 +6,8 @@ import { oAuthProxy, organization } from "better-auth/plugins";
 import { db } from "@silo-storage/db/client";
 
 import { authEnv } from "../env";
+import { organizationAccessControl, organizationRoles } from "./permissions";
+export * from "./permissions";
 
 
 export function initAuth<
@@ -33,6 +35,8 @@ export function initAuth<
       }),
       organization({
         allowUserToCreateOrganization: () => !env.DISABLE_ORG_CREATION,
+        ac: organizationAccessControl,
+        roles: organizationRoles,
       }),
       ...(options.extraPlugins ?? []),
     ],

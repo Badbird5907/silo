@@ -14,7 +14,7 @@ import {
 import { deriveSigningSecretFromHash } from "@silo-storage/shared/signing";
 import { env } from "../env";
 
-import { organizationProcedure } from "../trpc";
+import { organizationProcedure, requirePermission } from "../trpc";
 
 function encodeSiloToken(payload: {
   v: number;
@@ -43,6 +43,7 @@ async function hashApiKey(key: string): Promise<string> {
 export const apiKeyRouter = {
   list: organizationProcedure
     .input(z.object({ projectId: z.string() }))
+    .use(requirePermission({ apiKey: ["read"] }))
     .query(async ({ ctx, input }) => {
       // Verify project belongs to the organization
       const project = await ctx.db.query.projects.findFirst({
@@ -132,6 +133,7 @@ export const apiKeyRouter = {
         expiresAt: z.date().optional(),
       }),
     )
+    .use(requirePermission({ apiKey: ["create"] }))
     .mutation(async ({ ctx, input }) => {
       const project = await ctx.db.query.projects.findFirst({
         where: and(
@@ -225,6 +227,7 @@ export const apiKeyRouter = {
 
   delete: organizationProcedure
     .input(z.object({ id: z.string() }))
+    .use(requirePermission({ apiKey: ["delete"] }))
     .mutation(async ({ ctx, input }) => {
       const apiKey = await ctx.db.query.apiKeys.findFirst({
         where: and(
@@ -248,6 +251,7 @@ export const apiKeyRouter = {
   // Get environments for a project (for API key creation)
   getEnvironments: organizationProcedure
     .input(z.object({ projectId: z.string() }))
+    .use(requirePermission({ apiKey: ["read"] }))
     .query(async ({ ctx, input }) => {
       // Verify project belongs to the organization
       const project = await ctx.db.query.projects.findFirst({

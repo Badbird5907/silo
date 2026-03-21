@@ -11,7 +11,7 @@ import {
   usageEvents,
 } from "@silo-storage/db/schema";
 
-import { organizationProcedure } from "../trpc";
+import { organizationProcedure, requirePermission } from "../trpc";
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
@@ -46,6 +46,7 @@ export const analyticsRouter = {
         environmentId: z.string().optional(),
       }),
     )
+    .use(requirePermission({ analytics: ["read"] }))
     .query(async ({ ctx, input }) => {
       const project = await ctx.db.query.projects.findFirst({
         where: eq(projects.id, input.projectId),
@@ -182,6 +183,7 @@ export const analyticsRouter = {
         endDate: z.string().optional(),
       }),
     )
+    .use(requirePermission({ analytics: ["read"] }))
     .query(async ({ ctx, input }) => {
       const now = new Date();
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -290,6 +292,7 @@ export const analyticsRouter = {
         limit: z.number().min(1).max(100).default(50),
       }),
     )
+    .use(requirePermission({ analytics: ["read"] }))
     .query(async ({ ctx, input }) => {
       if (input.projectId) {
         const project = await ctx.db.query.projects.findFirst({

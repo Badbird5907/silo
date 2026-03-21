@@ -11,7 +11,8 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { z, ZodError } from "zod/v4";
 
-import type { Auth, Session } from "@silo-storage/auth";
+import type { Auth, PermissionCheck, Session } from "@silo-storage/auth";
+import { roleHasPermissions } from "@silo-storage/auth";
 import { and, eq } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import { members, organizations } from "@silo-storage/db/schema";
@@ -187,3 +188,30 @@ export const organizationProcedure = protectedProcedure
       },
     });
   });
+
+export function requirePermission(
+  permissions: PermissionCheck,
+  message?: string,
+) {
+  return t.middleware(({ ctx, next }) => {
+    const membership = (
+      ctx as typeof ctx & { membership?: { role: string } }
+    ).membership;
+
+    if (!membership) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Permission checks require organization-scoped procedures",
+      });
+    }
+
+    if (!roleHasPermissions(membership.role, permissions)) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: message ?? "You don't have permission to perform this action",
+      });
+    }
+
+    return next();
+  });
+}

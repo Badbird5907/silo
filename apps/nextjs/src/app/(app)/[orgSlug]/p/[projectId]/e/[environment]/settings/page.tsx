@@ -1,6 +1,6 @@
 "use client";
 
-import ProjectSettingsPage from "@/app/(app)/[orgSlug]/p/[projectId]/settings/page";
+import ProjectSettingsPage from "../../../settings/page";
 
 type ProjectSettingsPageProps = Parameters<typeof ProjectSettingsPage>[0];
 

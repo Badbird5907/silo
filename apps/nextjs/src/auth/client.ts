@@ -1,6 +1,15 @@
 import { organizationClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
+import {
+  organizationAccessControl,
+  organizationRoles,
+} from "@silo-storage/auth/permissions";
 
 export const authClient = createAuthClient({
-  plugins: [organizationClient()],
+  plugins: [
+    organizationClient({
+      ac: organizationAccessControl,
+      roles: organizationRoles,
+    }),
+  ],
 });

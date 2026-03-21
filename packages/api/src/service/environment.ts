@@ -244,11 +244,15 @@ export async function rotateEnvironmentWebhookSecret(
   return { environment: updated, secret: newSecret };
 }
 
-export async function deleteEnvironment(db: Db, environmentId: string, projectId: string) {
-  await scheduleEnvironmentObjectDeletion({
-    projectId,
-    environmentId,
-  });
+// _deleteObjects true by default. Only false when we're handling deletion on our own
+// only time this should be used is for deleteProject where we're deleting the prefix above
+export async function deleteEnvironment(db: Db, environmentId: string, projectId: string, _deleteObjects = true) {
+  if (_deleteObjects) {
+    await scheduleEnvironmentObjectDeletion({
+      projectId,
+      environmentId,
+    });
+  }
 
   const [deleted] = await db
     .delete(projectEnvironments)
@@ -275,7 +279,7 @@ export async function scheduleEnvironmentObjectDeletion(params: {
   if (!response.ok) {
     const body = await response.text().catch(() => "");
     throw new Error(
-      `Failed to schedule environment object deletion: ${response.status} ${body}`,
+      `Failed to schedule environment object deletion. Daemon responded with ${response.status} ${body}`,
     );
   }
 }

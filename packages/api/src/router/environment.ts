@@ -15,7 +15,7 @@ import {
   updateEnvironment,
   updateEnvironmentWebhookConfig,
 } from "../service/environment";
-import { organizationProcedure } from "../trpc";
+import { organizationProcedure, requirePermission } from "../trpc";
 
 /** Validate that a project belongs to the caller's organization. */
 async function validateProjectAccess(
@@ -84,6 +84,7 @@ async function validateEnvironmentAccess(
 export const environmentRouter = {
   list: organizationProcedure
     .input(z.object({ projectId: z.string() }))
+    .use(requirePermission({ environment: ["read"] }))
     .query(async ({ ctx, input }) => {
       await validateProjectAccess(ctx.db, input.projectId, ctx.organizationId);
       const environments = await listEnvironments(ctx.db, input.projectId);
@@ -96,6 +97,7 @@ export const environmentRouter = {
 
   getById: organizationProcedure
     .input(z.object({ id: z.string() }))
+    .use(requirePermission({ environment: ["read"] }))
     .query(async ({ ctx, input }) => {
       const environment = await validateEnvironmentAccess(
         ctx.db,
@@ -115,6 +117,7 @@ export const environmentRouter = {
         slug: z.string().optional(),
       }),
     )
+    .use(requirePermission({ environment: ["create"] }))
     .mutation(async ({ ctx, input }) => {
       await validateProjectAccess(ctx.db, input.projectId, ctx.organizationId);
 
@@ -134,6 +137,7 @@ export const environmentRouter = {
         preferredName: z.string().min(1).max(100).optional(),
       }),
     )
+    .use(requirePermission({ personalEnvironment: ["create"] }))
     .mutation(async ({ ctx, input }) => {
       await validateProjectAccess(ctx.db, input.projectId, ctx.organizationId);
       return createPersonalDevelopmentEnvironment(ctx.db, {
@@ -152,6 +156,7 @@ export const environmentRouter = {
         type: z.enum(["development", "staging", "production"]).optional(),
       }),
     )
+    .use(requirePermission({ environment: ["update"] }))
     .mutation(async ({ ctx, input }) => {
       await validateEnvironmentAccess(ctx.db, input.id, ctx.organizationId);
 
@@ -172,6 +177,7 @@ export const environmentRouter = {
         webhookEvents: z.array(webhookEventsSchema).min(1).optional(),
       }),
     )
+    .use(requirePermission({ environment: ["update"] }))
     .mutation(async ({ ctx, input }) => {
       await validateEnvironmentAccess(ctx.db, input.id, ctx.organizationId);
       const updated = await updateEnvironmentWebhookConfig(ctx.db, {
@@ -193,6 +199,7 @@ export const environmentRouter = {
 
   rotateWebhookSecret: organizationProcedure
     .input(z.object({ id: z.string() }))
+    .use(requirePermission({ environment: ["update"] }))
     .mutation(async ({ ctx, input }) => {
       await validateEnvironmentAccess(ctx.db, input.id, ctx.organizationId);
       const result = await rotateEnvironmentWebhookSecret(ctx.db, input.id);
@@ -212,6 +219,7 @@ export const environmentRouter = {
 
   delete: organizationProcedure
     .input(z.object({ id: z.string() }))
+    .use(requirePermission({ environment: ["delete"] }))
     .mutation(async ({ ctx, input }) => {
       const environment = await validateEnvironmentAccess(
         ctx.db,

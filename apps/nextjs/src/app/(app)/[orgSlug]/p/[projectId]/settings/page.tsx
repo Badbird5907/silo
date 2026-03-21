@@ -19,6 +19,7 @@ import {
 } from "@/components/project-settings";
 import { useOrganization } from "@/hooks/use-organization";
 import { useTRPC } from "@/trpc/react";
+import { DangerZone } from "@/components/project-settings/danger-zone";
 
 interface ProjectSettingsPageProps {
   params: Promise<{
@@ -36,7 +37,7 @@ export default function ProjectSettingsPage({
   const searchParams = useSearchParams();
   const { organization } = useOrganization();
   const organizationId = organization?.id ?? "";
-
+  const { orgSlug } = use(params);
   const { projectId } = use(params);
   const shouldAutoOpenWizard = searchParams.get("createDevEnv") === "1";
 
@@ -98,6 +99,7 @@ export default function ProjectSettingsPage({
             router.replace(query ? `${pathname}?${query}` : pathname);
           }}
         />
+        <DangerZone projectId={projectId} organizationId={organizationId} orgSlug={orgSlug} />
       </div>
     </>
   );
