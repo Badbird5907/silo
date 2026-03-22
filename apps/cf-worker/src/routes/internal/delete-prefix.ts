@@ -1,24 +1,45 @@
 import type { Context } from "hono";
 
-import type { Bindings, Variables } from "../../types/bindings";
 import type { DeletePrefixQueueMessage } from "../../services/r2/delete-prefix";
+import type { Bindings, Variables } from "../../types/bindings";
+import { deletePrefixChunk } from "../../services/r2/delete-prefix";
 import { HTTP_STATUS } from "../../utils/constants";
 
 interface DeletePrefixRequestBody {
   prefix?: string;
+  cursor?: string;
+  blocking?: boolean;
 }
 
 export async function handleInternalDeletePrefix(
   c: Context<{ Bindings: Bindings; Variables: Variables }>,
 ): Promise<Response> {
   const body = await c.req.json<DeletePrefixRequestBody>();
-  const { prefix } = body;
+  const { prefix, cursor, blocking } = body;
 
   if (!prefix) {
     return c.json({ error: "prefix is required" }, HTTP_STATUS.BAD_REQUEST);
   }
 
   try {
+    if (blocking) {
+      const result = await deletePrefixChunk({
+        prefix,
+        cursor,
+        env: c.env,
+      });
+
+      return c.json(
+        {
+          success: true,
+          mode: "blocking",
+          prefix,
+          ...result,
+        },
+        HTTP_STATUS.OK,
+      );
+    }
+
     const deletePrefixQueue: {
       send(message: DeletePrefixQueueMessage): Promise<void>;
     } = c.env.DELETE_PREFIX_QUEUE;

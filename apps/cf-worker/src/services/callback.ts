@@ -28,7 +28,6 @@ export async function verifyUploadSignature(
     },
   );
 
-
   if (!response.ok) {
     try {
       const error: { error?: string } = await response.json();
@@ -112,11 +111,50 @@ export async function lookupFileKey(
   return fileKeyInfoSchema.parse(json);
 }
 
+export async function registerUploadSession(
+  data: {
+    projectId: string;
+    environmentId: string;
+    fileKeyId: string;
+    uploadId: string;
+    adapterKey: string;
+  },
+  env: Bindings,
+): Promise<void> {
+  const response = await fetch(
+    `${env.NEXTJS_CALLBACK_URL}/api/internal/upload-session/start`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.CALLBACK_SECRET}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    },
+  );
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(
+      `Failed to register upload session (${response.status}): ${text || response.statusText}`,
+    );
+  }
+}
+
 export interface TrackDownloadData {
   projectId: string;
   environmentId: string;
   fileId: string;
   bytes: number;
+}
+
+export interface ReportMissingObjectData {
+  projectId: string;
+  environmentId: string;
+  fileKeyId: string;
+  fileId: string;
+  accessKey: string;
+  adapterKey: string;
 }
 
 export async function trackDownload(
@@ -141,5 +179,34 @@ export async function trackDownload(
     }
   } catch (error) {
     console.error("[analytics] Error tracking download:", error);
+  }
+}
+
+export async function reportMissingObject(
+  data: ReportMissingObjectData,
+  env: Bindings,
+): Promise<void> {
+  try {
+    const response = await fetch(
+      `${env.NEXTJS_CALLBACK_URL}/api/internal/files/repair-missing`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.CALLBACK_SECRET}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      },
+    );
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      console.error("[repair] Failed to report missing object", {
+        status: response.status,
+        details: text,
+      });
+    }
+  } catch (error) {
+    console.error("[repair] Error reporting missing object", error);
   }
 }

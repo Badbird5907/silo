@@ -78,7 +78,7 @@ export async function POST(request: Request) {
     // Attempt to clean up any partial upload data from R2
     if (fileKey.file?.adapterKey) {
       try {
-        const deleteUrl = `${env.WORKER_URL}/internal/delete/${fileKey.file.adapterKey}`;
+        const deleteUrl = `${env.WORKER_URL}/internal/delete/${encodeURIComponent(fileKey.file.adapterKey)}`;
         await fetch(deleteUrl, {
           method: "DELETE",
           headers: {

@@ -10,6 +10,8 @@ import { sendUploadCallback } from "../services/callback";
 import {
   abortMultipartUpload,
   completeMultipartUpload,
+  createMultipartUpload,
+  shouldUseSinglePut,
   uploadChunkToR2,
 } from "../services/r2/upload";
 import { isUploadExpired } from "../services/tus/metadata";
@@ -265,6 +267,39 @@ export class TusStateDO {
     const newOffset = metadata.offset + contentLength;
     const isComplete = metadata.size !== null && newOffset >= metadata.size;
     const nextPartNumber = metadata.parts.length + 1;
+    const usesSinglePut = shouldUseSinglePut({
+      chunkSize: contentLength,
+      isLastChunk: isComplete,
+      offset: metadata.offset,
+    });
+
+    if (!usesSinglePut && !metadata.multipartUploadId) {
+      const createdUploadId = await createMultipartUpload({
+        adapterKey: metadata.adapterKey,
+        env: this.env,
+      });
+      metadata.multipartUploadId = createdUploadId;
+      try {
+        await this.persistMetadata(metadata);
+      } catch (persistError) {
+        await abortMultipartUpload({
+          adapterKey: metadata.adapterKey,
+          uploadId: createdUploadId,
+          env: this.env,
+        }).catch((abortError) => {
+          console.error(
+            "Failed to abort multipart upload after persist failure",
+            {
+              uploadId: metadata.uploadId,
+              multipartUploadId: createdUploadId,
+              abortError,
+            },
+          );
+        });
+        throw persistError;
+      }
+    }
+
     this.logEvent("patch_start", metadata, {
       mode: "do",
       offsetBefore: metadata.offset,
@@ -364,28 +399,44 @@ export class TusStateDO {
       request.headers.get("X-Upload-Id"),
     );
     const multipartUploadId = metadata.multipartUploadId;
+    let cleanupFailed = false;
+
     if (multipartUploadId) {
-      await retry((attempt) => {
-        if (attempt > 1) {
-          this.logEvent("delete_retry_abort_multipart", metadata, {
-            mode: "do",
-            retryAttempt: attempt,
-            multipartUploadId: metadata.multipartUploadId,
+      try {
+        await retry((attempt) => {
+          if (attempt > 1) {
+            this.logEvent("delete_retry_abort_multipart", metadata, {
+              mode: "do",
+              retryAttempt: attempt,
+              multipartUploadId: metadata.multipartUploadId,
+            });
+          }
+          return abortMultipartUpload({
+            adapterKey: metadata.adapterKey,
+            uploadId: multipartUploadId,
+            env: this.env,
           });
-        }
-        return abortMultipartUpload({
-          adapterKey: metadata.adapterKey,
-          uploadId: multipartUploadId,
-          env: this.env,
         });
-      }).catch((error) => {
+      } catch (error) {
+        cleanupFailed = true;
         console.error("Failed to abort multipart upload", error);
-      });
+      }
     }
 
-    await this.env.R2_BUCKET.delete(metadata.adapterKey).catch((error) => {
+    try {
+      await this.env.R2_BUCKET.delete(metadata.adapterKey);
+    } catch (error) {
+      cleanupFailed = true;
       console.error("Failed to delete upload object", error);
-    });
+    }
+
+    if (cleanupFailed) {
+      throw new TusError(
+        "INVALID_REQUEST",
+        503,
+        "Upload cleanup temporarily unavailable. Retry deletion shortly.",
+      );
+    }
 
     await this.deleteMetadata();
 
@@ -440,9 +491,44 @@ export class TusStateDO {
       throw Errors.unauthorized("Upload does not belong to this project");
     }
     if (isUploadExpired(metadata)) {
+      await this.cleanupExpiredUpload(metadata);
       throw Errors.uploadExpired(metadata.uploadId);
     }
     return metadata;
+  }
+
+  private async cleanupExpiredUpload(
+    metadata: TusUploadMetadata,
+  ): Promise<void> {
+    const multipartUploadId = metadata.multipartUploadId;
+    if (multipartUploadId) {
+      await abortMultipartUpload({
+        adapterKey: metadata.adapterKey,
+        uploadId: multipartUploadId,
+        env: this.env,
+      }).catch((error) => {
+        console.error("Failed to abort multipart upload for expired upload", {
+          uploadId: metadata.uploadId,
+          multipartUploadId,
+          error,
+        });
+      });
+    }
+
+    await this.env.R2_BUCKET.delete(metadata.adapterKey).catch((error) => {
+      console.error("Failed to delete expired upload object", {
+        uploadId: metadata.uploadId,
+        adapterKey: metadata.adapterKey,
+        error,
+      });
+    });
+
+    await this.deleteMetadata().catch((error) => {
+      console.error("Failed to delete metadata for expired upload", {
+        uploadId: metadata.uploadId,
+        error,
+      });
+    });
   }
 
   private logMissingState(extra: Record<string, unknown> = {}): void {

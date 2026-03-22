@@ -120,6 +120,23 @@ async function trackUsageEvent(
   }
 }
 
+async function cleanupAdapterKey(adapterKey: string) {
+  const deleteUrl = `${env.WORKER_URL}/internal/delete/${encodeURIComponent(adapterKey)}`;
+  const response = await fetch(deleteUrl, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${env.CALLBACK_SECRET}`,
+    },
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(
+      `Failed to cleanup adapter key (${response.status}): ${body || response.statusText}`,
+    );
+  }
+}
+
 export async function POST(request: Request) {
   const header = request.headers.get("Authorization");
   if (!header?.startsWith("Bearer ")) {
@@ -176,6 +193,15 @@ export async function POST(request: Request) {
       });
 
       if (completion.alreadyFailed) {
+        try {
+          await cleanupAdapterKey(data.adapterKey);
+        } catch (cleanupError) {
+          console.error(
+            "Failed to cleanup adapter key for already-failed upload:",
+            cleanupError,
+          );
+        }
+
         return new Response(
           JSON.stringify({
             success: true,
@@ -188,6 +214,17 @@ export async function POST(request: Request) {
 
       const file = completion.file;
       const fileKey = completion.fileKey;
+
+      if (completion.alreadyCompleted && file.adapterKey !== data.adapterKey) {
+        try {
+          await cleanupAdapterKey(data.adapterKey);
+        } catch (cleanupError) {
+          console.error(
+            "Failed to cleanup duplicate completion adapter key:",
+            cleanupError,
+          );
+        }
+      }
 
       const uploadCompletedEvent = createUploadEventEnvelope(
         "upload.completed",

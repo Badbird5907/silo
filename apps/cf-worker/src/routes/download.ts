@@ -3,7 +3,11 @@ import type { Context } from "hono";
 import type { Bindings, Variables } from "../types/bindings";
 import type { FileKeyInfo } from "../types/project";
 import { verifyDownloadSignature } from "../middleware/auth";
-import { lookupFileKey, trackDownload } from "../services/callback";
+import {
+  lookupFileKey,
+  reportMissingObject,
+  trackDownload,
+} from "../services/callback";
 import { Errors } from "../utils/errors";
 
 const FILE_KEY_CACHE_TTL = 60; // 1 minute cache for file key lookups
@@ -152,6 +156,19 @@ export async function handleDownload(
   }
 
   if (!object) {
+    c.executionCtx.waitUntil(
+      reportMissingObject(
+        {
+          projectId,
+          environmentId: fileKey.environmentId,
+          fileKeyId: fileKey.id,
+          fileId: fileKey.file.id,
+          accessKey: fileKey.accessKey,
+          adapterKey: fileKey.file.adapterKey,
+        },
+        c.env,
+      ),
+    );
     throw Errors.fileNotFound(accessKey);
   }
 

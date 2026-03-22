@@ -17,6 +17,30 @@ export interface UploadChunkResult {
   part: TusUploadPart | null;
 }
 
+const MULTIPART_MIN_PART_SIZE = 5 * 1024 * 1024;
+
+export function shouldUseSinglePut(params: {
+  chunkSize: number;
+  isLastChunk: boolean;
+  offset: number;
+}): boolean {
+  return (
+    params.chunkSize < MULTIPART_MIN_PART_SIZE &&
+    params.isLastChunk &&
+    params.offset === 0
+  );
+}
+
+export async function createMultipartUpload(params: {
+  adapterKey: string;
+  env: Bindings;
+}): Promise<string> {
+  const multipart = await params.env.R2_BUCKET.createMultipartUpload(
+    params.adapterKey,
+  );
+  return multipart.uploadId;
+}
+
 export async function uploadChunkToR2(
   params: UploadChunkParams,
 ): Promise<UploadChunkResult> {
@@ -34,15 +58,14 @@ export async function uploadChunkToR2(
   const chunkBody = chunk;
 
   // use simple put for small single-chunk uploads
-  if (chunkSize < 5 * 1024 * 1024 && isLastChunk && offset === 0) {
+  if (shouldUseSinglePut({ chunkSize, isLastChunk, offset })) {
     await env.R2_BUCKET.put(adapterKey, chunkBody);
     return { multipartUploadId: null, part: null };
   }
 
-  let uploadId = multipartUploadId;
+  const uploadId = multipartUploadId;
   if (!uploadId) {
-    const multipart = await env.R2_BUCKET.createMultipartUpload(adapterKey);
-    uploadId = multipart.uploadId;
+    throw new Error("Multipart upload id is required for multipart chunks");
   }
 
   // parts are 1-indexed, calculate sequentially from existing parts count

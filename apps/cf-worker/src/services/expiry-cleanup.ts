@@ -106,12 +106,17 @@ export async function runExpiryCleanup(env: Bindings) {
       break;
     }
 
-    const fileIdsToFinalize = new Set<string>();
+    const finalizedInBatch = new Set<string>();
     for (const item of expiredItems) {
       try {
         await deleteObject(item.adapterKey, env);
-        fileIdsToFinalize.add(item.fileId);
         totalR2Deleted += 1;
+
+        if (!finalizedInBatch.has(item.fileId)) {
+          const finalized = await finalizeExpiredBatch(env, [item.fileId]);
+          totalDbDeleted += finalized.deletedCount;
+          finalizedInBatch.add(item.fileId);
+        }
       } catch (error) {
         console.error("Failed to delete expired object from R2", {
           fileKeyId: item.fileKeyId,
@@ -120,11 +125,6 @@ export async function runExpiryCleanup(env: Bindings) {
           error,
         });
       }
-    }
-
-    if (fileIdsToFinalize.size > 0) {
-      const finalized = await finalizeExpiredBatch(env, [...fileIdsToFinalize]);
-      totalDbDeleted += finalized.deletedCount;
     }
 
     batchesProcessed += 1;

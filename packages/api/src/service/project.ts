@@ -1,12 +1,13 @@
-import { db  } from "@silo-storage/db/client";
 import type { Db } from "@silo-storage/db/client";
 
 import { eq } from "@silo-storage/db";
+import { db } from "@silo-storage/db/client";
 import { projectEnvironments, projects } from "@silo-storage/db/schema";
 import {
   sanitizeForSlug,
   validateProjectSlug,
 } from "@silo-storage/shared/slug";
+
 import { env } from "../env";
 
 const DEFAULT_ENVIRONMENTS = [
@@ -124,23 +125,52 @@ export async function updateProject(
 
 export async function deleteProject(projectId: string) {
   await scheduleProjectObjectDeletion(projectId);
-  const [deleted] = await db.delete(projects).where(eq(projects.id, projectId)).returning();
+  const [deleted] = await db
+    .delete(projects)
+    .where(eq(projects.id, projectId))
+    .returning();
   return deleted;
 }
 
 export async function scheduleProjectObjectDeletion(projectId: string) {
   const prefix = `${projectId}/`;
-  const response = await fetch(`${env.WORKER_URL}/internal/delete-prefix`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${env.CALLBACK_SECRET}`,
-    },
-    body: JSON.stringify({ prefix }),
-  });
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(`Failed to schedule project object deletion. Daemon responded with ${response.status} ${body}`);
+  let cursor: string | undefined;
+
+  for (let i = 0; i < 2000; i++) {
+    const response = await fetch(`${env.WORKER_URL}/internal/delete-prefix`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.CALLBACK_SECRET}`,
+      },
+      body: JSON.stringify({
+        prefix,
+        cursor,
+        blocking: true,
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(
+        `Failed to delete project objects. Worker responded with ${response.status} ${body}`,
+      );
+    }
+
+    const json = (await response.json()) as {
+      truncated?: boolean;
+      cursor?: string | null;
+    };
+
+    if (!json.truncated) {
+      return json;
+    }
+
+    cursor = json.cursor ?? undefined;
+    if (!cursor) {
+      return json;
+    }
   }
-  return response.json();
+
+  throw new Error("Project object deletion exceeded maximum pagination depth");
 }

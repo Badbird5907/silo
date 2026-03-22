@@ -1,8 +1,11 @@
 import type { Db } from "@silo-storage/db/client";
+import { nanoid } from "nanoid";
+
 import { and, eq } from "@silo-storage/db";
 import { projectEnvironments } from "@silo-storage/db/schema";
-import { nanoid } from "nanoid";
+
 import { env } from "../env";
+
 const WEBHOOK_EVENTS = ["upload.completed", "upload.failed"] as const;
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 const WEBHOOK_EVENT_SET = new Set<WebhookEvent>(WEBHOOK_EVENTS);
@@ -27,7 +30,9 @@ async function getUniqueSlug(
 
   const existingSlugs = new Set(
     existingEnvs
-      .filter((env) => (excludeEnvironmentId ? env.id !== excludeEnvironmentId : true))
+      .filter((env) =>
+        excludeEnvironmentId ? env.id !== excludeEnvironmentId : true,
+      )
       .map((env) => env.slug),
   );
 
@@ -100,7 +105,8 @@ export async function createPersonalDevelopmentEnvironment(
 
   if (existing) return existing;
 
-  const resolvedName = input.preferredName?.trim() ?? input.userName?.trim() ?? "My Dev Env";
+  const resolvedName =
+    input.preferredName?.trim() ?? input.userName?.trim() ?? "My Dev Env";
 
   return createEnvironment(db, {
     projectId: input.projectId,
@@ -246,7 +252,12 @@ export async function rotateEnvironmentWebhookSecret(
 
 // _deleteObjects true by default. Only false when we're handling deletion on our own
 // only time this should be used is for deleteProject where we're deleting the prefix above
-export async function deleteEnvironment(db: Db, environmentId: string, projectId: string, _deleteObjects = true) {
+export async function deleteEnvironment(
+  db: Db,
+  environmentId: string,
+  projectId: string,
+  _deleteObjects = true,
+) {
   if (_deleteObjects) {
     await scheduleEnvironmentObjectDeletion({
       projectId,
@@ -267,19 +278,45 @@ export async function scheduleEnvironmentObjectDeletion(params: {
   environmentId: string;
 }) {
   const prefix = `${params.projectId}/${params.environmentId}/`;
-  const response = await fetch(`${env.WORKER_URL}/internal/delete-prefix`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${env.CALLBACK_SECRET}`,
-    },
-    body: JSON.stringify({ prefix }),
-  });
+  let cursor: string | undefined;
 
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(
-      `Failed to schedule environment object deletion. Daemon responded with ${response.status} ${body}`,
-    );
+  for (let i = 0; i < 2000; i++) {
+    const response = await fetch(`${env.WORKER_URL}/internal/delete-prefix`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.CALLBACK_SECRET}`,
+      },
+      body: JSON.stringify({
+        prefix,
+        cursor,
+        blocking: true,
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(
+        `Failed to delete environment objects. Worker responded with ${response.status} ${body}`,
+      );
+    }
+
+    const json = (await response.json()) as {
+      truncated?: boolean;
+      cursor?: string | null;
+    };
+
+    if (!json.truncated) {
+      return json;
+    }
+
+    cursor = json.cursor ?? undefined;
+    if (!cursor) {
+      return json;
+    }
   }
+
+  throw new Error(
+    "Environment object deletion exceeded maximum pagination depth",
+  );
 }

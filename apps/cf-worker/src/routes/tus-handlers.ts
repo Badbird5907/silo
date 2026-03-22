@@ -4,6 +4,7 @@ import type { Bindings, Variables } from "../types/bindings";
 import type { TusUploadMetadata } from "../types/tus";
 import { isAllowedMimeType } from "../lib/file-types";
 import {
+  registerUploadSession,
   sendUploadCallback,
   verifyUploadSignature,
 } from "../services/callback";
@@ -223,28 +224,38 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
 
       await c.env.R2_BUCKET.put(adapterKey, new Uint8Array(0));
 
-      await sendUploadCallback(
-        {
-          type: "upload-completed",
-          data: {
-            environmentId,
-            fileKeyId,
-            accessKey,
-            fileName,
-            claimedSize: verificationResult.size,
-            claimedHash: verificationResult.claimedHash ?? null,
-            claimedMimeType: verificationResult.claimedMimeType ?? null,
-            actualHash: null,
-            actualMimeType: zeroByteMimeType,
-            actualSize: 0,
-            adapterKey,
-            projectId,
-            isPublic: verificationResult.isPublic ?? false,
-            metadata,
+      try {
+        await sendUploadCallback(
+          {
+            type: "upload-completed",
+            data: {
+              environmentId,
+              fileKeyId,
+              accessKey,
+              fileName,
+              claimedSize: verificationResult.size,
+              claimedHash: verificationResult.claimedHash ?? null,
+              claimedMimeType: verificationResult.claimedMimeType ?? null,
+              actualHash: null,
+              actualMimeType: zeroByteMimeType,
+              actualSize: 0,
+              adapterKey,
+              projectId,
+              isPublic: verificationResult.isPublic ?? false,
+              metadata,
+            },
           },
-        },
-        c.env,
-      );
+          c.env,
+        );
+      } catch (callbackError) {
+        await c.env.R2_BUCKET.delete(adapterKey).catch((deleteError) => {
+          console.error("Failed to rollback zero-byte upload object", {
+            adapterKey,
+            deleteError,
+          });
+        });
+        throw callbackError;
+      }
 
       return new Response(null, {
         status: HTTP_STATUS.CREATED,
@@ -258,6 +269,34 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
     }
 
     await initializeUploadInDo(uploadId, uploadMetadata, c.env);
+    try {
+      await registerUploadSession(
+        {
+          projectId,
+          environmentId,
+          fileKeyId,
+          uploadId,
+          adapterKey,
+        },
+        c.env,
+      );
+    } catch (registrationError) {
+      const cleanupHeaders = new Headers(c.req.raw.headers);
+      cleanupHeaders.set("Tus-Resumable", TUS_VERSION);
+      await proxyTusDeleteToDo(
+        uploadId,
+        projectId,
+        cleanupHeaders,
+        c.env,
+      ).catch((cleanupError) => {
+        console.error("Failed to cleanup upload after registration failure", {
+          uploadId,
+          adapterKey,
+          cleanupError,
+        });
+      });
+      throw registrationError;
+    }
 
     const bodyContentLength = parseNonNegativeInt(contentLengthHeader) ?? 0;
     const body = c.req.raw.body as ReadableStream<Uint8Array> | null;

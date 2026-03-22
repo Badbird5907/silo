@@ -16,6 +16,7 @@ import { handleInternalDelete } from "./routes/internal/delete";
 import { handleInternalDeletePrefix } from "./routes/internal/delete-prefix";
 import { handleInternalList } from "./routes/internal/list";
 import { handleInternalMetadata } from "./routes/internal/metadata";
+import { handleInternalTusDelete } from "./routes/internal/tus-delete";
 import {
   handleTusCreate,
   handleTusDelete,
@@ -50,7 +51,7 @@ app.get("/f/:accessKey", requireProject, handleDownload);
 
 // internal routes
 app.delete(
-  "/internal/delete/:adapterKey",
+  "/internal/delete/*",
   requireMainDomain,
   requireCallbackSecret,
   handleInternalDelete,
@@ -72,6 +73,12 @@ app.post(
   requireMainDomain,
   requireCallbackSecret,
   handleInternalMetadata,
+);
+app.post(
+  "/internal/tus/:uploadId/delete",
+  requireMainDomain,
+  requireCallbackSecret,
+  handleInternalTusDelete,
 );
 
 app.onError((err, c) => {
