@@ -3,11 +3,11 @@ import { z } from "zod";
 import {
   lookupFileKey,
   markUploadAsFailed,
+  runLifecycleJobBatch,
   UploadFailureError,
 } from "@silo-storage/api/services";
 import { db } from "@silo-storage/db/client";
 
-import { env } from "@/env";
 import {
   authenticateRequest,
   jsonError,
@@ -75,27 +75,17 @@ export async function POST(request: Request) {
       );
     }
 
-    // Attempt to clean up any partial upload data from R2
-    if (fileKey.file?.adapterKey) {
-      try {
-        const deleteUrl = `${env.WORKER_URL}/internal/delete/${encodeURIComponent(fileKey.file.adapterKey)}`;
-        await fetch(deleteUrl, {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${env.CALLBACK_SECRET}`,
-          },
-        });
-      } catch (cleanupError) {
-        console.error("Failed to clean up R2 data:", cleanupError);
-        // Continue anyway — marking as failed is more important
-      }
-    }
-
     const updated = await markUploadAsFailed(db, {
       projectId,
       environmentId,
       fileKeyId: fileKey.id,
       error: "Upload marked as failed via API",
+    });
+
+    const drainResult = await runLifecycleJobBatch(db, {
+      limit: 20,
+      leaseSeconds: 45,
+      leaseOwner: "api:v1/upload/fail",
     });
 
     return new Response(
@@ -104,9 +94,10 @@ export async function POST(request: Request) {
         fileKeyId: updated.id,
         accessKey: updated.accessKey,
         status: "failed",
+        lifecycleJobs: drainResult,
       }),
       {
-        status: 200,
+        status: 202,
         headers: { "Content-Type": "application/json" },
       },
     );

@@ -357,6 +357,10 @@ export async function completeFileKeyFromCallback(input: {
         status: "completed",
         uploadCompletedAt: new Date(),
         uploadFailedAt: null,
+        uploadSessionId: null,
+        uploadSessionAdapterKey: null,
+        uploadSessionMultipartId: null,
+        uploadSessionUpdatedAt: null,
         isPublic: input.isPublic ?? claimedFileKey.isPublic,
         metadata: mergedMetadata,
       })

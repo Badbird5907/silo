@@ -11,7 +11,7 @@ const schema = z.object({
   environmentId: z.string().min(1),
   fileKeyId: z.string().min(1),
   uploadId: z.string().min(1),
-  adapterKey: z.string().min(1),
+  multipartUploadId: z.string().min(1),
 });
 
 export async function POST(request: Request) {
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { projectId, environmentId, fileKeyId, uploadId, adapterKey } =
+  const { projectId, environmentId, fileKeyId, uploadId, multipartUploadId } =
     parsed.data;
 
   const existing = await db.query.fileKeys.findFirst({
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
       id: true,
       status: true,
       uploadSessionId: true,
-      uploadSessionAdapterKey: true,
+      uploadSessionMultipartId: true,
     },
   });
 
@@ -78,26 +78,20 @@ export async function POST(request: Request) {
     });
   }
 
-  if (existing.uploadSessionId && existing.uploadSessionId !== uploadId) {
-    return new Response(
-      JSON.stringify({
-        error: "Upload session already exists for file key",
-        uploadSessionId: existing.uploadSessionId,
-      }),
-      {
-        status: 409,
-        headers: { "Content-Type": "application/json" },
-      },
-    );
+  if (existing.uploadSessionId !== uploadId) {
+    return new Response(JSON.stringify({ error: "Upload session mismatch" }), {
+      status: 409,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   if (
-    existing.uploadSessionAdapterKey &&
-    existing.uploadSessionAdapterKey !== adapterKey
+    existing.uploadSessionMultipartId &&
+    existing.uploadSessionMultipartId !== multipartUploadId
   ) {
     return new Response(
       JSON.stringify({
-        error: "Upload session adapter key mismatch",
+        error: "Multipart upload already registered for session",
       }),
       {
         status: 409,
@@ -109,21 +103,16 @@ export async function POST(request: Request) {
   const [updated] = await db
     .update(fileKeys)
     .set({
-      uploadSessionId: uploadId,
-      uploadSessionAdapterKey: adapterKey,
-      uploadSessionMultipartId: null,
+      uploadSessionMultipartId: multipartUploadId,
       uploadSessionUpdatedAt: new Date(),
     })
     .where(
       and(
         eq(fileKeys.id, fileKeyId),
+        eq(fileKeys.uploadSessionId, uploadId),
         or(
-          isNull(fileKeys.uploadSessionId),
-          eq(fileKeys.uploadSessionId, uploadId),
-        ),
-        or(
-          isNull(fileKeys.uploadSessionAdapterKey),
-          eq(fileKeys.uploadSessionAdapterKey, adapterKey),
+          isNull(fileKeys.uploadSessionMultipartId),
+          eq(fileKeys.uploadSessionMultipartId, multipartUploadId),
         ),
       ),
     )
@@ -131,7 +120,7 @@ export async function POST(request: Request) {
 
   if (!updated) {
     return new Response(
-      JSON.stringify({ error: "Upload session registration conflict" }),
+      JSON.stringify({ error: "Multipart registration conflict" }),
       {
         status: 409,
         headers: { "Content-Type": "application/json" },

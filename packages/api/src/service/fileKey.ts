@@ -1,11 +1,23 @@
 import type { Db } from "@silo-storage/db/client";
+
 import { and, eq, sql } from "@silo-storage/db";
-import { fileKeys, projects, usageDaily, usageEvents } from "@silo-storage/db/schema";
+import {
+  fileKeys,
+  projects,
+  usageDaily,
+  usageEvents,
+} from "@silo-storage/db/schema";
 import { publishMessage } from "@silo-storage/redis";
 import {
   createUploadEventEnvelope,
   normalizeFileKeyMetadata,
 } from "@silo-storage/shared";
+
+import {
+  enqueueAbortMultipartJob,
+  enqueueDeleteObjectJob,
+  enqueueFinalizeFailedFileKeyJob,
+} from "./lifecycleJob";
 import { enqueueUploadWebhookEvent } from "./webhook";
 
 export class UploadFailureError extends Error {
@@ -145,43 +157,99 @@ export async function markUploadAsFailed(
     error?: string;
   },
 ) {
-  const fileKey = await db.query.fileKeys.findFirst({
-    where: and(
-      eq(fileKeys.id, opts.fileKeyId),
-      eq(fileKeys.projectId, opts.projectId),
-    ),
+  const updated = await db.transaction(async (tx) => {
+    const fileKey = await tx.query.fileKeys.findFirst({
+      where: and(
+        eq(fileKeys.id, opts.fileKeyId),
+        eq(fileKeys.projectId, opts.projectId),
+      ),
+      with: { file: true },
+    });
+
+    if (!fileKey) {
+      throw new UploadFailureError("FileKey not found", "NOT_FOUND");
+    }
+
+    if (fileKey.environmentId !== opts.environmentId) {
+      throw new UploadFailureError("FileKey not found", "NOT_FOUND");
+    }
+
+    if (fileKey.status === "completed") {
+      throw new UploadFailureError(
+        "Upload has already completed successfully",
+        "ALREADY_COMPLETED",
+      );
+    }
+
+    if (fileKey.status === "failed") {
+      throw new UploadFailureError(
+        "Upload has already been marked as failed",
+        "ALREADY_FAILED",
+      );
+    }
+
+    if (fileKey.uploadSessionId) {
+      await enqueueAbortMultipartJob(tx, {
+        projectId: opts.projectId,
+        environmentId: opts.environmentId,
+        fileKeyId: fileKey.id,
+        fileId: fileKey.file?.id ?? null,
+        uploadSessionId: fileKey.uploadSessionId,
+        adapterKey: fileKey.uploadSessionAdapterKey ?? null,
+        multipartUploadId: fileKey.uploadSessionMultipartId ?? null,
+        priority: 120,
+      });
+    } else if (fileKey.uploadSessionAdapterKey) {
+      await enqueueDeleteObjectJob(tx, {
+        projectId: opts.projectId,
+        environmentId: opts.environmentId,
+        fileKeyId: fileKey.id,
+        fileId: fileKey.file?.id ?? null,
+        adapterKey: fileKey.uploadSessionAdapterKey,
+        priority: 110,
+      });
+    }
+
+    if (fileKey.file?.adapterKey) {
+      await enqueueDeleteObjectJob(tx, {
+        projectId: opts.projectId,
+        environmentId: opts.environmentId,
+        fileKeyId: fileKey.id,
+        fileId: fileKey.file.id,
+        adapterKey: fileKey.file.adapterKey,
+        priority: 120,
+      });
+    }
+
+    if (fileKey.file?.id) {
+      await enqueueFinalizeFailedFileKeyJob(tx, {
+        projectId: opts.projectId,
+        environmentId: opts.environmentId,
+        fileKeyId: fileKey.id,
+        fileId: fileKey.file.id,
+        priority: 100,
+      });
+    }
+
+    const [next] = await tx
+      .update(fileKeys)
+      .set({
+        status: "failed",
+        uploadFailedAt: new Date(),
+        uploadSessionId: null,
+        uploadSessionAdapterKey: null,
+        uploadSessionMultipartId: null,
+        uploadSessionUpdatedAt: null,
+      })
+      .where(eq(fileKeys.id, opts.fileKeyId))
+      .returning();
+
+    if (!next) {
+      throw new Error("Failed to update file key status");
+    }
+
+    return next;
   });
-
-  if (!fileKey) {
-    throw new UploadFailureError("FileKey not found", "NOT_FOUND");
-  }
-
-  if (fileKey.status === "completed") {
-    throw new UploadFailureError(
-      "Upload has already completed successfully",
-      "ALREADY_COMPLETED",
-    );
-  }
-
-  if (fileKey.status === "failed") {
-    throw new UploadFailureError(
-      "Upload has already been marked as failed",
-      "ALREADY_FAILED",
-    );
-  }
-
-  const [updated] = await db
-    .update(fileKeys)
-    .set({
-      status: "failed",
-      uploadFailedAt: new Date(),
-    })
-    .where(eq(fileKeys.id, opts.fileKeyId))
-    .returning();
-
-  if (!updated) {
-    throw new Error("Failed to update file key status");
-  }
 
   // this is the message
   const uploadFailedEvent = createUploadEventEnvelope(

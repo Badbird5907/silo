@@ -141,6 +141,36 @@ export async function registerUploadSession(
   }
 }
 
+export async function registerMultipartUploadSession(
+  data: {
+    projectId: string;
+    environmentId: string;
+    fileKeyId: string;
+    uploadId: string;
+    multipartUploadId: string;
+  },
+  env: Bindings,
+): Promise<void> {
+  const response = await fetch(
+    `${env.NEXTJS_CALLBACK_URL}/api/internal/upload-session/multipart`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.CALLBACK_SECRET}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    },
+  );
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(
+      `Failed to register multipart upload session (${response.status}): ${text || response.statusText}`,
+    );
+  }
+}
+
 export interface TrackDownloadData {
   projectId: string;
   environmentId: string;

@@ -6,7 +6,10 @@ import {
   isAllowedMimeType,
 } from "../lib/file-types";
 import { readHeaderBytes } from "../lib/hash";
-import { sendUploadCallback } from "../services/callback";
+import {
+  registerMultipartUploadSession,
+  sendUploadCallback,
+} from "../services/callback";
 import {
   abortMultipartUpload,
   completeMultipartUpload,
@@ -281,12 +284,30 @@ export class TusStateDO {
       metadata.multipartUploadId = createdUploadId;
       try {
         await this.persistMetadata(metadata);
+        await retry(
+          () =>
+            registerMultipartUploadSession(
+              {
+                projectId: metadata.projectId,
+                environmentId: metadata.environmentId,
+                fileKeyId: metadata.fileKeyId,
+                uploadId: metadata.uploadId,
+                multipartUploadId: createdUploadId,
+              },
+              this.env,
+            ),
+          {
+            maxAttempts: 3,
+            baseDelayMs: 150,
+            maxDelayMs: 1000,
+          },
+        );
       } catch (persistError) {
         await abortMultipartUpload({
           adapterKey: metadata.adapterKey,
           uploadId: createdUploadId,
           env: this.env,
-        }).catch((abortError) => {
+        }).catch((abortError: unknown) => {
           console.error(
             "Failed to abort multipart upload after persist failure",
             {
@@ -501,29 +522,45 @@ export class TusStateDO {
     metadata: TusUploadMetadata,
   ): Promise<void> {
     const multipartUploadId = metadata.multipartUploadId;
+    let cleanupFailed = false;
+
     if (multipartUploadId) {
-      await abortMultipartUpload({
-        adapterKey: metadata.adapterKey,
-        uploadId: multipartUploadId,
-        env: this.env,
-      }).catch((error) => {
+      try {
+        await abortMultipartUpload({
+          adapterKey: metadata.adapterKey,
+          uploadId: multipartUploadId,
+          env: this.env,
+        });
+      } catch (error) {
+        cleanupFailed = true;
         console.error("Failed to abort multipart upload for expired upload", {
           uploadId: metadata.uploadId,
           multipartUploadId,
           error,
         });
-      });
+      }
     }
 
-    await this.env.R2_BUCKET.delete(metadata.adapterKey).catch((error) => {
+    try {
+      await this.env.R2_BUCKET.delete(metadata.adapterKey);
+    } catch (error) {
+      cleanupFailed = true;
       console.error("Failed to delete expired upload object", {
         uploadId: metadata.uploadId,
         adapterKey: metadata.adapterKey,
         error,
       });
-    });
+    }
 
-    await this.deleteMetadata().catch((error) => {
+    if (cleanupFailed) {
+      throw new TusError(
+        "INVALID_REQUEST",
+        503,
+        "Expired upload cleanup temporarily unavailable. Retry shortly.",
+      );
+    }
+
+    await this.deleteMetadata().catch((error: unknown) => {
       console.error("Failed to delete metadata for expired upload", {
         uploadId: metadata.uploadId,
         error,

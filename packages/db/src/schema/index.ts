@@ -27,6 +27,21 @@ export const fileKeyStatus = pgEnum("file_key_status", [
   "failed",
 ]);
 
+export const fileLifecycleJobKinds = pgEnum("file_lifecycle_job_kind", [
+  "delete_object",
+  "abort_multipart",
+  "finalize_failed_filekey",
+  "repair_missing_object",
+]);
+
+export const fileLifecycleJobStates = pgEnum("file_lifecycle_job_state", [
+  "pending",
+  "leased",
+  "retry",
+  "done",
+  "dead",
+]);
+
 export const projects = pgTable("projects", {
   id: text("id")
     .primaryKey()
@@ -135,6 +150,10 @@ export const fileKeys = pgTable(
 
     // Upload state tracking
     status: fileKeyStatus("status").notNull().default("pending"),
+    uploadSessionId: text("upload_session_id"),
+    uploadSessionAdapterKey: text("upload_session_adapter_key"),
+    uploadSessionMultipartId: text("upload_session_multipart_id"),
+    uploadSessionUpdatedAt: timestamp("upload_session_updated_at"),
     expiresAt: timestamp("expires_at"),
     uploadCompletedAt: timestamp("upload_completed_at"),
     uploadFailedAt: timestamp("upload_failed_at"),
@@ -151,6 +170,71 @@ export const fileKeys = pgTable(
       table.accessKey,
     ),
     index("file_keys_status_expires_at_idx").on(table.status, table.expiresAt),
+  ],
+);
+
+export const fileLifecycleJobs = pgTable(
+  "file_lifecycle_jobs",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => nanoid(16)),
+    kind: fileLifecycleJobKinds("kind").notNull(),
+    state: fileLifecycleJobStates("state").notNull().default("pending"),
+    priority: integer("priority").notNull().default(100),
+
+    projectId: text("project_id").references(() => projects.id, {
+      onDelete: "set null",
+    }),
+    environmentId: text("environment_id").references(
+      () => projectEnvironments.id,
+      {
+        onDelete: "set null",
+      },
+    ),
+    fileKeyId: text("file_key_id").references(() => fileKeys.id, {
+      onDelete: "set null",
+    }),
+    fileId: text("file_id").references(() => files.id, {
+      onDelete: "set null",
+    }),
+
+    adapterKey: text("adapter_key"),
+    uploadSessionId: text("upload_session_id"),
+    multipartUploadId: text("multipart_upload_id"),
+
+    idempotencyKey: text("idempotency_key").notNull(),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    maxAttempts: integer("max_attempts").notNull().default(10),
+    nextAttemptAt: timestamp("next_attempt_at").defaultNow().notNull(),
+    leaseOwner: text("lease_owner"),
+    leaseExpiresAt: timestamp("lease_expires_at"),
+
+    lastError: text("last_error"),
+    lastHttpStatus: integer("last_http_status"),
+    lastErrorCode: text("last_error_code"),
+
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+    completedAt: timestamp("completed_at"),
+    deadAt: timestamp("dead_at"),
+  },
+  (table) => [
+    uniqueIndex("file_lifecycle_jobs_idempotency_key_idx").on(
+      table.idempotencyKey,
+    ),
+    index("file_lifecycle_jobs_state_next_attempt_idx").on(
+      table.state,
+      table.nextAttemptAt,
+    ),
+    index("file_lifecycle_jobs_lease_expires_idx").on(table.leaseExpiresAt),
+    index("file_lifecycle_jobs_file_key_kind_idx").on(
+      table.fileKeyId,
+      table.kind,
+    ),
   ],
 );
 
@@ -192,9 +276,10 @@ export const filesRelations = relations(files, ({ one, many }) => ({
     references: [projects.id],
   }),
   fileKeys: many(fileKeys),
+  lifecycleJobs: many(fileLifecycleJobs),
 }));
 
-export const fileKeysRelations = relations(fileKeys, ({ one }) => ({
+export const fileKeysRelations = relations(fileKeys, ({ one, many }) => ({
   file: one(files, {
     fields: [fileKeys.fileId],
     references: [files.id],
@@ -207,7 +292,30 @@ export const fileKeysRelations = relations(fileKeys, ({ one }) => ({
     fields: [fileKeys.projectId],
     references: [projects.id],
   }),
+  lifecycleJobs: many(fileLifecycleJobs),
 }));
+
+export const fileLifecycleJobsRelations = relations(
+  fileLifecycleJobs,
+  ({ one }) => ({
+    project: one(projects, {
+      fields: [fileLifecycleJobs.projectId],
+      references: [projects.id],
+    }),
+    environment: one(projectEnvironments, {
+      fields: [fileLifecycleJobs.environmentId],
+      references: [projectEnvironments.id],
+    }),
+    fileKey: one(fileKeys, {
+      fields: [fileLifecycleJobs.fileKeyId],
+      references: [fileKeys.id],
+    }),
+    file: one(files, {
+      fields: [fileLifecycleJobs.fileId],
+      references: [files.id],
+    }),
+  }),
+);
 
 // API Keys - project-scoped keys for external API access
 export const apiKeys = pgTable("api_keys", {

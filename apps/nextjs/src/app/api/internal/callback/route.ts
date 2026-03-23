@@ -1,13 +1,16 @@
 import { z } from "zod";
 
 import {
+  enqueueDeleteObjectJob,
   enqueueUploadWebhookEvent,
   markUploadAsFailed,
+  runLifecycleJobBatch,
   UploadFailureError,
 } from "@silo-storage/api/services";
 import { eq, sql } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import {
+  fileLifecycleJobs,
   projectEnvironments,
   projects,
   usageDaily,
@@ -120,19 +123,51 @@ async function trackUsageEvent(
   }
 }
 
-async function cleanupAdapterKey(adapterKey: string) {
-  const deleteUrl = `${env.WORKER_URL}/internal/delete/${encodeURIComponent(adapterKey)}`;
-  const response = await fetch(deleteUrl, {
-    method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${env.CALLBACK_SECRET}`,
-    },
+async function scheduleAdapterKeyCleanup(input: {
+  projectId: string;
+  environmentId: string;
+  fileKeyId: string;
+  adapterKey: string;
+}) {
+  const jobIdempotencyKey = `delete_object:${input.projectId}:${input.fileKeyId}:-:${input.adapterKey}`;
+
+  await db.transaction(async (tx) => {
+    await enqueueDeleteObjectJob(tx, {
+      projectId: input.projectId,
+      environmentId: input.environmentId,
+      fileKeyId: input.fileKeyId,
+      adapterKey: input.adapterKey,
+      priority: 130,
+      idempotencyKey: jobIdempotencyKey,
+    });
   });
 
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
+  await runLifecycleJobBatch(db, {
+    limit: 20,
+    leaseSeconds: 45,
+    leaseOwner: "internal:callback",
+  });
+
+  const [cleanupJob] = await db
+    .select({
+      state: fileLifecycleJobs.state,
+      attemptCount: fileLifecycleJobs.attemptCount,
+      lastError: fileLifecycleJobs.lastError,
+      lastHttpStatus: fileLifecycleJobs.lastHttpStatus,
+    })
+    .from(fileLifecycleJobs)
+    .where(eq(fileLifecycleJobs.idempotencyKey, jobIdempotencyKey))
+    .limit(1);
+
+  if (!cleanupJob) {
     throw new Error(
-      `Failed to cleanup adapter key (${response.status}): ${body || response.statusText}`,
+      `Cleanup lifecycle job missing after enqueue: ${jobIdempotencyKey}`,
+    );
+  }
+
+  if (cleanupJob.state !== "done") {
+    throw new Error(
+      `Adapter key cleanup not complete (state=${cleanupJob.state}, attempts=${cleanupJob.attemptCount}, status=${cleanupJob.lastHttpStatus ?? "n/a"}, error=${cleanupJob.lastError ?? "n/a"})`,
     );
   }
 }
@@ -169,8 +204,32 @@ export async function POST(request: Request) {
       });
 
       if (!environment) {
+        try {
+          await scheduleAdapterKeyCleanup({
+            projectId: data.projectId,
+            environmentId: data.environmentId,
+            fileKeyId: data.fileKeyId,
+            adapterKey: data.adapterKey,
+          });
+        } catch (cleanupError) {
+          console.error(
+            "Failed to enqueue cleanup for missing environment callback",
+            cleanupError,
+          );
+          return new Response(
+            JSON.stringify({
+              error:
+                "Temporary cleanup scheduling failure for missing environment callback",
+            }),
+            { status: 503, headers: { "Content-Type": "application/json" } },
+          );
+        }
+
         return new Response(
-          JSON.stringify({ error: "Environment not found" }),
+          JSON.stringify({
+            error: "Environment not found",
+            cleanupScheduled: true,
+          }),
           { status: 404, headers: { "Content-Type": "application/json" } },
         );
       }
@@ -194,11 +253,23 @@ export async function POST(request: Request) {
 
       if (completion.alreadyFailed) {
         try {
-          await cleanupAdapterKey(data.adapterKey);
+          await scheduleAdapterKeyCleanup({
+            projectId: data.projectId,
+            environmentId: data.environmentId,
+            fileKeyId: data.fileKeyId,
+            adapterKey: data.adapterKey,
+          });
         } catch (cleanupError) {
           console.error(
-            "Failed to cleanup adapter key for already-failed upload:",
+            "Failed to enqueue cleanup for already-failed upload:",
             cleanupError,
+          );
+          return new Response(
+            JSON.stringify({
+              error:
+                "Temporary cleanup scheduling failure for already-failed upload",
+            }),
+            { status: 503, headers: { "Content-Type": "application/json" } },
           );
         }
 
@@ -217,11 +288,23 @@ export async function POST(request: Request) {
 
       if (completion.alreadyCompleted && file.adapterKey !== data.adapterKey) {
         try {
-          await cleanupAdapterKey(data.adapterKey);
+          await scheduleAdapterKeyCleanup({
+            projectId: data.projectId,
+            environmentId: data.environmentId,
+            fileKeyId: data.fileKeyId,
+            adapterKey: data.adapterKey,
+          });
         } catch (cleanupError) {
           console.error(
-            "Failed to cleanup duplicate completion adapter key:",
+            "Failed to enqueue cleanup for duplicate completion adapter key:",
             cleanupError,
+          );
+          return new Response(
+            JSON.stringify({
+              error:
+                "Temporary cleanup scheduling failure for duplicate completion",
+            }),
+            { status: 503, headers: { "Content-Type": "application/json" } },
           );
         }
       }

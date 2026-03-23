@@ -19,6 +19,9 @@ export interface Bindings {
   EXPIRY_CLEANUP_MAX_BATCHES: string;
   PENDING_UPLOAD_CLEANUP_BATCH_SIZE: string;
   PENDING_UPLOAD_CLEANUP_MAX_BATCHES: string;
+  LIFECYCLE_JOB_BATCH_SIZE: string;
+  LIFECYCLE_JOB_MAX_BATCHES: string;
+  LIFECYCLE_JOB_LEASE_SECONDS: string;
 }
 
 export interface Variables {

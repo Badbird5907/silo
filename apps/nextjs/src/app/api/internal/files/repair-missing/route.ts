@@ -1,8 +1,12 @@
 import { z } from "zod";
 
+import {
+  enqueueLifecycleJob,
+  runLifecycleJobBatch,
+} from "@silo-storage/api/services";
 import { and, eq } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
-import { fileKeys, files } from "@silo-storage/db/schema";
+import { fileKeys } from "@silo-storage/db/schema";
 
 import { env } from "@/env";
 
@@ -76,18 +80,24 @@ export async function POST(request: Request) {
         return { repaired: false, reason: "not_completed" as const };
       }
 
-      await tx
-        .update(fileKeys)
-        .set({
-          status: "failed",
-          uploadFailedAt: new Date(),
-          fileId: null,
-        })
-        .where(eq(fileKeys.id, fileKey.id));
+      await enqueueLifecycleJob(tx, {
+        kind: "repair_missing_object",
+        projectId: input.projectId,
+        environmentId: input.environmentId,
+        fileKeyId: input.fileKeyId,
+        fileId: input.fileId,
+        adapterKey: input.adapterKey,
+        priority: 130,
+        idempotencyKey: `repair_missing_object:${input.projectId}:${input.fileKeyId}:${input.fileId}`,
+      });
 
-      await tx.delete(files).where(eq(files.id, input.fileId));
+      return { repaired: true, reason: "scheduled" as const };
+    });
 
-      return { repaired: true, reason: "updated" as const };
+    const drainResult = await runLifecycleJobBatch(db, {
+      limit: 20,
+      leaseSeconds: 45,
+      leaseOwner: "internal:files/repair-missing",
     });
 
     return new Response(
@@ -96,6 +106,7 @@ export async function POST(request: Request) {
         ...result,
         fileKeyId: input.fileKeyId,
         fileId: input.fileId,
+        lifecycleJobs: drainResult,
       }),
       {
         status: 200,

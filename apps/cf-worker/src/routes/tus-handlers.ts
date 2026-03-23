@@ -208,6 +208,17 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
     const uploadUrl = `${url.protocol}//${url.host}/ingest/tus/${uploadId}`;
 
     if (uploadLength === 0) {
+      await registerUploadSession(
+        {
+          projectId,
+          environmentId,
+          fileKeyId,
+          uploadId,
+          adapterKey,
+        },
+        c.env,
+      );
+
       const zeroByteMimeType = "application/octet-stream";
       if (
         verificationResult.acceptedMimeTypes &&
@@ -248,7 +259,7 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
           c.env,
         );
       } catch (callbackError) {
-        await c.env.R2_BUCKET.delete(adapterKey).catch((deleteError) => {
+        await c.env.R2_BUCKET.delete(adapterKey).catch((deleteError: unknown) => {
           console.error("Failed to rollback zero-byte upload object", {
             adapterKey,
             deleteError,
@@ -288,7 +299,7 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
         projectId,
         cleanupHeaders,
         c.env,
-      ).catch((cleanupError) => {
+      ).catch((cleanupError: unknown) => {
         console.error("Failed to cleanup upload after registration failure", {
           uploadId,
           adapterKey,

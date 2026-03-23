@@ -1,6 +1,6 @@
 import type { TRPCRouterRecord } from "@trpc/server";
-import { TRPCError } from "@trpc/server";
 import type { SQL } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
 import {
   and,
   asc,
@@ -10,13 +10,24 @@ import {
   ilike,
   isNotNull,
   or,
-  sql
+  sql,
 } from "drizzle-orm";
 import { z } from "zod/v4";
 
-import { fileKeys, files, projectEnvironments, projects } from "@silo-storage/db/schema";
+import {
+  fileKeys,
+  files,
+  projectEnvironments,
+  projects,
+} from "@silo-storage/db/schema";
 
-import { markUploadAsFailed, UploadFailureError } from "../service/fileKey";
+import {
+  enqueueDeleteObjectJob,
+  enqueueFinalizeFailedFileKeyJob,
+  markUploadAsFailed,
+  runLifecycleJobBatch,
+  UploadFailureError,
+} from "../service";
 import { organizationProcedure, requirePermission } from "../trpc";
 
 const sortFieldSchema = z.enum(["createdAt", "size", "mimeType", "fileName"]);
@@ -457,9 +468,106 @@ export const fileKeyRouter = {
         });
       }
 
-      await ctx.db.delete(fileKeys).where(eq(fileKeys.id, input.id));
+      if (!fileKey.file && fileKey.status === "failed") {
+        return {
+          success: true,
+          alreadyDeleted: true,
+        };
+      }
 
-      return { success: true };
+      if (!fileKey.file) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "File has not been uploaded yet",
+        });
+      }
+
+      const transitionResult = await ctx.db.transaction(async (tx) => {
+        const current = await tx.query.fileKeys.findFirst({
+          where: and(
+            eq(fileKeys.id, input.id),
+            eq(fileKeys.projectId, input.projectId),
+          ),
+          with: { file: true },
+        });
+
+        if (!current) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "FileKey not found",
+          });
+        }
+
+        if (!current.file) {
+          return {
+            alreadyDeleted: current.status === "failed",
+            fileId: null,
+            adapterKey: null,
+          };
+        }
+
+        await tx
+          .update(fileKeys)
+          .set({
+            status: "failed",
+            uploadFailedAt: new Date(),
+            uploadSessionId: null,
+            uploadSessionAdapterKey: null,
+            uploadSessionMultipartId: null,
+            uploadSessionUpdatedAt: null,
+            fileId: null,
+          })
+          .where(eq(fileKeys.id, current.id));
+
+        await enqueueDeleteObjectJob(tx, {
+          projectId: input.projectId,
+          environmentId: current.environmentId,
+          fileKeyId: current.id,
+          fileId: current.file.id,
+          adapterKey: current.file.adapterKey,
+          priority: 120,
+        });
+
+        await enqueueFinalizeFailedFileKeyJob(tx, {
+          projectId: input.projectId,
+          environmentId: current.environmentId,
+          fileKeyId: current.id,
+          fileId: current.file.id,
+          priority: 100,
+        });
+
+        return {
+          alreadyDeleted: false,
+          fileId: current.file.id,
+          adapterKey: current.file.adapterKey,
+        };
+      });
+
+      if (transitionResult.alreadyDeleted) {
+        return {
+          success: true,
+          alreadyDeleted: true,
+        };
+      }
+
+      const drainResult = await runLifecycleJobBatch(ctx.db, {
+        limit: 20,
+        leaseSeconds: 45,
+        leaseOwner: "trpc:fileKey.delete",
+      });
+
+      return {
+        success: true,
+        alreadyDeleted: false,
+        lifecycleJobs: {
+          fileId: transitionResult.fileId,
+          adapterKey: transitionResult.adapterKey,
+          claimed: drainResult.claimed,
+          completed: drainResult.completed,
+          retried: drainResult.retried,
+          dead: drainResult.dead,
+        },
+      };
     }),
 
   markFailed: organizationProcedure

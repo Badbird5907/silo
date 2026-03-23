@@ -16,6 +16,7 @@ import { handleInternalDelete } from "./routes/internal/delete";
 import { handleInternalDeletePrefix } from "./routes/internal/delete-prefix";
 import { handleInternalList } from "./routes/internal/list";
 import { handleInternalMetadata } from "./routes/internal/metadata";
+import { handleInternalMultipartAbort } from "./routes/internal/multipart-abort";
 import { handleInternalTusDelete } from "./routes/internal/tus-delete";
 import {
   handleTusCreate,
@@ -25,6 +26,7 @@ import {
   handleTusPatch,
 } from "./routes/tus-handlers";
 import { runExpiryCleanup } from "./services/expiry-cleanup";
+import { runLifecycleJobs } from "./services/lifecycle-job-runner";
 import { runPendingUploadCleanup } from "./services/pending-upload-cleanup";
 import { deletePrefixChunk } from "./services/r2/delete-prefix";
 import { createErrorResponse } from "./utils/errors";
@@ -75,6 +77,12 @@ app.post(
   handleInternalMetadata,
 );
 app.post(
+  "/internal/multipart/abort",
+  requireMainDomain,
+  requireCallbackSecret,
+  handleInternalMultipartAbort,
+);
+app.post(
   "/internal/tus/:uploadId/delete",
   requireMainDomain,
   requireCallbackSecret,
@@ -107,6 +115,7 @@ export default {
   ): Promise<void> {
     await runExpiryCleanup(env);
     await runPendingUploadCleanup(env);
+    await runLifecycleJobs(env);
   },
   async queue(
     batch: MessageBatch<DeletePrefixQueueMessage>,
