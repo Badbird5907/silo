@@ -8,6 +8,7 @@ const lifecycleJobRunResponseSchema = z.object({
   completed: z.number().int().nonnegative(),
   retried: z.number().int().nonnegative(),
   dead: z.number().int().nonnegative(),
+  deadRequeued: z.number().int().nonnegative().optional(),
 });
 
 function resolvePositiveInt(
@@ -66,6 +67,7 @@ export async function runLifecycleJobs(env: Bindings) {
   if (result.dead > 0) {
     console.error("Lifecycle jobs moved to dead state", {
       dead: result.dead,
+      deadRequeued: result.deadRequeued ?? 0,
       claimed: result.claimed,
       completed: result.completed,
       retried: result.retried,

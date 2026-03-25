@@ -9,6 +9,7 @@ import {
 import { and, eq } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import { fileKeys } from "@silo-storage/db/schema";
+import { clearUploadSessionAdapterData } from "@silo-storage/shared";
 
 import {
   authenticateRequest,
@@ -32,7 +33,7 @@ type DeleteTransitionResult =
   | { status: "missing" }
   | { status: "already_deleted" }
   | { status: "no_file" }
-  | { status: "transitioned"; fileId: string; adapterKey: string };
+  | { status: "transitioned"; fileId: string; storageKey: string };
 
 export async function POST(request: Request) {
   const authResult = await authenticateRequest(request);
@@ -136,10 +137,7 @@ export async function POST(request: Request) {
           .set({
             status: "failed",
             uploadFailedAt: new Date(),
-            uploadSessionId: null,
-            uploadSessionAdapterKey: null,
-            uploadSessionMultipartId: null,
-            uploadSessionUpdatedAt: null,
+            adapterData: clearUploadSessionAdapterData(current.adapterData),
             fileId: null,
           })
           .where(eq(fileKeys.id, current.id));
@@ -149,7 +147,7 @@ export async function POST(request: Request) {
           environmentId,
           fileKeyId: current.id,
           fileId: current.file.id,
-          adapterKey: current.file.adapterKey,
+          storageKey: current.file.storageKey,
           priority: 120,
         });
 
@@ -164,7 +162,7 @@ export async function POST(request: Request) {
         return {
           status: "transitioned",
           fileId: current.file.id,
-          adapterKey: current.file.adapterKey,
+          storageKey: current.file.storageKey,
         };
       },
     );
@@ -214,7 +212,7 @@ export async function POST(request: Request) {
         accessKey: fileKey.accessKey,
         lifecycleJobs: {
           fileId: transitioned.fileId,
-          adapterKey: transitioned.adapterKey,
+          storageKey: transitioned.storageKey,
           claimed: drainResult.claimed,
           completed: drainResult.completed,
           retried: drainResult.retried,

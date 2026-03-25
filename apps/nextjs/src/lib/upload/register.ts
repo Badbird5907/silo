@@ -3,6 +3,7 @@ import { z } from "zod";
 import { and, eq, sql } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import { fileKeys, files } from "@silo-storage/db/schema";
+import { clearUploadSessionAdapterData } from "@silo-storage/shared";
 
 const unknownRecordSchema = z.record(z.string(), z.unknown());
 
@@ -229,7 +230,7 @@ export async function completeFileKeyFromCallback(input: {
   actualSize: number;
   actualMimeType: string;
   actualHash?: string | null;
-  adapterKey: string;
+  storageKey: string;
   metadata?: Record<string, unknown>;
 }): Promise<
   | {
@@ -336,7 +337,7 @@ export async function completeFileKeyFromCallback(input: {
         hash: input.actualHash ?? null,
         mimeType: input.actualMimeType,
         size: input.actualSize,
-        adapterKey: input.adapterKey,
+        storageKey: input.storageKey,
         environmentId: input.environmentId,
         projectId: input.projectId,
       })
@@ -357,10 +358,7 @@ export async function completeFileKeyFromCallback(input: {
         status: "completed",
         uploadCompletedAt: new Date(),
         uploadFailedAt: null,
-        uploadSessionId: null,
-        uploadSessionAdapterKey: null,
-        uploadSessionMultipartId: null,
-        uploadSessionUpdatedAt: null,
+        adapterData: clearUploadSessionAdapterData(claimedFileKey.adapterData),
         isPublic: input.isPublic ?? claimedFileKey.isPublic,
         metadata: mergedMetadata,
       })

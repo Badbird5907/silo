@@ -1,8 +1,12 @@
 import { z } from "zod";
 
-import { eq } from "@silo-storage/db";
+import { and, eq } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
-import { apiKeys, projectEnvironments } from "@silo-storage/db/schema";
+import {
+  apiKeys,
+  fileKeys,
+  projectEnvironments,
+} from "@silo-storage/db/schema";
 import { normalizeFileRouterInputKey } from "@silo-storage/mime-types";
 import {
   parseAcceptedMimeTypePatterns,
@@ -261,6 +265,45 @@ export async function POST(request: Request) {
         }),
         {
           status: 403,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    const fileKey = await db.query.fileKeys.findFirst({
+      where: and(
+        eq(fileKeys.id, payload.fileKeyId),
+        eq(fileKeys.projectId, apiKey.projectId),
+        eq(fileKeys.environmentId, payload.environmentId),
+        eq(fileKeys.accessKey, payload.accessKey),
+      ),
+      columns: {
+        id: true,
+        status: true,
+      },
+    });
+
+    if (!fileKey) {
+      return new Response(
+        JSON.stringify({
+          error: "File key not found",
+          valid: false,
+        }),
+        {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    if (fileKey.status !== "pending") {
+      return new Response(
+        JSON.stringify({
+          error: "File key is not pending",
+          valid: false,
+        }),
+        {
+          status: 409,
           headers: { "Content-Type": "application/json" },
         },
       );

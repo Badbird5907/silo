@@ -28,7 +28,10 @@ export async function POST(request: Request) {
     }
 
     const fileKey = await db.query.fileKeys.findFirst({
-      where: and(eq(fileKeys.accessKey, accessKey), eq(fileKeys.projectId, projectId)),
+      where: and(
+        eq(fileKeys.accessKey, accessKey),
+        eq(fileKeys.projectId, projectId),
+      ),
       with: {
         file: true,
       },
@@ -41,7 +44,17 @@ export async function POST(request: Request) {
       });
     }
 
-    return new Response(JSON.stringify(fileKey), {
+    const responseBody = {
+      ...fileKey,
+      file: fileKey.file
+        ? {
+            ...fileKey.file,
+            adapterKey: fileKey.file.storageKey,
+          }
+        : null,
+    };
+
+    return new Response(JSON.stringify(responseBody), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });

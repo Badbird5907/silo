@@ -101,11 +101,11 @@ export const projectRouter = {
         id: z.string(),
         name: z.string().min(1).max(100).optional(),
         defaultFileAccess: z.enum(fileAccessTypes.enumValues).optional(),
-        pendingUploadFailAfterHours: z
+        pendingUploadFailAfterMinutes: z
           .number()
           .int()
-          .min(1)
-          .max(720)
+          .min(5)
+          .max(43200)
           .optional(),
       }),
     )
@@ -131,7 +131,7 @@ export const projectRouter = {
         id: input.id,
         name: input.name,
         defaultFileAccess: input.defaultFileAccess,
-        pendingUploadFailAfterHours: input.pendingUploadFailAfterHours,
+        pendingUploadFailAfterHours: input.pendingUploadFailAfterMinutes,
       });
     }),
 

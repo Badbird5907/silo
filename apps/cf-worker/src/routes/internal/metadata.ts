@@ -7,10 +7,10 @@ import { HTTP_STATUS } from "../../utils/constants";
 export async function handleInternalMetadata(
   c: Context<{ Bindings: Bindings; Variables: Variables }>,
 ): Promise<Response> {
-  const adapterKey = c.req.param("adapterKey");
+  const storageKey = c.req.param("storageKey");
 
   try {
-    const metadata = await getObjectMetadata(adapterKey, c.env);
+    const metadata = await getObjectMetadata(storageKey, c.env);
 
     if (!metadata) {
       return c.json({ error: "File not found" }, HTTP_STATUS.NOT_FOUND);

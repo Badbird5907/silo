@@ -12,6 +12,7 @@ import {
   sql,
 } from "@silo-storage/db";
 import { fileKeys, fileLifecycleJobs, files } from "@silo-storage/db/schema";
+import { clearUploadSessionAdapterData } from "@silo-storage/shared";
 
 import { env } from "../env";
 
@@ -29,13 +30,20 @@ export interface EnqueueLifecycleJobInput {
   environmentId?: string | null;
   fileKeyId?: string | null;
   fileId?: string | null;
-  adapterKey?: string | null;
+  storageKey?: string | null;
   uploadSessionId?: string | null;
   multipartUploadId?: string | null;
+  adapterData?: Record<string, unknown> | null;
   idempotencyKey?: string;
   maxAttempts?: number;
   priority?: number;
   nextAttemptAt?: Date;
+}
+
+interface LifecycleJobAdapterData {
+  storageKey?: string;
+  uploadSessionId?: string;
+  multipartUploadId?: string;
 }
 
 type JobExecutor = Pick<Db, "execute">;
@@ -44,6 +52,11 @@ interface ClaimOptions {
   limit?: number;
   leaseSeconds?: number;
   leaseOwner?: string;
+}
+
+interface RequeueDeadOptions {
+  limit?: number;
+  kinds?: LifecycleJobKind[];
 }
 
 function resolveIdempotencyKey(input: EnqueueLifecycleJobInput): string {
@@ -55,7 +68,7 @@ function resolveIdempotencyKey(input: EnqueueLifecycleJobInput): string {
     input.environmentId ?? "-",
     input.fileKeyId ?? "-",
     input.fileId ?? "-",
-    input.adapterKey ?? "-",
+    input.storageKey ?? "-",
     input.uploadSessionId ?? "-",
     input.multipartUploadId ?? "-",
   ];
@@ -73,76 +86,96 @@ export async function enqueueLifecycleJob(
   input: EnqueueLifecycleJobInput,
 ): Promise<void> {
   const idempotencyKey = resolveIdempotencyKey(input);
-
-  await executor
-    .execute(
-      sql`
-        insert into file_lifecycle_jobs (
-          kind,
-          state,
-          priority,
-          project_id,
-          environment_id,
-          file_key_id,
-          file_id,
-          adapter_key,
-          upload_session_id,
-          multipart_upload_id,
-          idempotency_key,
-          max_attempts,
-          next_attempt_at
-        ) values (
-          ${input.kind},
-          'pending',
-          ${input.priority ?? 100},
-          ${input.projectId ?? null},
-          ${input.environmentId ?? null},
-          ${input.fileKeyId ?? null},
-          ${input.fileId ?? null},
-          ${input.adapterKey ?? null},
-          ${input.uploadSessionId ?? null},
-          ${input.multipartUploadId ?? null},
-          ${idempotencyKey},
-          ${input.maxAttempts ?? 10},
-          ${input.nextAttemptAt ?? new Date()}
-        )
-        on conflict (idempotency_key)
-        do update set
-          state = case
-            when file_lifecycle_jobs.state = 'done' then file_lifecycle_jobs.state
-            else 'pending'
-          end,
-          next_attempt_at = least(file_lifecycle_jobs.next_attempt_at, excluded.next_attempt_at),
-          lease_owner = null,
-          lease_expires_at = null,
-          updated_at = now()
-      `,
-    )
-    .catch((error: unknown) => {
-      console.error("Failed to enqueue lifecycle job", {
+  const adapterData: LifecycleJobAdapterData = {
+    ...(input.adapterData ?? {}),
+    ...(input.storageKey ? { storageKey: input.storageKey } : {}),
+    ...(input.uploadSessionId
+      ? { uploadSessionId: input.uploadSessionId }
+      : {}),
+    ...(input.multipartUploadId
+      ? { multipartUploadId: input.multipartUploadId }
+      : {}),
+  };
+  try {
+    await executor
+      .insert(fileLifecycleJobs)
+      .values({
         kind: input.kind,
+        state: "pending",
+        priority: input.priority ?? 100,
+        projectId: input.projectId ?? null,
+        environmentId: input.environmentId ?? null,
+        fileKeyId: input.fileKeyId ?? null,
+        fileId: input.fileId ?? null,
+        adapterData: Object.keys(adapterData).length > 0 ? adapterData : null,
         idempotencyKey,
-        fileKeyId: input.fileKeyId,
-        fileId: input.fileId,
-        adapterKey: input.adapterKey,
-        uploadSessionId: input.uploadSessionId,
-        error,
+        maxAttempts: input.maxAttempts ?? 10,
+        nextAttemptAt: input.nextAttemptAt ?? new Date(),
+      })
+      .onConflictDoUpdate({
+        target: fileLifecycleJobs.idempotencyKey,
+        set: {
+          state: sql`case
+            when ${fileLifecycleJobs.state} = 'done' then ${fileLifecycleJobs.state}
+            else 'pending'
+          end`,
+          nextAttemptAt: sql`least(${fileLifecycleJobs.nextAttemptAt}, excluded.next_attempt_at)`,
+          leaseOwner: null,
+          leaseExpiresAt: null,
+          updatedAt: sql`now()`,
+        },
       });
-      throw error;
+  } catch (error) {
+    console.error("Failed to enqueue lifecycle job", {
+      kind: input.kind,
+      idempotencyKey,
+      fileKeyId: input.fileKeyId,
+      fileId: input.fileId,
+      storageKey: input.storageKey,
+      uploadSessionId: input.uploadSessionId,
+      error,
     });
+    throw error;
+  }
 }
 
 export async function enqueueDeleteObjectJob(
   executor: JobExecutor,
-  input: Omit<EnqueueLifecycleJobInput, "kind"> & { adapterKey: string },
+  input: Omit<EnqueueLifecycleJobInput, "kind"> & { storageKey: string },
 ): Promise<void> {
   await enqueueLifecycleJob(executor, {
     ...input,
     kind: "delete_object",
     idempotencyKey:
       input.idempotencyKey ??
-      `delete_object:${input.projectId ?? "-"}:${input.fileKeyId ?? "-"}:${input.fileId ?? "-"}:${input.adapterKey}`,
+      `delete_object:${input.projectId ?? "-"}:${input.fileKeyId ?? "-"}:${input.fileId ?? "-"}:${input.storageKey}`,
   });
+}
+
+function getLifecycleJobAdapterData(
+  adapterData: unknown,
+): LifecycleJobAdapterData {
+  if (
+    !adapterData ||
+    typeof adapterData !== "object" ||
+    Array.isArray(adapterData)
+  ) {
+    return {};
+  }
+
+  const data = adapterData as Record<string, unknown>;
+  return {
+    storageKey:
+      typeof data.storageKey === "string" ? data.storageKey : undefined,
+    uploadSessionId:
+      typeof data.uploadSessionId === "string"
+        ? data.uploadSessionId
+        : undefined,
+    multipartUploadId:
+      typeof data.multipartUploadId === "string"
+        ? data.multipartUploadId
+        : undefined,
+  };
 }
 
 export async function enqueueAbortMultipartJob(
@@ -236,6 +269,52 @@ async function claimLifecycleJobs(db: Db, options: ClaimOptions) {
   return claimed;
 }
 
+export async function requeueDeadLifecycleJobs(
+  db: Db,
+  options: RequeueDeadOptions = {},
+): Promise<{
+  selected: number;
+  requeued: number;
+}> {
+  const limit = options.limit ?? 100;
+  const kinds = options.kinds ?? ["delete_object", "abort_multipart"];
+
+  const candidates = await db
+    .select({ id: fileLifecycleJobs.id })
+    .from(fileLifecycleJobs)
+    .where(
+      and(
+        eq(fileLifecycleJobs.state, "dead"),
+        inArray(fileLifecycleJobs.kind, kinds),
+        sql`${fileLifecycleJobs.attemptCount} < ${fileLifecycleJobs.maxAttempts}`,
+      ),
+    )
+    .orderBy(asc(fileLifecycleJobs.deadAt), asc(fileLifecycleJobs.updatedAt))
+    .limit(limit);
+
+  const ids = candidates.map((candidate) => candidate.id);
+  if (ids.length === 0) {
+    return { selected: 0, requeued: 0 };
+  }
+
+  const requeued = await db
+    .update(fileLifecycleJobs)
+    .set({
+      state: "retry",
+      nextAttemptAt: new Date(),
+      leaseOwner: null,
+      leaseExpiresAt: null,
+      deadAt: null,
+    })
+    .where(inArray(fileLifecycleJobs.id, ids))
+    .returning({ id: fileLifecycleJobs.id });
+
+  return {
+    selected: ids.length,
+    requeued: requeued.length,
+  };
+}
+
 async function markJobDone(db: Db, jobId: string): Promise<void> {
   await db
     .update(fileLifecycleJobs)
@@ -286,17 +365,18 @@ async function markJobFailed(
 }
 
 async function performDeleteObject(job: typeof fileLifecycleJobs.$inferSelect) {
-  if (!job.adapterKey) {
+  const adapterData = getLifecycleJobAdapterData(job.adapterData);
+  if (!adapterData.storageKey) {
     return {
       ok: false as const,
       retryable: false,
-      errorCode: "missing_adapter_key",
-      message: "Lifecycle job missing adapterKey",
+      errorCode: "missing_storage_key",
+      message: "Lifecycle job missing storageKey",
     };
   }
 
   const response = await fetch(
-    `${env.WORKER_URL}/internal/delete/${encodeURIComponent(job.adapterKey)}`,
+    `${env.WORKER_URL}/internal/delete/${encodeURIComponent(adapterData.storageKey)}`,
     {
       method: "DELETE",
       headers: {
@@ -324,7 +404,9 @@ async function performDeleteObject(job: typeof fileLifecycleJobs.$inferSelect) {
 async function performAbortMultipart(
   job: typeof fileLifecycleJobs.$inferSelect,
 ) {
-  if (!job.uploadSessionId || !job.projectId) {
+  const adapterData = getLifecycleJobAdapterData(job.adapterData);
+
+  if (!adapterData.uploadSessionId || !job.projectId) {
     return {
       ok: false as const,
       retryable: false,
@@ -334,7 +416,7 @@ async function performAbortMultipart(
   }
 
   const response = await fetch(
-    `${env.WORKER_URL}/internal/tus/${job.uploadSessionId}/delete`,
+    `${env.WORKER_URL}/internal/tus/${adapterData.uploadSessionId}/delete`,
     {
       method: "POST",
       headers: {
@@ -346,7 +428,11 @@ async function performAbortMultipart(
   );
 
   if (response.ok || response.status === 404) {
-    if (response.status === 404 && job.adapterKey && job.multipartUploadId) {
+    if (
+      response.status === 404 &&
+      adapterData.storageKey &&
+      adapterData.multipartUploadId
+    ) {
       const fallbackAbortResponse = await fetch(
         `${env.WORKER_URL}/internal/multipart/abort`,
         {
@@ -356,8 +442,8 @@ async function performAbortMultipart(
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            adapterKey: job.adapterKey,
-            uploadId: job.multipartUploadId,
+            storageKey: adapterData.storageKey,
+            uploadId: adapterData.multipartUploadId,
           }),
         },
       );
@@ -380,7 +466,7 @@ async function performAbortMultipart(
       }
     }
 
-    if (job.adapterKey) {
+    if (adapterData.storageKey) {
       const deleteResult = await performDeleteObject(job);
       if (!deleteResult.ok) {
         return deleteResult;
@@ -406,6 +492,44 @@ async function performFinalizeFailedFileKey(
   db: Db,
   job: typeof fileLifecycleJobs.$inferSelect,
 ) {
+  if (job.fileId || job.fileKeyId) {
+    const blockingCleanupJobs = await db
+      .select({
+        id: fileLifecycleJobs.id,
+        state: fileLifecycleJobs.state,
+      })
+      .from(fileLifecycleJobs)
+      .where(
+        and(
+          inArray(fileLifecycleJobs.kind, ["delete_object", "abort_multipart"]),
+          inArray(fileLifecycleJobs.state, [
+            "pending",
+            "retry",
+            "leased",
+            "dead",
+          ]),
+          or(
+            job.fileId ? eq(fileLifecycleJobs.fileId, job.fileId) : undefined,
+            job.fileKeyId
+              ? eq(fileLifecycleJobs.fileKeyId, job.fileKeyId)
+              : undefined,
+          ),
+        ),
+      )
+      .limit(1);
+
+    if (blockingCleanupJobs.length > 0) {
+      return {
+        ok: false as const,
+        retryable: true,
+        httpStatus: undefined,
+        errorCode: "storage_cleanup_incomplete",
+        message:
+          "Finalize failed file key deferred until storage cleanup completes",
+      };
+    }
+  }
+
   if (job.fileId) {
     await db.delete(files).where(eq(files.id, job.fileId));
   }
@@ -419,15 +543,19 @@ async function performRepairMissingObject(
 ) {
   await db.transaction(async (tx) => {
     if (job.fileKeyId) {
+      const currentFileKey = await tx.query.fileKeys.findFirst({
+        where: eq(fileKeys.id, job.fileKeyId),
+        columns: { adapterData: true },
+      });
+
       await tx
         .update(fileKeys)
         .set({
           status: "failed",
           uploadFailedAt: new Date(),
-          uploadSessionId: null,
-          uploadSessionAdapterKey: null,
-          uploadSessionMultipartId: null,
-          uploadSessionUpdatedAt: null,
+          adapterData: clearUploadSessionAdapterData(
+            currentFileKey?.adapterData,
+          ),
           fileId: null,
         })
         .where(eq(fileKeys.id, job.fileKeyId));

@@ -71,8 +71,8 @@ export default function ProjectSettingsPage({
             name: projectQuery.data.name,
             slug: projectQuery.data.slug,
             defaultFileAccess: projectQuery.data.defaultFileAccess,
-            pendingUploadFailAfterHours:
-              projectQuery.data.pendingUploadFailAfterHours,
+            pendingUploadFailAfterMinutes:
+              projectQuery.data.pendingUploadFailAfterMinutes,
           }}
           organizationId={organizationId}
         />

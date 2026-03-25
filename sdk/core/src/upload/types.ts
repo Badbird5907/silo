@@ -67,7 +67,7 @@ export interface SiloFileSummary {
   hash: string | null;
   mimeType: string | null;
   size: number | null;
-  adapterKey: string | null;
+  storageKey: string | null;
 }
 
 export interface ListFilesResult {
@@ -112,7 +112,7 @@ export interface SiloFileDetail {
     hash: string | null;
     mimeType: string;
     size: number;
-    adapterKey: string;
+    storageKey: string;
     createdAt: string;
     updatedAt: string;
   } | null;

@@ -96,7 +96,7 @@ export async function GET(
             hash: fileKey.file.hash,
             mimeType: fileKey.file.mimeType,
             size: fileKey.file.size,
-            adapterKey: fileKey.file.adapterKey,
+            storageKey: fileKey.file.storageKey,
             createdAt: fileKey.file.createdAt,
             updatedAt: fileKey.file.updatedAt,
           }

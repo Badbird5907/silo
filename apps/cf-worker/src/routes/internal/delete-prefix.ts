@@ -16,13 +16,14 @@ export async function handleInternalDeletePrefix(
 ): Promise<Response> {
   const body = await c.req.json<DeletePrefixRequestBody>();
   const { prefix, cursor, blocking } = body;
+  const shouldBlock = blocking !== false;
 
   if (!prefix) {
     return c.json({ error: "prefix is required" }, HTTP_STATUS.BAD_REQUEST);
   }
 
   try {
-    if (blocking) {
+    if (shouldBlock) {
       const result = await deletePrefixChunk({
         prefix,
         cursor,

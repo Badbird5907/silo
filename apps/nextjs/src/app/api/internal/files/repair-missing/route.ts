@@ -86,7 +86,7 @@ export async function POST(request: Request) {
         environmentId: input.environmentId,
         fileKeyId: input.fileKeyId,
         fileId: input.fileId,
-        adapterKey: input.adapterKey,
+        storageKey: input.adapterKey,
         priority: 130,
         idempotencyKey: `repair_missing_object:${input.projectId}:${input.fileKeyId}:${input.fileId}`,
       });

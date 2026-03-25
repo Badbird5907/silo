@@ -7,18 +7,18 @@ import { HTTP_STATUS } from "../../utils/constants";
 export async function handleInternalDelete(
   c: Context<{ Bindings: Bindings; Variables: Variables }>,
 ): Promise<Response> {
-  const rawAdapterKey = c.req.param("*");
-  const adapterKey = rawAdapterKey ? decodeURIComponent(rawAdapterKey) : "";
+  const rawStorageKey = c.req.param("*");
+  const storageKey = rawStorageKey ? decodeURIComponent(rawStorageKey) : "";
 
-  if (!adapterKey) {
+  if (!storageKey) {
     return c.json(
-      { success: false, error: "adapterKey is required" },
+      { success: false, error: "storageKey is required" },
       HTTP_STATUS.BAD_REQUEST,
     );
   }
 
   try {
-    await deleteObject(adapterKey, c.env);
+    await deleteObject(storageKey, c.env);
 
     return c.json({ success: true }, HTTP_STATUS.OK);
   } catch (error) {

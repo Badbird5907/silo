@@ -7,7 +7,7 @@ export interface TusUploadMetadata {
   fileName: string;
   size: number | null;
   offset: number;
-  adapterKey: string;
+  storageKey: string;
   multipartUploadId: string | null;
   parts: TusUploadPart[];
   isPublic: boolean;

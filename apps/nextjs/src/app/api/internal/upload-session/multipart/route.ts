@@ -1,8 +1,12 @@
 import { z } from "zod";
 
-import { and, eq, isNull, or } from "@silo-storage/db";
+import { and, eq } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import { fileKeys } from "@silo-storage/db/schema";
+import {
+  getUploadSessionAdapterData,
+  setUploadSessionAdapterData,
+} from "@silo-storage/shared";
 
 import { env } from "@/env";
 
@@ -59,8 +63,7 @@ export async function POST(request: Request) {
     columns: {
       id: true,
       status: true,
-      uploadSessionId: true,
-      uploadSessionMultipartId: true,
+      adapterData: true,
     },
   });
 
@@ -72,13 +75,21 @@ export async function POST(request: Request) {
   }
 
   if (existing.status !== "pending") {
-    return new Response(JSON.stringify({ success: true, skipped: true }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        error: "Multipart upload cannot be registered for non-pending file key",
+        status: existing.status,
+      }),
+      {
+        status: 409,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   }
 
-  if (existing.uploadSessionId !== uploadId) {
+  const uploadSession = getUploadSessionAdapterData(existing.adapterData);
+
+  if (uploadSession?.id !== uploadId) {
     return new Response(JSON.stringify({ error: "Upload session mismatch" }), {
       status: 409,
       headers: { "Content-Type": "application/json" },
@@ -86,8 +97,8 @@ export async function POST(request: Request) {
   }
 
   if (
-    existing.uploadSessionMultipartId &&
-    existing.uploadSessionMultipartId !== multipartUploadId
+    uploadSession?.multipartUploadId &&
+    uploadSession.multipartUploadId !== multipartUploadId
   ) {
     return new Response(
       JSON.stringify({
@@ -103,19 +114,13 @@ export async function POST(request: Request) {
   const [updated] = await db
     .update(fileKeys)
     .set({
-      uploadSessionMultipartId: multipartUploadId,
-      uploadSessionUpdatedAt: new Date(),
+      adapterData: setUploadSessionAdapterData(existing.adapterData, {
+        id: uploadId,
+        storageKey: uploadSession.storageKey,
+        multipartUploadId,
+      }),
     })
-    .where(
-      and(
-        eq(fileKeys.id, fileKeyId),
-        eq(fileKeys.uploadSessionId, uploadId),
-        or(
-          isNull(fileKeys.uploadSessionMultipartId),
-          eq(fileKeys.uploadSessionMultipartId, multipartUploadId),
-        ),
-      ),
-    )
+    .where(and(eq(fileKeys.id, fileKeyId), eq(fileKeys.status, "pending")))
     .returning({ id: fileKeys.id });
 
   if (!updated) {

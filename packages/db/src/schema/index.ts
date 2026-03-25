@@ -51,9 +51,9 @@ export const projects = pgTable("projects", {
   defaultFileAccess: fileAccessTypes("default_file_access")
     .notNull()
     .default("private"),
-  pendingUploadFailAfterHours: integer("pending_upload_fail_after_hours")
+  pendingUploadFailAfterMinutes: integer("pending_upload_fail_after_minutes")
     .notNull()
-    .default(24),
+    .default(24 * 60),
   parentOrganizationId: text("parent_organization_id").references(
     () => auth.organizations.id,
     { onDelete: "cascade" },
@@ -109,7 +109,7 @@ export const files = pgTable("files", {
   hash: text("hash"), // optional sha256 hash of the file (null if not computed)
   mimeType: text("mime_type").notNull(),
   size: bigint("size", { mode: "number" }).notNull(),
-  adapterKey: text("adapter_key").notNull(), // this is the file key in s3
+  storageKey: text("storage_key").notNull(), // this is the file key in storage backend
   environmentId: text("environment_id")
     .references(() => projectEnvironments.id, { onDelete: "cascade" })
     .notNull(),
@@ -150,10 +150,7 @@ export const fileKeys = pgTable(
 
     // Upload state tracking
     status: fileKeyStatus("status").notNull().default("pending"),
-    uploadSessionId: text("upload_session_id"),
-    uploadSessionAdapterKey: text("upload_session_adapter_key"),
-    uploadSessionMultipartId: text("upload_session_multipart_id"),
-    uploadSessionUpdatedAt: timestamp("upload_session_updated_at"),
+    adapterData: jsonb("adapter_data"),
     expiresAt: timestamp("expires_at"),
     uploadCompletedAt: timestamp("upload_completed_at"),
     uploadFailedAt: timestamp("upload_failed_at"),
@@ -199,9 +196,7 @@ export const fileLifecycleJobs = pgTable(
       onDelete: "set null",
     }),
 
-    adapterKey: text("adapter_key"),
-    uploadSessionId: text("upload_session_id"),
-    multipartUploadId: text("multipart_upload_id"),
+    adapterData: jsonb("adapter_data"),
 
     idempotencyKey: text("idempotency_key").notNull(),
     attemptCount: integer("attempt_count").notNull().default(0),

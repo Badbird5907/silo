@@ -52,7 +52,7 @@ export async function POST(request: Request) {
         environmentId: fileKeys.environmentId,
         accessKey: fileKeys.accessKey,
         expiresAt: fileKeys.expiresAt,
-        adapterKey: files.adapterKey,
+        storageKey: files.storageKey,
       })
       .from(fileKeys)
       .innerJoin(files, eq(fileKeys.fileId, files.id))
@@ -76,7 +76,8 @@ export async function POST(request: Request) {
           environmentId: item.environmentId,
           accessKey: item.accessKey,
           expiresAt: item.expiresAt,
-          adapterKey: item.adapterKey,
+          storageKey: item.storageKey,
+          adapterKey: item.storageKey,
         })),
       }),
       {

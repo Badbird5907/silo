@@ -10,6 +10,10 @@ const WEBHOOK_EVENTS = ["upload.completed", "upload.failed"] as const;
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 const WEBHOOK_EVENT_SET = new Set<WebhookEvent>(WEBHOOK_EVENTS);
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function toSlug(input: string) {
   return input
     .toLowerCase()
@@ -265,12 +269,28 @@ export async function deleteEnvironment(
     });
   }
 
-  const [deleted] = await db
-    .delete(projectEnvironments)
-    .where(eq(projectEnvironments.id, environmentId))
-    .returning();
+  let lastError: unknown;
 
-  return deleted;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const [deleted] = await db
+        .delete(projectEnvironments)
+        .where(eq(projectEnvironments.id, environmentId))
+        .returning();
+
+      return deleted;
+    } catch (error) {
+      lastError = error;
+      if (attempt >= 3) {
+        break;
+      }
+      await sleep(100 * 2 ** (attempt - 1));
+    }
+  }
+
+  throw new Error(
+    `Failed to delete environment metadata after object cleanup for environment ${environmentId}: ${lastError instanceof Error ? lastError.message : "Unknown error"}`,
+  );
 }
 
 export async function scheduleEnvironmentObjectDeletion(params: {

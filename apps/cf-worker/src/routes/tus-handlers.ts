@@ -178,7 +178,7 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
     }
 
     const uploadId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
-    const adapterKey = `${projectId}/${environmentId}/${crypto.randomUUID()}`;
+    const storageKey = `${projectId}/${environmentId}/${crypto.randomUUID()}`;
 
     const uploadMetadata: TusUploadMetadata = {
       uploadId,
@@ -189,7 +189,7 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
       fileName,
       size: uploadLength ?? null,
       offset: 0,
-      adapterKey,
+      storageKey,
       multipartUploadId: null,
       parts: [],
       isPublic: verificationResult.isPublic ?? false,
@@ -214,7 +214,7 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
           environmentId,
           fileKeyId,
           uploadId,
-          adapterKey,
+          storageKey,
         },
         c.env,
       );
@@ -233,7 +233,7 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
         );
       }
 
-      await c.env.R2_BUCKET.put(adapterKey, new Uint8Array(0));
+      await c.env.R2_BUCKET.put(storageKey, new Uint8Array(0));
 
       try {
         await sendUploadCallback(
@@ -250,7 +250,7 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
               actualHash: null,
               actualMimeType: zeroByteMimeType,
               actualSize: 0,
-              adapterKey,
+              adapterKey: storageKey,
               projectId,
               isPublic: verificationResult.isPublic ?? false,
               metadata,
@@ -259,12 +259,14 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
           c.env,
         );
       } catch (callbackError) {
-        await c.env.R2_BUCKET.delete(adapterKey).catch((deleteError: unknown) => {
-          console.error("Failed to rollback zero-byte upload object", {
-            adapterKey,
-            deleteError,
-          });
-        });
+        await c.env.R2_BUCKET.delete(storageKey).catch(
+          (deleteError: unknown) => {
+            console.error("Failed to rollback zero-byte upload object", {
+              storageKey,
+              deleteError,
+            });
+          },
+        );
         throw callbackError;
       }
 
@@ -287,7 +289,7 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
           environmentId,
           fileKeyId,
           uploadId,
-          adapterKey,
+          storageKey,
         },
         c.env,
       );
@@ -302,7 +304,7 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
       ).catch((cleanupError: unknown) => {
         console.error("Failed to cleanup upload after registration failure", {
           uploadId,
-          adapterKey,
+          storageKey,
           cleanupError,
         });
       });

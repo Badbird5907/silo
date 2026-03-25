@@ -31,7 +31,7 @@ interface ProjectGeneralSettingsProps {
     name: string;
     slug: string;
     defaultFileAccess: "public" | "private";
-    pendingUploadFailAfterHours: number;
+    pendingUploadFailAfterMinutes: number;
   };
   organizationId: string;
 }
@@ -45,8 +45,8 @@ export function ProjectGeneralSettings({
   const [defaultFileAccess, setDefaultFileAccess] = React.useState(
     project.defaultFileAccess,
   );
-  const [pendingUploadFailAfterHours, setPendingUploadFailAfterHours] =
-    React.useState(project.pendingUploadFailAfterHours);
+  const [pendingUploadFailAfterMinutes, setPendingUploadFailAfterMinutes] =
+    React.useState(project.pendingUploadFailAfterMinutes);
 
   const updateMutation = useMutation(
     trpc.project.update.mutationOptions({
@@ -68,13 +68,13 @@ export function ProjectGeneralSettings({
   const handleSave = () => {
     if (
       defaultFileAccess !== project.defaultFileAccess ||
-      pendingUploadFailAfterHours !== project.pendingUploadFailAfterHours
+      pendingUploadFailAfterMinutes !== project.pendingUploadFailAfterMinutes
     ) {
       updateMutation.mutate({
         id: project.id,
         organizationId,
         defaultFileAccess,
-        pendingUploadFailAfterHours,
+        pendingUploadFailAfterMinutes,
       });
     }
   };
@@ -87,7 +87,7 @@ export function ProjectGeneralSettings({
 
   const hasChanges =
     defaultFileAccess !== project.defaultFileAccess ||
-    pendingUploadFailAfterHours !== project.pendingUploadFailAfterHours;
+    pendingUploadFailAfterMinutes !== project.pendingUploadFailAfterMinutes;
 
   return (
     <div className="flex w-full flex-row gap-6">
@@ -174,21 +174,21 @@ export function ProjectGeneralSettings({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="pending-upload-fail-after-hours">
-              Auto-fail Pending Uploads (hours)
+            <Label htmlFor="pending-upload-fail-after-minutes">
+              Auto-fail Pending Uploads (minutes)
             </Label>
             <Input
-              id="pending-upload-fail-after-hours"
+              id="pending-upload-fail-after-minutes"
               type="number"
-              min={1}
-              max={720}
+              min={5}
+              max={43200}
               step={1}
-              value={pendingUploadFailAfterHours}
+              value={pendingUploadFailAfterMinutes}
               onChange={(event) => {
                 const nextValue = Number.parseInt(event.target.value, 10);
                 if (Number.isNaN(nextValue)) return;
-                setPendingUploadFailAfterHours(
-                  Math.min(720, Math.max(1, nextValue)),
+                setPendingUploadFailAfterMinutes(
+                  Math.min(43200, Math.max(5, nextValue)),
                 );
               }}
               className="w-[200px]"

@@ -1,6 +1,9 @@
 import { z } from "zod";
 
-import { runLifecycleJobBatch } from "@silo-storage/api/services";
+import {
+  requeueDeadLifecycleJobs,
+  runLifecycleJobBatch,
+} from "@silo-storage/api/services";
 import { db } from "@silo-storage/db/client";
 
 import { env } from "@/env";
@@ -51,6 +54,7 @@ export async function POST(request: Request) {
     let completed = 0;
     let retried = 0;
     let dead = 0;
+    let deadRequeued = 0;
 
     while (batches < maxBatches) {
       const result = await runLifecycleJobBatch(db, {
@@ -69,6 +73,13 @@ export async function POST(request: Request) {
       }
     }
 
+    if (dead > 0) {
+      const replay = await requeueDeadLifecycleJobs(db, {
+        limit: Math.min(dead, 200),
+      });
+      deadRequeued = replay.requeued;
+    }
+
     return new Response(
       JSON.stringify({
         batches,
@@ -76,6 +87,7 @@ export async function POST(request: Request) {
         completed,
         retried,
         dead,
+        deadRequeued,
       }),
       {
         status: 200,

@@ -9,7 +9,9 @@ import {
 } from "@silo-storage/db/schema";
 import { publishMessage } from "@silo-storage/redis";
 import {
+  clearUploadSessionAdapterData,
   createUploadEventEnvelope,
+  getUploadSessionAdapterData,
   normalizeFileKeyMetadata,
 } from "@silo-storage/shared";
 
@@ -188,35 +190,37 @@ export async function markUploadAsFailed(
       );
     }
 
-    if (fileKey.uploadSessionId) {
+    const uploadSession = getUploadSessionAdapterData(fileKey.adapterData);
+
+    if (uploadSession?.id) {
       await enqueueAbortMultipartJob(tx, {
         projectId: opts.projectId,
         environmentId: opts.environmentId,
         fileKeyId: fileKey.id,
         fileId: fileKey.file?.id ?? null,
-        uploadSessionId: fileKey.uploadSessionId,
-        adapterKey: fileKey.uploadSessionAdapterKey ?? null,
-        multipartUploadId: fileKey.uploadSessionMultipartId ?? null,
+        uploadSessionId: uploadSession.id,
+        storageKey: uploadSession.storageKey,
+        multipartUploadId: uploadSession.multipartUploadId ?? null,
         priority: 120,
       });
-    } else if (fileKey.uploadSessionAdapterKey) {
+    } else if (uploadSession?.storageKey) {
       await enqueueDeleteObjectJob(tx, {
         projectId: opts.projectId,
         environmentId: opts.environmentId,
         fileKeyId: fileKey.id,
         fileId: fileKey.file?.id ?? null,
-        adapterKey: fileKey.uploadSessionAdapterKey,
+        storageKey: uploadSession.storageKey,
         priority: 110,
       });
     }
 
-    if (fileKey.file?.adapterKey) {
+    if (fileKey.file?.storageKey) {
       await enqueueDeleteObjectJob(tx, {
         projectId: opts.projectId,
         environmentId: opts.environmentId,
         fileKeyId: fileKey.id,
         fileId: fileKey.file.id,
-        adapterKey: fileKey.file.adapterKey,
+        storageKey: fileKey.file.storageKey,
         priority: 120,
       });
     }
@@ -236,10 +240,7 @@ export async function markUploadAsFailed(
       .set({
         status: "failed",
         uploadFailedAt: new Date(),
-        uploadSessionId: null,
-        uploadSessionAdapterKey: null,
-        uploadSessionMultipartId: null,
-        uploadSessionUpdatedAt: null,
+        adapterData: clearUploadSessionAdapterData(fileKey.adapterData),
       })
       .where(eq(fileKeys.id, opts.fileKeyId))
       .returning();

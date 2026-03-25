@@ -14,6 +14,10 @@ const DEFAULT_ENVIRONMENTS = [
   { name: "Production", slug: "production", type: "production" as const },
 ];
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export type ProjectSlugAvailability =
   | { available: true }
   | { available: false; reason: "invalid" | "reserved" | "taken" };
@@ -98,6 +102,7 @@ export async function updateProject(
     id: string;
     name?: string;
     defaultFileAccess?: "public" | "private";
+    pendingUploadFailAfterMinutes?: number;
     pendingUploadFailAfterHours?: number;
   },
 ) {
@@ -105,8 +110,10 @@ export async function updateProject(
   if (input.name !== undefined) updates.name = input.name;
   if (input.defaultFileAccess !== undefined)
     updates.defaultFileAccess = input.defaultFileAccess;
-  if (input.pendingUploadFailAfterHours !== undefined)
-    updates.pendingUploadFailAfterHours = input.pendingUploadFailAfterHours;
+  const pendingUploadFailAfterMinutes =
+    input.pendingUploadFailAfterMinutes ?? input.pendingUploadFailAfterHours;
+  if (pendingUploadFailAfterMinutes !== undefined)
+    updates.pendingUploadFailAfterMinutes = pendingUploadFailAfterMinutes;
 
   if (Object.keys(updates).length === 0) {
     return db.query.projects.findFirst({
@@ -125,11 +132,28 @@ export async function updateProject(
 
 export async function deleteProject(projectId: string) {
   await scheduleProjectObjectDeletion(projectId);
-  const [deleted] = await db
-    .delete(projects)
-    .where(eq(projects.id, projectId))
-    .returning();
-  return deleted;
+
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const [deleted] = await db
+        .delete(projects)
+        .where(eq(projects.id, projectId))
+        .returning();
+
+      return deleted;
+    } catch (error) {
+      lastError = error;
+      if (attempt >= 3) {
+        break;
+      }
+      await sleep(100 * 2 ** (attempt - 1));
+    }
+  }
+
+  throw new Error(
+    `Failed to delete project metadata after object cleanup for project ${projectId}: ${lastError instanceof Error ? lastError.message : "Unknown error"}`,
+  );
 }
 
 export async function scheduleProjectObjectDeletion(projectId: string) {

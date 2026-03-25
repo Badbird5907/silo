@@ -5,10 +5,16 @@ import type { Bindings, Variables } from "../../types/bindings";
 import { abortMultipartUpload } from "../../services/r2/upload";
 import { HTTP_STATUS } from "../../utils/constants";
 
-const schema = z.object({
-  adapterKey: z.string().min(1),
-  uploadId: z.string().min(1),
-});
+const schema = z
+  .object({
+    storageKey: z.string().min(1).optional(),
+    adapterKey: z.string().min(1).optional(),
+    uploadId: z.string().min(1),
+  })
+  .refine((input) => Boolean(input.storageKey ?? input.adapterKey), {
+    message: "storageKey is required",
+    path: ["storageKey"],
+  });
 
 function isNoSuchUploadError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
@@ -37,11 +43,19 @@ export async function handleInternalMultipartAbort(
     );
   }
 
-  const { adapterKey, uploadId } = parsed.data;
+  const { uploadId } = parsed.data;
+  const storageKey = parsed.data.storageKey ?? parsed.data.adapterKey;
+
+  if (!storageKey) {
+    return c.json(
+      { success: false, error: "storageKey is required" },
+      HTTP_STATUS.BAD_REQUEST,
+    );
+  }
 
   try {
     await abortMultipartUpload({
-      adapterKey,
+      storageKey,
       uploadId,
       env: c.env,
     });

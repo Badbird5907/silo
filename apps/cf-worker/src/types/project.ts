@@ -21,16 +21,30 @@ export interface FileInfo {
   hash: string | null;
   mimeType: string;
   size: number;
-  adapterKey: string;
+  storageKey: string;
+  adapterKey?: string;
 }
 
-export const fileInfoSchema = z.object({
-  id: z.string(),
-  hash: z.string().nullable(),
-  mimeType: z.string(),
-  size: z.number(),
-  adapterKey: z.string(),
-});
+export const fileInfoSchema = z
+  .object({
+    id: z.string(),
+    hash: z.string().nullable(),
+    mimeType: z.string(),
+    size: z.number(),
+    storageKey: z.string().optional(),
+    adapterKey: z.string().optional(),
+  })
+  .transform((value) => {
+    const storageKey = value.storageKey ?? value.adapterKey;
+    if (!storageKey) {
+      throw new Error("Missing storage key in file info");
+    }
+
+    return {
+      ...value,
+      storageKey,
+    };
+  });
 
 export const fileKeyInfoSchema = z.object({
   id: z.string(),

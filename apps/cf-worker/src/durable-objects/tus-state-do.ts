@@ -49,6 +49,17 @@ function getMaxPatchSizeBytes(env: Bindings): number {
   return parsed;
 }
 
+function isTerminalSessionRegistrationError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("not pending") ||
+    message.includes("session mismatch") ||
+    message.includes("already registered") ||
+    message.includes("(409)")
+  );
+}
+
 export class TusStateDO {
   private queue: Promise<void> = Promise.resolve();
 
@@ -278,7 +289,7 @@ export class TusStateDO {
 
     if (!usesSinglePut && !metadata.multipartUploadId) {
       const createdUploadId = await createMultipartUpload({
-        adapterKey: metadata.adapterKey,
+        storageKey: metadata.storageKey,
         env: this.env,
       });
       metadata.multipartUploadId = createdUploadId;
@@ -304,7 +315,7 @@ export class TusStateDO {
         );
       } catch (persistError) {
         await abortMultipartUpload({
-          adapterKey: metadata.adapterKey,
+          storageKey: metadata.storageKey,
           uploadId: createdUploadId,
           env: this.env,
         }).catch((abortError: unknown) => {
@@ -317,6 +328,25 @@ export class TusStateDO {
             },
           );
         });
+
+        if (isTerminalSessionRegistrationError(persistError)) {
+          await this.deleteMetadata().catch((deleteMetadataError: unknown) => {
+            console.error(
+              "Failed to clear upload metadata after terminal registration failure",
+              {
+                uploadId: metadata.uploadId,
+                deleteMetadataError,
+              },
+            );
+          });
+
+          throw new TusError(
+            "INVALID_REQUEST",
+            409,
+            "Upload session is no longer pending",
+          );
+        }
+
         throw persistError;
       }
     }
@@ -333,7 +363,7 @@ export class TusStateDO {
     let uploadResult;
     try {
       uploadResult = await uploadChunkToR2({
-        adapterKey: metadata.adapterKey,
+        storageKey: metadata.storageKey,
         chunk: body,
         chunkSize: contentLength,
         offset: metadata.offset,
@@ -433,7 +463,7 @@ export class TusStateDO {
             });
           }
           return abortMultipartUpload({
-            adapterKey: metadata.adapterKey,
+            storageKey: metadata.storageKey,
             uploadId: multipartUploadId,
             env: this.env,
           });
@@ -445,7 +475,7 @@ export class TusStateDO {
     }
 
     try {
-      await this.env.R2_BUCKET.delete(metadata.adapterKey);
+      await this.env.R2_BUCKET.delete(metadata.storageKey);
     } catch (error) {
       cleanupFailed = true;
       console.error("Failed to delete upload object", error);
@@ -527,7 +557,7 @@ export class TusStateDO {
     if (multipartUploadId) {
       try {
         await abortMultipartUpload({
-          adapterKey: metadata.adapterKey,
+          storageKey: metadata.storageKey,
           uploadId: multipartUploadId,
           env: this.env,
         });
@@ -542,12 +572,12 @@ export class TusStateDO {
     }
 
     try {
-      await this.env.R2_BUCKET.delete(metadata.adapterKey);
+      await this.env.R2_BUCKET.delete(metadata.storageKey);
     } catch (error) {
       cleanupFailed = true;
       console.error("Failed to delete expired upload object", {
         uploadId: metadata.uploadId,
-        adapterKey: metadata.adapterKey,
+        storageKey: metadata.storageKey,
         error,
       });
     }
@@ -587,7 +617,7 @@ export class TusStateDO {
           });
         }
         return completeMultipartUpload({
-          adapterKey: metadata.adapterKey,
+          storageKey: metadata.storageKey,
           uploadId: multipartUploadId,
           parts: metadata.parts,
           env: this.env,
@@ -595,7 +625,7 @@ export class TusStateDO {
       });
     }
 
-    const fileObject = await this.env.R2_BUCKET.get(metadata.adapterKey);
+    const fileObject = await this.env.R2_BUCKET.get(metadata.storageKey);
     if (!fileObject) {
       throw new Error("Failed to retrieve uploaded file");
     }
@@ -617,7 +647,7 @@ export class TusStateDO {
         metadata.fileName,
       )
     ) {
-      await this.env.R2_BUCKET.delete(metadata.adapterKey);
+      await this.env.R2_BUCKET.delete(metadata.storageKey);
       await this.deleteMetadata();
       throw Errors.mimeTypeMismatch(metadata.claimedMimeType, actualMimeType);
     }
@@ -631,7 +661,7 @@ export class TusStateDO {
         metadata.fileName,
       )
     ) {
-      await this.env.R2_BUCKET.delete(metadata.adapterKey);
+      await this.env.R2_BUCKET.delete(metadata.storageKey);
       await this.deleteMetadata();
       throw Errors.mimeTypeNotAllowed(
         actualMimeType,
@@ -671,7 +701,7 @@ export class TusStateDO {
     let actualHash = actual?.actualHash;
 
     if (actualSize === undefined || actualMimeType === undefined) {
-      const object = await this.env.R2_BUCKET.get(metadata.adapterKey);
+      const object = await this.env.R2_BUCKET.get(metadata.storageKey);
       if (!object) return;
       actualSize = object.size;
       const headerBytes = await readHeaderBytes(
@@ -703,7 +733,7 @@ export class TusStateDO {
               actualHash: actualHash ?? null,
               actualMimeType,
               actualSize,
-              adapterKey: metadata.adapterKey,
+              adapterKey: metadata.storageKey,
               projectId: metadata.projectId,
               isPublic: metadata.isPublic,
               metadata: metadata.metadata,

@@ -33,7 +33,7 @@ export const listFilesResultSchema = z.object({
       hash: z.string().nullable(),
       mimeType: z.string().nullable(),
       size: z.number().nullable(),
-      adapterKey: z.string().nullable(),
+      storageKey: z.string().nullable(),
     }),
   ),
   pagination: z.object({
@@ -71,7 +71,7 @@ export const fileDetailSchema = z.object({
       hash: z.string().nullable(),
       mimeType: z.string(),
       size: z.number(),
-      adapterKey: z.string(),
+      storageKey: z.string(),
       createdAt: z.string().datetime(),
       updatedAt: z.string().datetime(),
     })

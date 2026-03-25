@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { Bindings } from "../types/bindings";
+import { reportMissingObject } from "./callback";
 import { deleteObject } from "./r2/upload";
 
 const expiryListResponseSchema = z.object({
@@ -12,7 +13,8 @@ const expiryListResponseSchema = z.object({
       environmentId: z.string(),
       accessKey: z.string(),
       expiresAt: z.string().datetime().nullable().optional(),
-      adapterKey: z.string(),
+      storageKey: z.string().optional(),
+      adapterKey: z.string().optional(),
     }),
   ),
 });
@@ -108,21 +110,55 @@ export async function runExpiryCleanup(env: Bindings) {
 
     const finalizedInBatch = new Set<string>();
     for (const item of expiredItems) {
-      try {
-        await deleteObject(item.adapterKey, env);
-        totalR2Deleted += 1;
-
-        if (!finalizedInBatch.has(item.fileId)) {
-          const finalized = await finalizeExpiredBatch(env, [item.fileId]);
-          totalDbDeleted += finalized.deletedCount;
-          finalizedInBatch.add(item.fileId);
-        }
-      } catch (error) {
+      const storageKey = item.storageKey ?? item.adapterKey;
+      if (!storageKey) {
         console.error("Failed to delete expired object from R2", {
           fileKeyId: item.fileKeyId,
           fileId: item.fileId,
-          adapterKey: item.adapterKey,
-          error,
+          storageKey: item.storageKey ?? item.adapterKey,
+          error: "Expired item missing storage key",
+        });
+        continue;
+      }
+
+      try {
+        await deleteObject(storageKey, env);
+        totalR2Deleted += 1;
+
+        if (finalizedInBatch.has(item.fileId)) {
+          continue;
+        }
+
+        try {
+          const finalized = await finalizeExpiredBatch(env, [item.fileId]);
+          totalDbDeleted += finalized.deletedCount;
+          finalizedInBatch.add(item.fileId);
+        } catch (finalizeError) {
+          console.error("Failed to finalize expired file after R2 deletion", {
+            fileKeyId: item.fileKeyId,
+            fileId: item.fileId,
+            storageKey,
+            finalizeError,
+          });
+
+          await reportMissingObject(
+            {
+              projectId: item.projectId,
+              environmentId: item.environmentId,
+              fileKeyId: item.fileKeyId,
+              fileId: item.fileId,
+              accessKey: item.accessKey,
+              storageKey,
+            },
+            env,
+          );
+        }
+      } catch (deleteError) {
+        console.error("Failed to delete expired object from R2", {
+          fileKeyId: item.fileKeyId,
+          fileId: item.fileId,
+          storageKey,
+          error: deleteError,
         });
       }
     }

@@ -10,6 +10,7 @@ import {
 import { eq, sql } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import {
+  fileKeys,
   fileLifecycleJobs,
   projectEnvironments,
   projects,
@@ -126,21 +127,70 @@ async function trackUsageEvent(
 async function scheduleAdapterKeyCleanup(input: {
   projectId: string;
   environmentId: string;
-  fileKeyId: string;
-  adapterKey: string;
+  fileKeyId?: string;
+  storageKey: string;
 }) {
-  const jobIdempotencyKey = `delete_object:${input.projectId}:${input.fileKeyId}:-:${input.adapterKey}`;
+  const [projectRecord, environmentRecord, fileKeyRecord] = await Promise.all([
+    db.query.projects.findFirst({
+      where: eq(projects.id, input.projectId),
+      columns: { id: true },
+    }),
+    db.query.projectEnvironments.findFirst({
+      where: eq(projectEnvironments.id, input.environmentId),
+      columns: { id: true },
+    }),
+    input.fileKeyId
+      ? db.query.fileKeys.findFirst({
+          where: eq(fileKeys.id, input.fileKeyId),
+          columns: { id: true },
+        })
+      : Promise.resolve(undefined),
+  ]);
 
-  await db.transaction(async (tx) => {
-    await enqueueDeleteObjectJob(tx, {
-      projectId: input.projectId,
-      environmentId: input.environmentId,
-      fileKeyId: input.fileKeyId,
-      adapterKey: input.adapterKey,
-      priority: 130,
-      idempotencyKey: jobIdempotencyKey,
+  const resolvedProjectId = projectRecord?.id ?? null;
+  const resolvedEnvironmentId = environmentRecord?.id ?? null;
+  const resolvedFileKeyId = fileKeyRecord?.id ?? null;
+
+  const jobIdempotencyKey = `delete_object:${input.projectId}:${input.fileKeyId ?? "-"}:-:${input.storageKey}`;
+
+  const enqueueCleanupJob = async (refs: {
+    projectId: string | null;
+    environmentId: string | null;
+    fileKeyId: string | null;
+  }) => {
+    await db.transaction(async (tx) => {
+      await enqueueDeleteObjectJob(tx, {
+        projectId: refs.projectId,
+        environmentId: refs.environmentId,
+        fileKeyId: refs.fileKeyId,
+        storageKey: input.storageKey,
+        priority: 130,
+        idempotencyKey: jobIdempotencyKey,
+      });
     });
-  });
+  };
+
+  try {
+    await enqueueCleanupJob({
+      projectId: resolvedProjectId,
+      environmentId: resolvedEnvironmentId,
+      fileKeyId: resolvedFileKeyId,
+    });
+  } catch (enqueueError) {
+    const isForeignKeyViolation =
+      enqueueError instanceof Error &&
+      enqueueError.message.toLowerCase().includes("foreign key");
+
+    if (!isForeignKeyViolation) {
+      throw enqueueError;
+    }
+
+    await enqueueCleanupJob({
+      projectId: null,
+      environmentId: null,
+      fileKeyId: null,
+    });
+  }
 
   await runLifecycleJobBatch(db, {
     limit: 20,
@@ -209,7 +259,7 @@ export async function POST(request: Request) {
             projectId: data.projectId,
             environmentId: data.environmentId,
             fileKeyId: data.fileKeyId,
-            adapterKey: data.adapterKey,
+            storageKey: data.adapterKey,
           });
         } catch (cleanupError) {
           console.error(
@@ -247,7 +297,7 @@ export async function POST(request: Request) {
         actualSize: data.actualSize,
         actualMimeType: data.actualMimeType,
         actualHash: data.actualHash,
-        adapterKey: data.adapterKey,
+        storageKey: data.adapterKey,
         metadata: data.metadata,
       });
 
@@ -257,7 +307,7 @@ export async function POST(request: Request) {
             projectId: data.projectId,
             environmentId: data.environmentId,
             fileKeyId: data.fileKeyId,
-            adapterKey: data.adapterKey,
+            storageKey: data.adapterKey,
           });
         } catch (cleanupError) {
           console.error(
@@ -286,13 +336,13 @@ export async function POST(request: Request) {
       const file = completion.file;
       const fileKey = completion.fileKey;
 
-      if (completion.alreadyCompleted && file.adapterKey !== data.adapterKey) {
+      if (completion.alreadyCompleted && file.storageKey !== data.adapterKey) {
         try {
           await scheduleAdapterKeyCleanup({
             projectId: data.projectId,
             environmentId: data.environmentId,
             fileKeyId: data.fileKeyId,
-            adapterKey: data.adapterKey,
+            storageKey: data.adapterKey,
           });
         } catch (cleanupError) {
           console.error(

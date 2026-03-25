@@ -12,6 +12,7 @@ import {
   requireProject,
 } from "./middleware/project";
 import { handleDownload } from "./routes/download";
+import { handleDevR2ListAll } from "./routes/dev/r2-list-all";
 import { handleInternalDelete } from "./routes/internal/delete";
 import { handleInternalDeletePrefix } from "./routes/internal/delete-prefix";
 import { handleInternalList } from "./routes/internal/list";
@@ -38,6 +39,7 @@ app.use("*", methodOverride);
 app.use("*", extractProject);
 
 app.get("/health", (c) => c.json({ status: "ok", version: "1.0.0" }));
+app.get("/dev/r2/list-all", handleDevR2ListAll);
 
 app.options("/ingest/tus", requireProject, handleTusOptions);
 app.options("/ingest/tus/:uploadId", requireProject, handleTusOptions);
@@ -71,7 +73,7 @@ app.post(
   handleInternalList,
 );
 app.post(
-  "/internal/get-metadata/:adapterKey",
+  "/internal/get-metadata/:storageKey",
   requireMainDomain,
   requireCallbackSecret,
   handleInternalMetadata,
@@ -121,6 +123,8 @@ export default {
     batch: MessageBatch<DeletePrefixQueueMessage>,
     env: Bindings,
   ): Promise<void> {
+    const isDlqBatch = batch.queue === "silo-delete-prefix-dlq";
+
     for (const message of batch.messages) {
       const { prefix, cursor, requestId } = message.body;
 
@@ -140,6 +144,7 @@ export default {
         });
 
         console.info("Processed delete-prefix chunk", {
+          queue: batch.queue,
           requestId,
           prefix,
           processed: result.processed,
@@ -158,11 +163,18 @@ export default {
         message.ack();
       } catch (error) {
         console.error("Delete-prefix queue message failed", {
+          queue: batch.queue,
           requestId,
           prefix,
           cursor,
           error,
         });
+
+        if (isDlqBatch) {
+          message.ack();
+          continue;
+        }
+
         message.retry();
       }
     }

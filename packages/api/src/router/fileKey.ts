@@ -20,6 +20,7 @@ import {
   projectEnvironments,
   projects,
 } from "@silo-storage/db/schema";
+import { clearUploadSessionAdapterData } from "@silo-storage/shared";
 
 import {
   enqueueDeleteObjectJob,
@@ -502,7 +503,7 @@ export const fileKeyRouter = {
           return {
             alreadyDeleted: current.status === "failed",
             fileId: null,
-            adapterKey: null,
+            storageKey: null,
           };
         }
 
@@ -511,10 +512,7 @@ export const fileKeyRouter = {
           .set({
             status: "failed",
             uploadFailedAt: new Date(),
-            uploadSessionId: null,
-            uploadSessionAdapterKey: null,
-            uploadSessionMultipartId: null,
-            uploadSessionUpdatedAt: null,
+            adapterData: clearUploadSessionAdapterData(current.adapterData),
             fileId: null,
           })
           .where(eq(fileKeys.id, current.id));
@@ -524,7 +522,7 @@ export const fileKeyRouter = {
           environmentId: current.environmentId,
           fileKeyId: current.id,
           fileId: current.file.id,
-          adapterKey: current.file.adapterKey,
+          storageKey: current.file.storageKey,
           priority: 120,
         });
 
@@ -539,7 +537,7 @@ export const fileKeyRouter = {
         return {
           alreadyDeleted: false,
           fileId: current.file.id,
-          adapterKey: current.file.adapterKey,
+          storageKey: current.file.storageKey,
         };
       });
 
@@ -561,7 +559,7 @@ export const fileKeyRouter = {
         alreadyDeleted: false,
         lifecycleJobs: {
           fileId: transitionResult.fileId,
-          adapterKey: transitionResult.adapterKey,
+          storageKey: transitionResult.storageKey,
           claimed: drainResult.claimed,
           completed: drainResult.completed,
           retried: drainResult.retried,

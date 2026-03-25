@@ -93,7 +93,7 @@ export function TusUploadDemo() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action: "register",
-        endpoint: "imageUploader",
+        endpoint: "imageOrVideoUploader",
         files: [
           {
             fileName: file.name,

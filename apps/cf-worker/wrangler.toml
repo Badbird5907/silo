@@ -32,6 +32,12 @@ max_batch_timeout = 5
 max_retries = 5
 dead_letter_queue = "silo-delete-prefix-dlq"
 
+[[queues.consumers]]
+queue = "silo-delete-prefix-dlq"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 1
+
 [vars]
 WORKER_DOMAIN = "files.evanyu.dev"
 NEXTJS_CALLBACK_URL = "http://localhost:3000"
@@ -48,7 +54,7 @@ LIFECYCLE_JOB_MAX_BATCHES = "10"
 LIFECYCLE_JOB_LEASE_SECONDS = "60"
 
 [triggers]
-crons = ["*/15 * * * *"]
+crons = ["*/5 * * * *"]
 
 # Development environment
 [env.development]

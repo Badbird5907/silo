@@ -105,7 +105,7 @@ export async function GET(request: Request) {
         fileHash: files.hash,
         fileMimeType: files.mimeType,
         fileSize: files.size,
-        adapterKey: files.adapterKey,
+        storageKey: files.storageKey,
       })
       .from(fileKeys)
       .leftJoin(files, eq(fileKeys.fileId, files.id))
@@ -132,7 +132,7 @@ export async function GET(request: Request) {
         hash: row.fileHash ?? row.claimedHash,
         mimeType: row.fileMimeType ?? row.claimedMimeType,
         size: row.fileSize ?? row.claimedSize,
-        adapterKey: row.adapterKey ?? null,
+        storageKey: row.storageKey ?? null,
       })),
       pagination: {
         page: input.page,

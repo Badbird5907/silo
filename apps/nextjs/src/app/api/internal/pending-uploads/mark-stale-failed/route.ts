@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       .where(
         and(
           eq(fileKeys.status, "pending"),
-          sql`${fileKeys.createdAt} <= now() - (${projects.pendingUploadFailAfterHours} * interval '1 hour')`,
+          sql`${fileKeys.createdAt} <= now() - (${projects.pendingUploadFailAfterMinutes} * interval '1 minute')`,
         ),
       )
       .orderBy(asc(fileKeys.createdAt), asc(fileKeys.id))

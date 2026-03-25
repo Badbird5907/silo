@@ -133,6 +133,7 @@ export async function handleDownload(
 
   const fileName = c.req.query("fileName") ?? fileKey.fileName;
   const fileSize = fileKey.file.size;
+  const storageKey = fileKey.file.storageKey;
 
   let object: R2ObjectBody | null;
   let isPartialContent = false;
@@ -142,17 +143,17 @@ export async function handleDownload(
   if (rangeHeader) {
     const range = parseRangeHeader(rangeHeader, fileSize);
     if (range) {
-      object = await c.env.R2_BUCKET.get(fileKey.file.adapterKey, {
+      object = await c.env.R2_BUCKET.get(storageKey, {
         range: { offset: range.offset, length: range.length },
       });
       isPartialContent = true;
       rangeStart = range.offset;
       rangeEnd = range.offset + range.length - 1;
     } else {
-      object = await c.env.R2_BUCKET.get(fileKey.file.adapterKey);
+      object = await c.env.R2_BUCKET.get(storageKey);
     }
   } else {
-    object = await c.env.R2_BUCKET.get(fileKey.file.adapterKey);
+    object = await c.env.R2_BUCKET.get(storageKey);
   }
 
   if (!object) {
@@ -164,7 +165,7 @@ export async function handleDownload(
           fileKeyId: fileKey.id,
           fileId: fileKey.file.id,
           accessKey: fileKey.accessKey,
-          adapterKey: fileKey.file.adapterKey,
+          storageKey,
         },
         c.env,
       ),

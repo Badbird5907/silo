@@ -2,7 +2,7 @@ import type { Bindings } from "../../types/bindings";
 import type { TusUploadPart } from "../../types/tus";
 
 export interface UploadChunkParams {
-  adapterKey: string;
+  storageKey: string;
   chunk: ReadableStream<Uint8Array> | ArrayBuffer;
   chunkSize: number;
   offset: number;
@@ -32,11 +32,11 @@ export function shouldUseSinglePut(params: {
 }
 
 export async function createMultipartUpload(params: {
-  adapterKey: string;
+  storageKey: string;
   env: Bindings;
 }): Promise<string> {
   const multipart = await params.env.R2_BUCKET.createMultipartUpload(
-    params.adapterKey,
+    params.storageKey,
   );
   return multipart.uploadId;
 }
@@ -45,7 +45,7 @@ export async function uploadChunkToR2(
   params: UploadChunkParams,
 ): Promise<UploadChunkResult> {
   const {
-    adapterKey,
+    storageKey,
     chunk,
     chunkSize,
     offset,
@@ -59,7 +59,7 @@ export async function uploadChunkToR2(
 
   // use simple put for small single-chunk uploads
   if (shouldUseSinglePut({ chunkSize, isLastChunk, offset })) {
-    await env.R2_BUCKET.put(adapterKey, chunkBody);
+    await env.R2_BUCKET.put(storageKey, chunkBody);
     return { multipartUploadId: null, part: null };
   }
 
@@ -72,7 +72,7 @@ export async function uploadChunkToR2(
   // (not from offset, as TUS allows variable chunk sizes)
   const partNumber = existingPartsCount + 1;
 
-  const multipart = env.R2_BUCKET.resumeMultipartUpload(adapterKey, uploadId);
+  const multipart = env.R2_BUCKET.resumeMultipartUpload(storageKey, uploadId);
   const uploadedPart = await multipart.uploadPart(partNumber, chunkBody);
 
   return {
@@ -85,14 +85,14 @@ export async function uploadChunkToR2(
 }
 
 export async function completeMultipartUpload(params: {
-  adapterKey: string;
+  storageKey: string;
   uploadId: string;
   parts: TusUploadPart[];
   env: Bindings;
 }): Promise<R2Object> {
-  const { adapterKey, uploadId, parts, env } = params;
+  const { storageKey, uploadId, parts, env } = params;
 
-  const multipart = env.R2_BUCKET.resumeMultipartUpload(adapterKey, uploadId);
+  const multipart = env.R2_BUCKET.resumeMultipartUpload(storageKey, uploadId);
 
   const sortedParts = parts.sort((a, b) => a.partNumber - b.partNumber);
   const object = await multipart.complete(sortedParts);
@@ -101,28 +101,28 @@ export async function completeMultipartUpload(params: {
 }
 
 export async function abortMultipartUpload(params: {
-  adapterKey: string;
+  storageKey: string;
   uploadId: string;
   env: Bindings;
 }): Promise<void> {
-  const { adapterKey, uploadId, env } = params;
+  const { storageKey, uploadId, env } = params;
 
-  const multipart = env.R2_BUCKET.resumeMultipartUpload(adapterKey, uploadId);
+  const multipart = env.R2_BUCKET.resumeMultipartUpload(storageKey, uploadId);
   await multipart.abort();
 }
 
 export async function deleteObject(
-  adapterKey: string,
+  storageKey: string,
   env: Bindings,
 ): Promise<void> {
-  await env.R2_BUCKET.delete(adapterKey);
+  await env.R2_BUCKET.delete(storageKey);
 }
 
 export async function getObject(
-  adapterKey: string,
+  storageKey: string,
   env: Bindings,
 ): Promise<R2ObjectBody | null> {
-  return await env.R2_BUCKET.get(adapterKey);
+  return await env.R2_BUCKET.get(storageKey);
 }
 
 export async function listObjects(params: {
@@ -141,8 +141,8 @@ export async function listObjects(params: {
 }
 
 export async function getObjectMetadata(
-  adapterKey: string,
+  storageKey: string,
   env: Bindings,
 ): Promise<R2Object | null> {
-  return await env.R2_BUCKET.head(adapterKey);
+  return await env.R2_BUCKET.head(storageKey);
 }

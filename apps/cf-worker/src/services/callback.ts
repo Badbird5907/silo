@@ -111,13 +111,38 @@ export async function lookupFileKey(
   return fileKeyInfoSchema.parse(json);
 }
 
+interface UploadSessionRegistrationResponse {
+  success?: boolean;
+  skipped?: boolean;
+  error?: string;
+  status?: string;
+}
+
+async function parseUploadSessionRegistrationResponse(
+  response: Response,
+): Promise<UploadSessionRegistrationResponse | null> {
+  const text = await response.text().catch(() => "");
+  if (!text) return null;
+
+  try {
+    const json: unknown = JSON.parse(text);
+    if (json && typeof json === "object") {
+      return json as UploadSessionRegistrationResponse;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
 export async function registerUploadSession(
   data: {
     projectId: string;
     environmentId: string;
     fileKeyId: string;
     uploadId: string;
-    adapterKey: string;
+    storageKey: string;
   },
   env: Bindings,
 ): Promise<void> {
@@ -129,14 +154,25 @@ export async function registerUploadSession(
         Authorization: `Bearer ${env.CALLBACK_SECRET}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        ...data,
+        adapterKey: data.storageKey,
+      }),
     },
   );
 
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
+  const payload = await parseUploadSessionRegistrationResponse(response);
+
+  if (response.ok && payload?.skipped) {
     throw new Error(
-      `Failed to register upload session (${response.status}): ${text || response.statusText}`,
+      "Upload session registration was skipped because file key is not pending",
+    );
+  }
+
+  if (!response.ok) {
+    const errorDetails = payload?.error ?? response.statusText;
+    throw new Error(
+      `Failed to register upload session (${response.status}): ${errorDetails}`,
     );
   }
 }
@@ -163,10 +199,18 @@ export async function registerMultipartUploadSession(
     },
   );
 
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
+  const payload = await parseUploadSessionRegistrationResponse(response);
+
+  if (response.ok && payload?.skipped) {
     throw new Error(
-      `Failed to register multipart upload session (${response.status}): ${text || response.statusText}`,
+      "Multipart upload registration was skipped because file key is not pending",
+    );
+  }
+
+  if (!response.ok) {
+    const errorDetails = payload?.error ?? response.statusText;
+    throw new Error(
+      `Failed to register multipart upload session (${response.status}): ${errorDetails}`,
     );
   }
 }
@@ -184,7 +228,7 @@ export interface ReportMissingObjectData {
   fileKeyId: string;
   fileId: string;
   accessKey: string;
-  adapterKey: string;
+  storageKey: string;
 }
 
 export async function trackDownload(
@@ -225,7 +269,10 @@ export async function reportMissingObject(
           Authorization: `Bearer ${env.CALLBACK_SECRET}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          adapterKey: data.storageKey,
+        }),
       },
     );
 

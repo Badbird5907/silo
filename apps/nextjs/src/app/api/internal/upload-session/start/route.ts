@@ -1,8 +1,12 @@
 import { z } from "zod";
 
-import { and, eq, isNull, or } from "@silo-storage/db";
+import { and, eq } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import { fileKeys } from "@silo-storage/db/schema";
+import {
+  getUploadSessionAdapterData,
+  setUploadSessionAdapterData,
+} from "@silo-storage/shared";
 
 import { env } from "@/env";
 
@@ -59,8 +63,7 @@ export async function POST(request: Request) {
     columns: {
       id: true,
       status: true,
-      uploadSessionId: true,
-      uploadSessionAdapterKey: true,
+      adapterData: true,
     },
   });
 
@@ -72,17 +75,10 @@ export async function POST(request: Request) {
   }
 
   if (existing.status !== "pending") {
-    return new Response(JSON.stringify({ success: true, skipped: true }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
-  if (existing.uploadSessionId && existing.uploadSessionId !== uploadId) {
     return new Response(
       JSON.stringify({
-        error: "Upload session already exists for file key",
-        uploadSessionId: existing.uploadSessionId,
+        error: "Upload session cannot be registered for non-pending file key",
+        status: existing.status,
       }),
       {
         status: 409,
@@ -91,10 +87,22 @@ export async function POST(request: Request) {
     );
   }
 
-  if (
-    existing.uploadSessionAdapterKey &&
-    existing.uploadSessionAdapterKey !== adapterKey
-  ) {
+  const uploadSession = getUploadSessionAdapterData(existing.adapterData);
+
+  if (uploadSession?.id && uploadSession.id !== uploadId) {
+    return new Response(
+      JSON.stringify({
+        error: "Upload session already exists for file key",
+        uploadSessionId: uploadSession.id,
+      }),
+      {
+        status: 409,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
+
+  if (uploadSession?.storageKey && uploadSession.storageKey !== adapterKey) {
     return new Response(
       JSON.stringify({
         error: "Upload session adapter key mismatch",
@@ -109,24 +117,13 @@ export async function POST(request: Request) {
   const [updated] = await db
     .update(fileKeys)
     .set({
-      uploadSessionId: uploadId,
-      uploadSessionAdapterKey: adapterKey,
-      uploadSessionMultipartId: null,
-      uploadSessionUpdatedAt: new Date(),
+      adapterData: setUploadSessionAdapterData(existing.adapterData, {
+        id: uploadId,
+        storageKey: adapterKey,
+        multipartUploadId: uploadSession?.multipartUploadId ?? null,
+      }),
     })
-    .where(
-      and(
-        eq(fileKeys.id, fileKeyId),
-        or(
-          isNull(fileKeys.uploadSessionId),
-          eq(fileKeys.uploadSessionId, uploadId),
-        ),
-        or(
-          isNull(fileKeys.uploadSessionAdapterKey),
-          eq(fileKeys.uploadSessionAdapterKey, adapterKey),
-        ),
-      ),
-    )
+    .where(and(eq(fileKeys.id, fileKeyId), eq(fileKeys.status, "pending")))
     .returning({ id: fileKeys.id });
 
   if (!updated) {
