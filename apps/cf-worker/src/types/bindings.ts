@@ -10,6 +10,7 @@ export interface Bindings {
 
   WORKER_DOMAIN: string;
   NEXTJS_CALLBACK_URL: string;
+  ENV: string;
   CALLBACK_SECRET: string;
   SIGNING_SECRET: string;
   TUS_MAX_SIZE: string;

@@ -7,7 +7,12 @@ import { HTTP_STATUS } from "../../utils/constants";
 export async function handleInternalMetadata(
   c: Context<{ Bindings: Bindings; Variables: Variables }>,
 ): Promise<Response> {
-  const storageKey = c.req.param("storageKey");
+  const rawStorageKey = c.req.param("*");
+  const storageKey = rawStorageKey ? decodeURIComponent(rawStorageKey) : "";
+
+  if (!storageKey) {
+    return c.json({ error: "storageKey is required" }, HTTP_STATUS.BAD_REQUEST);
+  }
 
   try {
     const metadata = await getObjectMetadata(storageKey, c.env);

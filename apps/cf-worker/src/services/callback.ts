@@ -128,11 +128,17 @@ export async function lookupFileKey(
 
   if (!response.ok) {
     const text = await response.text();
-    const parsed = errorResponseSchema.safeParse(JSON.parse(text));
-    if (parsed.success && parsed.data.error) {
-      throw new Error(parsed.data.error);
+    if (text) {
+      try {
+        const parsed = errorResponseSchema.safeParse(JSON.parse(text));
+        if (parsed.success && parsed.data.error) {
+          throw new Error(parsed.data.error);
+        }
+      } catch {
+        // ignore parse failures and fall back to raw text
+      }
     }
-    throw new Error(`File key lookup failed: ${text}`);
+    throw new Error(`File key lookup failed: ${text || response.statusText}`);
   }
 
   const json = await response.json();

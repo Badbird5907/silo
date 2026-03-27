@@ -50,25 +50,46 @@ async function getCachedFileKey(
 function parseRangeHeader(
   rangeHeader: string,
   fileSize: number,
-): { offset: number; length: number } | null {
+): { offset: number; length: number } | "invalid" | null {
   const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader);
-  if (!match) return null;
+  if (!match) return "invalid";
 
   const start = match[1] ? parseInt(match[1], 10) : undefined;
   const end = match[2] ? parseInt(match[2], 10) : undefined;
 
+  if (
+    (start !== undefined && Number.isNaN(start)) ||
+    (end !== undefined && Number.isNaN(end))
+  ) {
+    return "invalid";
+  }
+
   if (start !== undefined && end !== undefined) {
     // bytes=0-499
-    return { offset: start, length: end - start + 1 };
+    if (start > end || start >= fileSize) {
+      return null;
+    }
+
+    const clampedEnd = Math.min(end, fileSize - 1);
+    return { offset: start, length: clampedEnd - start + 1 };
   } else if (start !== undefined) {
     // bytes=500-
+    if (start >= fileSize) {
+      return null;
+    }
+
     return { offset: start, length: fileSize - start };
   } else if (end !== undefined) {
     // bytes=-500 (last 500 bytes)
-    return { offset: fileSize - end, length: end };
+    if (end <= 0) {
+      return "invalid";
+    }
+
+    const length = Math.min(end, fileSize);
+    return { offset: fileSize - length, length };
   }
 
-  return null;
+  return "invalid";
 }
 
 export async function handleDownload(
@@ -135,23 +156,37 @@ export async function handleDownload(
   const fileSize = fileKey.file.size;
   const storageKey = fileKey.file.storageKey;
 
-  let object: R2ObjectBody | null;
+  let object: R2ObjectBody | null = null;
   let isPartialContent = false;
   let rangeStart = 0;
   let rangeEnd = fileSize - 1;
 
   if (rangeHeader) {
     const range = parseRangeHeader(rangeHeader, fileSize);
-    if (range) {
-      object = await c.env.R2_BUCKET.get(storageKey, {
-        range: { offset: range.offset, length: range.length },
+    if (range === "invalid") {
+      return new Response(null, {
+        status: 400,
+        headers: {
+          "Content-Type": "application/json",
+        },
       });
-      isPartialContent = true;
-      rangeStart = range.offset;
-      rangeEnd = range.offset + range.length - 1;
-    } else {
-      object = await c.env.R2_BUCKET.get(storageKey);
     }
+
+    if (!range) {
+      return new Response(null, {
+        status: 416,
+        headers: {
+          "Content-Range": `bytes */${fileSize}`,
+        },
+      });
+    }
+
+    object = await c.env.R2_BUCKET.get(storageKey, {
+      range: { offset: range.offset, length: range.length },
+    });
+    isPartialContent = true;
+    rangeStart = range.offset;
+    rangeEnd = range.offset + range.length - 1;
   } else {
     object = await c.env.R2_BUCKET.get(storageKey);
   }

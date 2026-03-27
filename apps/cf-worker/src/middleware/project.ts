@@ -11,7 +11,6 @@ export const requireProject: MiddlewareHandler<{
 }> = async (c, next) => {
   const hostname = new URL(c.req.url).hostname;
   const projectSlug = extractProjectSlug(hostname, c.env.WORKER_DOMAIN);
-  console.log("projectSlug", projectSlug);
   if (!projectSlug) {
     throw Errors.projectNotFound("no-subdomain");
   }

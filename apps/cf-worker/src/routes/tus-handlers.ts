@@ -189,6 +189,16 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
       throw Errors.signatureInvalid();
     }
 
+    if (
+      uploadLength !== null &&
+      verificationResult.size !== undefined &&
+      uploadLength !== verificationResult.size
+    ) {
+      throw Errors.sizeMismatch(verificationResult.size, uploadLength);
+    }
+
+    const resolvedUploadSize = uploadLength ?? verificationResult.size ?? null;
+
     const uploadId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
     const storageKey = `${projectId}/${environmentId}/${crypto.randomUUID()}`;
 
@@ -199,7 +209,7 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
       fileKeyId,
       accessKey,
       fileName,
-      size: uploadLength ?? null,
+      size: resolvedUploadSize,
       offset: 0,
       storageKey,
       multipartUploadId: null,
@@ -218,8 +228,16 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
 
     const url = new URL(c.req.url);
     const uploadUrl = `${url.protocol}//${url.host}/ingest/tus/${uploadId}`;
+    const bodyContentLength = parseNonNegativeInt(contentLengthHeader) ?? 0;
+    const body = c.req.raw.body as ReadableStream<Uint8Array> | null;
 
-    if (uploadLength === 0) {
+    if (resolvedUploadSize === 0) {
+      if (bodyContentLength > 0) {
+        throw Errors.invalidRequest(
+          "Creation request body must be empty when Upload-Length is 0",
+        );
+      }
+
       const zeroByteMimeType = "application/octet-stream";
       let sessionRegistered = false;
       let objectStored = false;
@@ -357,12 +375,12 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
       throw registrationError;
     }
 
-    const bodyContentLength = parseNonNegativeInt(contentLengthHeader) ?? 0;
-    const body = c.req.raw.body as ReadableStream<Uint8Array> | null;
-
     if (isCreationWithUpload && bodyContentLength > 0 && body) {
       const patchHeaders = new Headers(c.req.raw.headers);
       patchHeaders.set(UPLOAD_OFFSET_HEADER, "0");
+      if (resolvedUploadSize !== null) {
+        patchHeaders.set(UPLOAD_LENGTH_HEADER, resolvedUploadSize.toString());
+      }
       const patchResponse = await proxyTusPatchToDo(
         uploadId,
         projectId,
@@ -392,8 +410,8 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
         "Tus-Resumable": TUS_VERSION,
         Location: uploadUrl,
         "Upload-Expires": uploadMetadata.expiresAt,
-        ...(uploadLength !== null && {
-          [UPLOAD_LENGTH_HEADER]: uploadLength.toString(),
+        ...(resolvedUploadSize !== null && {
+          [UPLOAD_LENGTH_HEADER]: resolvedUploadSize.toString(),
         }),
       },
     });

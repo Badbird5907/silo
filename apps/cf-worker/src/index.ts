@@ -5,6 +5,7 @@ import type { Bindings, Variables } from "./types/bindings";
 import { TusStateDO } from "./durable-objects/tus-state-do";
 import { requireCallbackSecret } from "./middleware/auth";
 import { cors } from "./middleware/cors";
+import { requireDevelopment } from "./middleware/dev-only";
 import { methodOverride } from "./middleware/method-override";
 import {
   extractProject,
@@ -39,7 +40,7 @@ app.use("*", methodOverride);
 app.use("*", extractProject);
 
 app.get("/health", (c) => c.json({ status: "ok", version: "1.0.0" }));
-app.get("/dev/r2/list-all", handleDevR2ListAll);
+app.get("/dev/r2/list-all", requireDevelopment, handleDevR2ListAll);
 
 app.options("/ingest/tus", requireProject, handleTusOptions);
 app.options("/ingest/tus/:uploadId", requireProject, handleTusOptions);
@@ -73,7 +74,7 @@ app.post(
   handleInternalList,
 );
 app.post(
-  "/internal/get-metadata/:storageKey",
+  "/internal/get-metadata/*",
   requireMainDomain,
   requireCallbackSecret,
   handleInternalMetadata,
@@ -115,9 +116,25 @@ export default {
     _controller: ScheduledController,
     env: Bindings,
   ): Promise<void> {
-    await runExpiryCleanup(env);
-    await runPendingUploadCleanup(env);
-    await runLifecycleJobs(env);
+    const tasks = [
+      { name: "runExpiryCleanup", run: runExpiryCleanup(env) },
+      {
+        name: "runPendingUploadCleanup",
+        run: runPendingUploadCleanup(env),
+      },
+      { name: "runLifecycleJobs", run: runLifecycleJobs(env) },
+    ];
+
+    const results = await Promise.allSettled(tasks.map((task) => task.run));
+
+    for (const [index, result] of results.entries()) {
+      if (result.status === "rejected") {
+        console.error("Scheduled cleanup task failed", {
+          task: tasks[index]?.name,
+          error: result.reason as unknown,
+        });
+      }
+    }
   },
   async queue(
     batch: MessageBatch<DeletePrefixQueueMessage>,

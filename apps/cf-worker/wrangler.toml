@@ -61,12 +61,14 @@ crons = ["*/5 * * * *"]
 name = "silo-worker-dev"
 vars.WORKER_DOMAIN = "lvh.me:8787"
 vars.NEXTJS_CALLBACK_URL = "http://localhost:3000"
+vars.ENV = "development"
 
 # Production environment (override these values)
 [env.production]
 name = "silo-worker"
 vars.WORKER_DOMAIN = "files.evanyu.dev"
 vars.NEXTJS_CALLBACK_URL = "https://your-nextjs-app.com"  # TODO: Set your production URL
+vars.ENV = "production"
 
 # Secrets (set via: wrangler secret put <NAME>)
 # CALLBACK_SECRET - Shared secret for internal API authentication

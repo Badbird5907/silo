@@ -1,6 +1,6 @@
 import type { Bindings } from "../types/bindings";
 import type { ProjectInfo } from "../types/project";
-import { Errors } from "../utils/errors";
+import { Errors, TusError } from "../utils/errors";
 
 export async function lookupProject(
   slug: string,
@@ -39,7 +39,7 @@ export async function lookupProject(
       );
     }
 
-    const project = (await response.json());
+    const project = await response.json();
 
     try {
       await env.PROJECT_CACHE.put(cacheKey, JSON.stringify(project), {
@@ -51,7 +51,7 @@ export async function lookupProject(
 
     return project as ProjectInfo;
   } catch (error) {
-    if (error instanceof Error && error.message.includes("project_not_found")) {
+    if (error instanceof TusError) {
       throw error;
     }
     console.error("Failed to lookup project:", error);

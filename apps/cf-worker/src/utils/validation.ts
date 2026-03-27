@@ -3,8 +3,12 @@ export function parseNonNegativeInt(value: string | undefined): number | null {
     return null;
   }
 
-  const num = parseInt(value, 10);
-  if (isNaN(num) || num < 0) {
+  if (!/^(0|[1-9]\d*)$/.test(value)) {
+    return null;
+  }
+
+  const num = Number(value);
+  if (!Number.isSafeInteger(num)) {
     return null;
   }
 

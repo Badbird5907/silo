@@ -33,7 +33,18 @@ import { createErrorResponse, Errors, TusError } from "../utils/errors";
 import { parseNonNegativeInt, sanitizeHeaderValue } from "../utils/validation";
 
 const METADATA_KEY = "upload:metadata";
+const MULTIPART_RECOVERY_KEY = "upload:multipart-recovery";
 const DEFAULT_MAX_PATCH_SIZE = 256 * 1024 * 1024;
+
+interface MultipartRecoveryState {
+  uploadId: string;
+  projectId: string;
+  environmentId: string;
+  fileKeyId: string;
+  storageKey: string;
+  multipartUploadId: string;
+  createdAt: string;
+}
 
 function getMaxPatchSizeBytes(env: Bindings): number {
   const raw = env.TUS_MAX_PATCH_SIZE.trim();
@@ -204,7 +215,7 @@ export class TusStateDO {
     const metadata = await this.requireUpload(
       request.headers.get("X-Project-Id"),
       request.headers.get("X-Upload-Id"),
-      true,
+      false,
     );
     const uploadOffsetHeader = request.headers.get(UPLOAD_OFFSET_HEADER);
     if (!uploadOffsetHeader) {
@@ -228,6 +239,12 @@ export class TusStateDO {
         throw Errors.invalidRequest(
           "Upload-Length must be a non-negative integer",
         );
+      }
+      if (
+        metadata.claimedSize !== undefined &&
+        uploadLength !== metadata.claimedSize
+      ) {
+        throw Errors.sizeMismatch(metadata.claimedSize, uploadLength);
       }
       if (uploadLength < metadata.offset) {
         throw Errors.invalidRequest(
@@ -302,6 +319,55 @@ export class TusStateDO {
         storageKey: metadata.storageKey,
         env: this.env,
       });
+      const recoveryState: MultipartRecoveryState = {
+        uploadId: metadata.uploadId,
+        projectId: metadata.projectId,
+        environmentId: metadata.environmentId,
+        fileKeyId: metadata.fileKeyId,
+        storageKey: metadata.storageKey,
+        multipartUploadId: createdUploadId,
+        createdAt: new Date().toISOString(),
+      };
+
+      try {
+        await this.persistMultipartRecovery(recoveryState);
+      } catch (recoveryPersistError) {
+        console.error("Failed to persist multipart recovery state", {
+          uploadId: metadata.uploadId,
+          multipartUploadId: createdUploadId,
+          recoveryPersistError,
+        });
+
+        await retry(
+          () =>
+            abortMultipartUpload({
+              storageKey: metadata.storageKey,
+              uploadId: createdUploadId,
+              env: this.env,
+            }),
+          {
+            maxAttempts: 3,
+            baseDelayMs: 150,
+            maxDelayMs: 1000,
+          },
+        ).catch((abortError: unknown) => {
+          console.error(
+            "Failed to abort multipart upload after recovery failure",
+            {
+              uploadId: metadata.uploadId,
+              multipartUploadId: createdUploadId,
+              abortError,
+            },
+          );
+        });
+
+        throw new TusError(
+          "INVALID_REQUEST",
+          503,
+          "Upload setup temporarily unavailable. Retry shortly.",
+        );
+      }
+
       metadata.multipartUploadId = createdUploadId;
       try {
         await this.persistMetadata(metadata);
@@ -321,6 +387,15 @@ export class TusStateDO {
             maxAttempts: 3,
             baseDelayMs: 150,
             maxDelayMs: 1000,
+          },
+        );
+        await this.deleteMultipartRecovery().catch(
+          (deleteRecoveryError: unknown) => {
+            console.error("Failed to clear multipart recovery state", {
+              uploadId: metadata.uploadId,
+              multipartUploadId: createdUploadId,
+              deleteRecoveryError,
+            });
           },
         );
       } catch (persistError) {
@@ -363,6 +438,18 @@ export class TusStateDO {
               );
             },
           );
+          await this.persistMultipartRecovery(recoveryState).catch(
+            (recoveryPersistError: unknown) => {
+              console.error(
+                "Failed to persist multipart recovery after cleanup failure",
+                {
+                  uploadId: metadata.uploadId,
+                  multipartUploadId: createdUploadId,
+                  recoveryPersistError,
+                },
+              );
+            },
+          );
         }
 
         if (abortFailed) {
@@ -372,6 +459,16 @@ export class TusStateDO {
             "Upload cleanup temporarily unavailable. Retry shortly.",
           );
         }
+
+        await this.deleteMultipartRecovery().catch(
+          (deleteRecoveryError: unknown) => {
+            console.error("Failed to clear multipart recovery state", {
+              uploadId: metadata.uploadId,
+              multipartUploadId: createdUploadId,
+              deleteRecoveryError,
+            });
+          },
+        );
 
         await this.deleteMetadata().catch((deleteMetadataError: unknown) => {
           console.error("Failed to clear upload metadata after setup failure", {
@@ -486,25 +583,62 @@ export class TusStateDO {
   private async handleDelete(request: Request): Promise<Response> {
     this.assertTusVersion(request);
 
-    const metadata = await this.requireUpload(
-      request.headers.get("X-Project-Id"),
-      request.headers.get("X-Upload-Id"),
-    );
-    const multipartUploadId = metadata.multipartUploadId;
+    const projectId = request.headers.get("X-Project-Id");
+    const uploadIdHeader = request.headers.get("X-Upload-Id");
+    const metadata = await this.getMetadata();
+    const recovery = metadata ? null : await this.getMultipartRecovery();
+
+    if (!metadata && !recovery) {
+      throw Errors.uploadNotFound(uploadIdHeader ?? "unknown");
+    }
+
+    if (
+      uploadIdHeader &&
+      ((metadata && metadata.uploadId !== uploadIdHeader) ||
+        (recovery && recovery.uploadId !== uploadIdHeader))
+    ) {
+      throw Errors.uploadNotFound(uploadIdHeader);
+    }
+
+    const effectiveProjectId = metadata?.projectId ?? recovery?.projectId;
+    if (!effectiveProjectId) {
+      throw Errors.uploadNotFound(uploadIdHeader ?? "unknown");
+    }
+    if (projectId && effectiveProjectId !== projectId) {
+      throw Errors.unauthorized("Upload does not belong to this project");
+    }
+
+    const effectiveUploadId =
+      metadata?.uploadId ?? recovery?.uploadId ?? "unknown";
+    const effectiveEnvironmentId =
+      metadata?.environmentId ?? recovery?.environmentId;
+    const effectiveFileKeyId = metadata?.fileKeyId ?? recovery?.fileKeyId;
+    const effectiveStorageKey =
+      metadata?.storageKey ?? recovery?.storageKey ?? "";
+    const multipartUploadId =
+      metadata?.multipartUploadId ?? recovery?.multipartUploadId ?? null;
+
     let cleanupFailed = false;
 
     if (multipartUploadId) {
       try {
         await retry((attempt) => {
           if (attempt > 1) {
-            this.logEvent("delete_retry_abort_multipart", metadata, {
-              mode: "do",
-              retryAttempt: attempt,
-              multipartUploadId: metadata.multipartUploadId,
-            });
+            this.logEvent(
+              "delete_retry_abort_multipart",
+              {
+                uploadId: effectiveUploadId,
+                projectId: effectiveProjectId,
+              },
+              {
+                mode: "do",
+                retryAttempt: attempt,
+                multipartUploadId,
+              },
+            );
           }
           return abortMultipartUpload({
-            storageKey: metadata.storageKey,
+            storageKey: effectiveStorageKey,
             uploadId: multipartUploadId,
             env: this.env,
           });
@@ -518,7 +652,7 @@ export class TusStateDO {
     }
 
     try {
-      await this.env.R2_BUCKET.delete(metadata.storageKey);
+      await this.env.R2_BUCKET.delete(effectiveStorageKey);
     } catch (error) {
       cleanupFailed = true;
       console.error("Failed to delete upload object", error);
@@ -538,9 +672,9 @@ export class TusStateDO {
       {
         type: "upload-failed",
         data: {
-          environmentId: metadata.environmentId,
-          fileKeyId: metadata.fileKeyId,
-          projectId: metadata.projectId,
+          environmentId: effectiveEnvironmentId ?? "unknown",
+          fileKeyId: effectiveFileKeyId ?? "unknown",
+          projectId: effectiveProjectId,
           error: "Upload aborted via TUS termination",
         },
       },
@@ -548,11 +682,18 @@ export class TusStateDO {
     ).catch((error) => {
       console.error("Failed to send upload failure callback", error);
     });
-    this.logEvent("upload_deleted", metadata, {
-      mode: "do",
-      offsetAfter: metadata.offset,
-      multipartUploadId: metadata.multipartUploadId,
-    });
+    this.logEvent(
+      "upload_deleted",
+      {
+        uploadId: effectiveUploadId,
+        projectId: effectiveProjectId,
+      },
+      {
+        mode: "do",
+        offsetAfter: metadata?.offset ?? 0,
+        multipartUploadId,
+      },
+    );
 
     return new Response(null, {
       status: HTTP_STATUS.NO_CONTENT,
@@ -701,6 +842,34 @@ export class TusStateDO {
     }
 
     const actualSize = fileObject.size;
+
+    if (
+      metadata.claimedSize !== undefined &&
+      actualSize !== metadata.claimedSize
+    ) {
+      await this.env.R2_BUCKET.delete(metadata.storageKey);
+      await this.deleteMetadata();
+      await sendUploadCallback(
+        {
+          type: "upload-failed",
+          data: {
+            environmentId: metadata.environmentId,
+            fileKeyId: metadata.fileKeyId,
+            projectId: metadata.projectId,
+            error: "Uploaded object size does not match claimed size",
+          },
+        },
+        this.env,
+      ).catch((callbackError: unknown) => {
+        console.error("Failed to send upload failure callback", {
+          uploadId: metadata.uploadId,
+          callbackError,
+        });
+      });
+
+      throw Errors.sizeMismatch(metadata.claimedSize, actualSize);
+    }
+
     const headerBytes = await readHeaderBytes(
       fileObject.body as ReadableStream<Uint8Array>,
       8192,
@@ -864,17 +1033,37 @@ export class TusStateDO {
     return metadata ?? null;
   }
 
+  private async getMultipartRecovery(): Promise<MultipartRecoveryState | null> {
+    const state = await this.state.storage.get<MultipartRecoveryState>(
+      MULTIPART_RECOVERY_KEY,
+    );
+    return state ?? null;
+  }
+
   private async persistMetadata(metadata: TusUploadMetadata): Promise<void> {
     await this.state.storage.put(METADATA_KEY, metadata);
   }
 
+  private async persistMultipartRecovery(
+    state: MultipartRecoveryState,
+  ): Promise<void> {
+    await this.state.storage.put(MULTIPART_RECOVERY_KEY, state);
+  }
+
+  private async deleteMultipartRecovery(): Promise<void> {
+    await this.state.storage.delete(MULTIPART_RECOVERY_KEY);
+  }
+
   private async deleteMetadata(): Promise<void> {
-    await this.state.storage.delete(METADATA_KEY);
+    await Promise.all([
+      this.state.storage.delete(METADATA_KEY),
+      this.state.storage.delete(MULTIPART_RECOVERY_KEY),
+    ]);
   }
 
   private logEvent(
     event: string,
-    metadata: TusUploadMetadata,
+    metadata: Pick<TusUploadMetadata, "uploadId" | "projectId">,
     extra: Record<string, unknown> = {},
   ): void {
     console.info("[tus-do]", {
