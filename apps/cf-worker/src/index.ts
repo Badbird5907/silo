@@ -201,14 +201,14 @@ export default {
             });
           });
 
-          console.error("DLQ delete-prefix failure was acked", {
+          console.error("DLQ delete-prefix failure requeued", {
             queue: batch.queue,
             requestId,
             prefix,
             cursor,
             dlqRecordKey: key,
           });
-          message.ack();
+          message.retry();
           continue;
         }
 

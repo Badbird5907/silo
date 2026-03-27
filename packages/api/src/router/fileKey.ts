@@ -513,7 +513,6 @@ export const fileKeyRouter = {
             status: "failed",
             uploadFailedAt: new Date(),
             adapterData: clearUploadSessionAdapterData(current.adapterData),
-            fileId: null,
           })
           .where(eq(fileKeys.id, current.id));
 

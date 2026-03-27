@@ -1,3 +1,5 @@
+import { CallbackRequestError } from "../callback";
+
 export interface RetryOptions {
   maxAttempts?: number;
   baseDelayMs?: number;
@@ -9,6 +11,10 @@ function sleep(ms: number): Promise<void> {
 }
 
 export function isRetryableError(error: unknown): boolean {
+  if (error instanceof CallbackRequestError) {
+    return error.retryable;
+  }
+
   if (!(error instanceof Error)) return false;
   if (error.name === "UploadStreamReadError") return true;
   const message = error.message.toLowerCase();
@@ -46,5 +52,7 @@ export async function retry<T>(
     }
   }
 
-  throw lastError instanceof Error ? lastError : new Error("Retry operation failed");
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Retry operation failed");
 }

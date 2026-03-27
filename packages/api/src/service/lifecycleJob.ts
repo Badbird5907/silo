@@ -17,6 +17,10 @@ import { clearUploadSessionAdapterData } from "@silo-storage/shared";
 import { env } from "../env";
 
 const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
+const ALWAYS_RETRY_CLEANUP_KINDS = new Set<LifecycleJobKind>([
+  "delete_object",
+  "abort_multipart",
+]);
 
 export type LifecycleJobKind =
   | "delete_object"
@@ -286,7 +290,12 @@ export async function requeueDeadLifecycleJobs(
       and(
         eq(fileLifecycleJobs.state, "dead"),
         inArray(fileLifecycleJobs.kind, kinds),
-        sql`${fileLifecycleJobs.attemptCount} < ${fileLifecycleJobs.maxAttempts}`,
+        or(
+          inArray(fileLifecycleJobs.lastHttpStatus, [
+            ...Array.from(RETRYABLE_STATUS_CODES),
+          ]),
+          eq(fileLifecycleJobs.lastErrorCode, "job_exception"),
+        ),
       ),
     )
     .orderBy(asc(fileLifecycleJobs.deadAt), asc(fileLifecycleJobs.updatedAt))
@@ -343,7 +352,9 @@ async function markJobFailed(
   const nextAttemptCount = job.attemptCount + 1;
   const shouldRetry = failure.retryable;
   const reachedMaxAttempts = nextAttemptCount >= job.maxAttempts;
-  const willRetry = shouldRetry && !reachedMaxAttempts;
+  const cleanupKindRetriesForever = ALWAYS_RETRY_CLEANUP_KINDS.has(job.kind);
+  const willRetry =
+    shouldRetry && (cleanupKindRetriesForever || !reachedMaxAttempts);
   const nextAttemptAt = willRetry
     ? new Date(Date.now() + nextBackoffMs(nextAttemptCount))
     : null;

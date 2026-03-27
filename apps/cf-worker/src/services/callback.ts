@@ -12,6 +12,19 @@ import {
   uploadCallbackResponseSchema,
 } from "../types/project";
 
+const RETRYABLE_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
+
+export class CallbackRequestError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly retryable: boolean,
+  ) {
+    super(message);
+    this.name = "CallbackRequestError";
+  }
+}
+
 export async function verifyUploadSignature(
   request: SignatureVerificationRequest,
   env: Bindings,
@@ -64,11 +77,26 @@ export async function sendUploadCallback(
     if (!response.ok) {
       const text = await response.text();
       console.error("[callback] Error response:", text);
-      const parsed = errorResponseSchema.safeParse(JSON.parse(text));
-      if (parsed.success && parsed.data.error) {
-        throw new Error(parsed.data.error);
+      let parsedError: string | null = null;
+
+      if (text) {
+        try {
+          const parsed = errorResponseSchema.safeParse(JSON.parse(text));
+          if (parsed.success && parsed.data.error) {
+            parsedError = parsed.data.error;
+          }
+        } catch {
+          parsedError = null;
+        }
       }
-      throw new Error(`Upload callback failed: ${text}`);
+
+      const retryable = RETRYABLE_HTTP_STATUSES.has(response.status);
+      throw new CallbackRequestError(
+        parsedError ??
+          `Upload callback failed (${response.status}): ${text || response.statusText}`,
+        response.status,
+        retryable,
+      );
     }
 
     const json = await response.json();
@@ -266,6 +294,7 @@ export async function reportMissingObject(
 ): Promise<void> {
   const maxAttempts = 4;
   const retryableStatuses = new Set([408, 425, 429, 500, 502, 503, 504]);
+  let lastError: unknown;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -300,9 +329,12 @@ export async function reportMissingObject(
       });
 
       if (!retryable || attempt >= maxAttempts) {
-        return;
+        throw new Error(
+          `Failed to report missing object (${response.status}): ${text || response.statusText}`,
+        );
       }
     } catch (error) {
+      lastError = error;
       console.error("[repair] Error reporting missing object", {
         attempt,
         maxAttempts,
@@ -310,10 +342,14 @@ export async function reportMissingObject(
       });
 
       if (attempt >= maxAttempts) {
-        return;
+        throw error;
       }
     }
 
     await sleep(Math.min(200 * 2 ** (attempt - 1), 2000));
   }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Failed to report missing object");
 }

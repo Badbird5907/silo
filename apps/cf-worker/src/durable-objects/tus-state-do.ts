@@ -60,6 +60,16 @@ function isTerminalSessionRegistrationError(error: unknown): boolean {
   );
 }
 
+function isNoSuchUploadError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("nosuchupload") ||
+    message.includes("no such upload") ||
+    message.includes("upload does not exist")
+  );
+}
+
 export class TusStateDO {
   private queue: Promise<void> = Promise.resolve();
 
@@ -500,8 +510,10 @@ export class TusStateDO {
           });
         });
       } catch (error) {
-        cleanupFailed = true;
-        console.error("Failed to abort multipart upload", error);
+        if (!isNoSuchUploadError(error)) {
+          cleanupFailed = true;
+          console.error("Failed to abort multipart upload", error);
+        }
       }
     }
 
@@ -593,12 +605,14 @@ export class TusStateDO {
           env: this.env,
         });
       } catch (error) {
-        cleanupFailed = true;
-        console.error("Failed to abort multipart upload for expired upload", {
-          uploadId: metadata.uploadId,
-          multipartUploadId,
-          error,
-        });
+        if (!isNoSuchUploadError(error)) {
+          cleanupFailed = true;
+          console.error("Failed to abort multipart upload for expired upload", {
+            uploadId: metadata.uploadId,
+            multipartUploadId,
+            error,
+          });
+        }
       }
     }
 
@@ -658,6 +672,31 @@ export class TusStateDO {
 
     const fileObject = await this.env.R2_BUCKET.get(metadata.storageKey);
     if (!fileObject) {
+      await this.deleteMetadata().catch((deleteMetadataError: unknown) => {
+        console.error("Failed to clear metadata after missing file object", {
+          uploadId: metadata.uploadId,
+          deleteMetadataError,
+        });
+      });
+
+      await sendUploadCallback(
+        {
+          type: "upload-failed",
+          data: {
+            environmentId: metadata.environmentId,
+            fileKeyId: metadata.fileKeyId,
+            projectId: metadata.projectId,
+            error: "Uploaded object is missing at finalize time",
+          },
+        },
+        this.env,
+      ).catch((callbackError: unknown) => {
+        console.error("Failed to send upload failure callback", {
+          uploadId: metadata.uploadId,
+          callbackError,
+        });
+      });
+
       throw new Error("Failed to retrieve uploaded file");
     }
 
@@ -680,6 +719,23 @@ export class TusStateDO {
     ) {
       await this.env.R2_BUCKET.delete(metadata.storageKey);
       await this.deleteMetadata();
+      await sendUploadCallback(
+        {
+          type: "upload-failed",
+          data: {
+            environmentId: metadata.environmentId,
+            fileKeyId: metadata.fileKeyId,
+            projectId: metadata.projectId,
+            error: "Detected MIME type does not match claimed MIME type",
+          },
+        },
+        this.env,
+      ).catch((callbackError: unknown) => {
+        console.error("Failed to send upload failure callback", {
+          uploadId: metadata.uploadId,
+          callbackError,
+        });
+      });
       throw Errors.mimeTypeMismatch(metadata.claimedMimeType, actualMimeType);
     }
 
@@ -694,6 +750,23 @@ export class TusStateDO {
     ) {
       await this.env.R2_BUCKET.delete(metadata.storageKey);
       await this.deleteMetadata();
+      await sendUploadCallback(
+        {
+          type: "upload-failed",
+          data: {
+            environmentId: metadata.environmentId,
+            fileKeyId: metadata.fileKeyId,
+            projectId: metadata.projectId,
+            error: "Detected MIME type is not allowed for this upload",
+          },
+        },
+        this.env,
+      ).catch((callbackError: unknown) => {
+        console.error("Failed to send upload failure callback", {
+          uploadId: metadata.uploadId,
+          callbackError,
+        });
+      });
       throw Errors.mimeTypeNotAllowed(
         actualMimeType,
         metadata.acceptedMimeTypes,

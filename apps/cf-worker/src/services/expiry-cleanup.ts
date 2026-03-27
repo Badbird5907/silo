@@ -167,7 +167,7 @@ export async function runExpiryCleanup(env: Bindings) {
           ]);
           totalDbDeleted += finalized.deletedCount;
           finalizedInBatch.add(item.fileId);
-        } catch (finalizeError) {
+        } catch (finalizeError: unknown) {
           console.error("Failed to finalize expired file after R2 deletion", {
             fileKeyId: item.fileKeyId,
             fileId: item.fileId,
@@ -185,7 +185,19 @@ export async function runExpiryCleanup(env: Bindings) {
               storageKey,
             },
             env,
-          );
+          ).catch((reportError: unknown) => {
+            console.error(
+              "Failed to report missing object after finalize error",
+              {
+                fileKeyId: item.fileKeyId,
+                fileId: item.fileId,
+                storageKey,
+                finalizeError,
+                reportError,
+              },
+            );
+            throw reportError;
+          });
         }
       } catch (deleteError) {
         console.error("Failed to delete expired object from R2", {
