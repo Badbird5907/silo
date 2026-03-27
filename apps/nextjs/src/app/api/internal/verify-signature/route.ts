@@ -270,6 +270,32 @@ export async function POST(request: Request) {
       );
     }
 
+    if (apiKey.project.lifecycleState === "deleting") {
+      return new Response(
+        JSON.stringify({
+          error: "Project is currently deleting",
+          valid: false,
+        }),
+        {
+          status: 409,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    if (environment.lifecycleState === "deleting") {
+      return new Response(
+        JSON.stringify({
+          error: "Environment is currently deleting",
+          valid: false,
+        }),
+        {
+          status: 409,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
     const fileKey = await db.query.fileKeys.findFirst({
       where: and(
         eq(fileKeys.id, payload.fileKeyId),

@@ -1,6 +1,8 @@
 import { env } from "@/env";
 import {
   authenticateRequest,
+  ensureEnvironmentWritable,
+  ensureProjectWritable,
   jsonError,
   validateEnvironmentAccess,
   validateProjectAccess,
@@ -68,9 +70,13 @@ export async function POST(request: Request) {
   }
   const project = await validateProjectAccess(authResult, projectId);
   if (project instanceof Response) return project;
+  const projectWritable = ensureProjectWritable(project);
+  if (projectWritable) return projectWritable;
 
   const environment = await validateEnvironmentAccess(environmentId, projectId);
   if (environment instanceof Response) return environment;
+  const environmentWritable = ensureEnvironmentWritable(environment);
+  if (environmentWritable) return environmentWritable;
 
   try {
     const registered = [];

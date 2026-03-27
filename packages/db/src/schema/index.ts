@@ -42,6 +42,11 @@ export const fileLifecycleJobStates = pgEnum("file_lifecycle_job_state", [
   "dead",
 ]);
 
+export const resourceLifecycleState = pgEnum("resource_lifecycle_state", [
+  "active",
+  "deleting",
+]);
+
 export const projects = pgTable("projects", {
   id: text("id")
     .primaryKey()
@@ -51,6 +56,9 @@ export const projects = pgTable("projects", {
   defaultFileAccess: fileAccessTypes("default_file_access")
     .notNull()
     .default("private"),
+  lifecycleState: resourceLifecycleState("lifecycle_state")
+    .notNull()
+    .default("active"),
   pendingUploadFailAfterMinutes: integer("pending_upload_fail_after_minutes")
     .notNull()
     .default(24 * 60),
@@ -84,6 +92,9 @@ export const projectEnvironments = pgTable("project_environments", {
   name: text("name").notNull(),
   slug: text("slug").notNull(), // unique across project, but not globally
   type: projectEnvironmentTypes("type").notNull(),
+  lifecycleState: resourceLifecycleState("lifecycle_state")
+    .notNull()
+    .default("active"),
   ownerUserId: text("owner_user_id").references(() => auth.users.id, {
     onDelete: "set null",
   }),

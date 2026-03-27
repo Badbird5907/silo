@@ -61,10 +61,14 @@ export async function handleDevR2ListAll(
       }
     }
 
+    const totalSize = objects.reduce((acc, obj) => acc + obj.size, 0);
+    const totalSizeMB = totalSize / 1024 / 1024;
+
     return c.json(
       {
         count: objects.length,
         objects,
+        totalSizeMB,
       },
       HTTP_STATUS.OK,
     );

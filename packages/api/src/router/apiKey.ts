@@ -123,7 +123,6 @@ export const apiKeyRouter = {
       }));
     }),
 
-  // Create a new API key
   create: organizationProcedure
     .input(
       z.object({
@@ -248,12 +247,10 @@ export const apiKeyRouter = {
       return { success: true };
     }),
 
-  // Get environments for a project (for API key creation)
   getEnvironments: organizationProcedure
     .input(z.object({ projectId: z.string() }))
     .use(requirePermission({ apiKey: ["read"] }))
     .query(async ({ ctx, input }) => {
-      // Verify project belongs to the organization
       const project = await ctx.db.query.projects.findFirst({
         where: and(
           eq(projects.id, input.projectId),

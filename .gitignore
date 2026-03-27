@@ -50,3 +50,6 @@ docker/*/data
 .react-email/
 .vercel
 .env*.local
+
+.wrangler/
+.env*.local

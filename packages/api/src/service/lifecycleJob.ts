@@ -46,7 +46,7 @@ interface LifecycleJobAdapterData {
   multipartUploadId?: string;
 }
 
-type JobExecutor = Pick<Db, "execute">;
+type JobExecutor = Pick<Db, "execute" | "insert">;
 
 interface ClaimOptions {
   limit?: number;
@@ -406,86 +406,95 @@ async function performAbortMultipart(
 ) {
   const adapterData = getLifecycleJobAdapterData(job.adapterData);
 
-  if (!adapterData.uploadSessionId || !job.projectId) {
+  const hasDoPath = !!adapterData.uploadSessionId && !!job.projectId;
+  const hasFallbackPath =
+    !!adapterData.storageKey && !!adapterData.multipartUploadId;
+
+  if (!hasDoPath && !hasFallbackPath) {
     return {
       ok: false as const,
       retryable: false,
       errorCode: "missing_upload_session",
-      message: "Abort multipart job missing uploadSessionId or projectId",
+      message:
+        "Abort multipart job missing both DO and fallback multipart identifiers",
     };
   }
 
-  const response = await fetch(
-    `${env.WORKER_URL}/internal/tus/${adapterData.uploadSessionId}/delete`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${env.CALLBACK_SECRET}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ projectId: job.projectId }),
-    },
-  );
-
-  if (response.ok || response.status === 404) {
-    if (
-      response.status === 404 &&
-      adapterData.storageKey &&
-      adapterData.multipartUploadId
-    ) {
-      const fallbackAbortResponse = await fetch(
-        `${env.WORKER_URL}/internal/multipart/abort`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${env.CALLBACK_SECRET}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            storageKey: adapterData.storageKey,
-            uploadId: adapterData.multipartUploadId,
-          }),
+  let doStatus = 0;
+  if (hasDoPath) {
+    const response = await fetch(
+      `${env.WORKER_URL}/internal/tus/${adapterData.uploadSessionId}/delete`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.CALLBACK_SECRET}`,
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({ projectId: job.projectId }),
+      },
+    );
 
-      if (!fallbackAbortResponse.ok) {
-        const fallbackDetails = await fallbackAbortResponse
-          .text()
-          .catch(() => "");
-        const retryable = RETRYABLE_STATUS_CODES.has(
-          fallbackAbortResponse.status,
-        );
+    doStatus = response.status;
 
-        return {
-          ok: false as const,
-          retryable,
-          httpStatus: fallbackAbortResponse.status,
-          errorCode: "abort_multipart_fallback_failed",
-          message: `Fallback multipart abort failed (${fallbackAbortResponse.status}): ${fallbackDetails || fallbackAbortResponse.statusText}`,
-        };
-      }
+    if (!response.ok && response.status !== 404) {
+      const details = await response.text().catch(() => "");
+      const retryable = RETRYABLE_STATUS_CODES.has(response.status);
+
+      return {
+        ok: false as const,
+        retryable,
+        httpStatus: response.status,
+        errorCode: "abort_multipart_failed",
+        message: `Abort multipart failed (${response.status}): ${details || response.statusText}`,
+      };
     }
-
-    if (adapterData.storageKey) {
-      const deleteResult = await performDeleteObject(job);
-      if (!deleteResult.ok) {
-        return deleteResult;
-      }
-    }
-
-    return { ok: true as const };
   }
 
-  const details = await response.text().catch(() => "");
-  const retryable = RETRYABLE_STATUS_CODES.has(response.status);
+  const shouldUseFallback =
+    hasFallbackPath && (!hasDoPath || doStatus === 404 || doStatus === 0);
 
-  return {
-    ok: false as const,
-    retryable,
-    httpStatus: response.status,
-    errorCode: "abort_multipart_failed",
-    message: `Abort multipart failed (${response.status}): ${details || response.statusText}`,
-  };
+  if (shouldUseFallback) {
+    const fallbackAbortResponse = await fetch(
+      `${env.WORKER_URL}/internal/multipart/abort`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.CALLBACK_SECRET}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          storageKey: adapterData.storageKey,
+          uploadId: adapterData.multipartUploadId,
+        }),
+      },
+    );
+
+    if (!fallbackAbortResponse.ok) {
+      const fallbackDetails = await fallbackAbortResponse
+        .text()
+        .catch(() => "");
+      const retryable = RETRYABLE_STATUS_CODES.has(
+        fallbackAbortResponse.status,
+      );
+
+      return {
+        ok: false as const,
+        retryable,
+        httpStatus: fallbackAbortResponse.status,
+        errorCode: "abort_multipart_fallback_failed",
+        message: `Fallback multipart abort failed (${fallbackAbortResponse.status}): ${fallbackDetails || fallbackAbortResponse.statusText}`,
+      };
+    }
+  }
+
+  if (adapterData.storageKey) {
+    const deleteResult = await performDeleteObject(job);
+    if (!deleteResult.ok) {
+      return deleteResult;
+    }
+  }
+
+  return { ok: true as const };
 }
 
 async function performFinalizeFailedFileKey(

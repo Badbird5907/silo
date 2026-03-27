@@ -2,7 +2,12 @@ import { z } from "zod";
 
 import { and, eq, sql } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
-import { fileKeys, files } from "@silo-storage/db/schema";
+import {
+  fileKeys,
+  files,
+  projectEnvironments,
+  projects,
+} from "@silo-storage/db/schema";
 import { clearUploadSessionAdapterData } from "@silo-storage/shared";
 
 const unknownRecordSchema = z.record(z.string(), z.unknown());
@@ -123,6 +128,36 @@ export async function registerFileKeyIntent(input: {
 }) {
   return db.transaction(async (tx) => {
     await lockFileKey(tx, input.fileKey.fileKeyId);
+
+    const [project, environment] = await Promise.all([
+      tx.query.projects.findFirst({
+        where: eq(projects.id, input.projectId),
+        columns: { id: true, lifecycleState: true },
+      }),
+      tx.query.projectEnvironments.findFirst({
+        where: and(
+          eq(projectEnvironments.id, input.environmentId),
+          eq(projectEnvironments.projectId, input.projectId),
+        ),
+        columns: { id: true, lifecycleState: true },
+      }),
+    ]);
+
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
+    if (project.lifecycleState === "deleting") {
+      throw new Error("Project is currently deleting");
+    }
+
+    if (!environment) {
+      throw new Error("Environment not found");
+    }
+
+    if (environment.lifecycleState === "deleting") {
+      throw new Error("Environment is currently deleting");
+    }
 
     const byId = await tx.query.fileKeys.findFirst({
       where: eq(fileKeys.id, input.fileKey.fileKeyId),

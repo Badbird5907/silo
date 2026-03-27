@@ -21,6 +21,7 @@ export const requireProject: MiddlewareHandler<{
   c.set("projectSlug", projectSlug);
   c.set("projectId", project.id);
   c.set("defaultFileAccess", project.defaultFileAccess);
+  c.set("projectLifecycleState", project.lifecycleState ?? "active");
 
   await next();
 };

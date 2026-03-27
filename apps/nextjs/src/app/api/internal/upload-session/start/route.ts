@@ -2,7 +2,11 @@ import { z } from "zod";
 
 import { and, eq } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
-import { fileKeys } from "@silo-storage/db/schema";
+import {
+  fileKeys,
+  projectEnvironments,
+  projects,
+} from "@silo-storage/db/schema";
 import {
   getUploadSessionAdapterData,
   setUploadSessionAdapterData,
@@ -53,6 +57,59 @@ export async function POST(request: Request) {
 
   const { projectId, environmentId, fileKeyId, uploadId, adapterKey } =
     parsed.data;
+
+  const [project, environment] = await Promise.all([
+    db.query.projects.findFirst({
+      where: eq(projects.id, projectId),
+      columns: { id: true, lifecycleState: true },
+    }),
+    db.query.projectEnvironments.findFirst({
+      where: and(
+        eq(projectEnvironments.id, environmentId),
+        eq(projectEnvironments.projectId, projectId),
+      ),
+      columns: { id: true, lifecycleState: true },
+    }),
+  ]);
+
+  if (!project) {
+    return new Response(JSON.stringify({ error: "Project not found" }), {
+      status: 404,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  if (project.lifecycleState === "deleting") {
+    return new Response(
+      JSON.stringify({
+        error: "Upload session cannot be registered while project is deleting",
+      }),
+      {
+        status: 409,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
+
+  if (!environment) {
+    return new Response(JSON.stringify({ error: "Environment not found" }), {
+      status: 404,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  if (environment.lifecycleState === "deleting") {
+    return new Response(
+      JSON.stringify({
+        error:
+          "Upload session cannot be registered while environment is deleting",
+      }),
+      {
+        status: 409,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
 
   const existing = await db.query.fileKeys.findFirst({
     where: and(

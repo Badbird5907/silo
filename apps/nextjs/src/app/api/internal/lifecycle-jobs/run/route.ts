@@ -73,11 +73,29 @@ export async function POST(request: Request) {
       }
     }
 
-    if (dead > 0) {
-      const replay = await requeueDeadLifecycleJobs(db, {
-        limit: Math.min(dead, 200),
-      });
-      deadRequeued = replay.requeued;
+    const replay = await requeueDeadLifecycleJobs(db, {
+      limit: 200,
+      kinds: ["delete_object", "abort_multipart"],
+    });
+    deadRequeued = replay.requeued;
+
+    if (deadRequeued > 0) {
+      for (let replayBatch = 0; replayBatch < 5; replayBatch++) {
+        const replayResult = await runLifecycleJobBatch(db, {
+          limit,
+          leaseSeconds,
+        });
+
+        batches += 1;
+        claimed += replayResult.claimed;
+        completed += replayResult.completed;
+        retried += replayResult.retried;
+        dead += replayResult.dead;
+
+        if (replayResult.claimed < limit) {
+          break;
+        }
+      }
     }
 
     return new Response(

@@ -28,6 +28,7 @@ export async function POST(request: Request) {
       columns: {
         id: true,
         defaultFileAccess: true,
+        lifecycleState: true,
       },
     });
 

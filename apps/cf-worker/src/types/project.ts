@@ -3,6 +3,7 @@ import { z } from "zod";
 export interface ProjectInfo {
   id: string;
   defaultFileAccess: "public" | "private";
+  lifecycleState?: "active" | "deleting";
 }
 
 export interface FileKeyInfo {

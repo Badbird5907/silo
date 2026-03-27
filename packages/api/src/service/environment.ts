@@ -1,10 +1,16 @@
 import type { Db } from "@silo-storage/db/client";
 import { nanoid } from "nanoid";
 
-import { and, eq } from "@silo-storage/db";
-import { projectEnvironments } from "@silo-storage/db/schema";
+import { and, eq, inArray } from "@silo-storage/db";
+import {
+  fileKeys,
+  fileLifecycleJobs,
+  projectEnvironments,
+} from "@silo-storage/db/schema";
 
 import { env } from "../env";
+import { markUploadAsFailed, UploadFailureError } from "./fileKey";
+import { runLifecycleJobBatch } from "./lifecycleJob";
 
 const WEBHOOK_EVENTS = ["upload.completed", "upload.failed"] as const;
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
@@ -262,6 +268,57 @@ export async function deleteEnvironment(
   projectId: string,
   _deleteObjects = true,
 ) {
+  const [environment] = await db
+    .update(projectEnvironments)
+    .set({ lifecycleState: "deleting" })
+    .where(
+      and(
+        eq(projectEnvironments.id, environmentId),
+        eq(projectEnvironments.projectId, projectId),
+      ),
+    )
+    .returning({ id: projectEnvironments.id });
+
+  if (!environment) {
+    return undefined;
+  }
+
+  const pendingUploads = await db
+    .select({
+      fileKeyId: fileKeys.id,
+    })
+    .from(fileKeys)
+    .where(
+      and(
+        eq(fileKeys.projectId, projectId),
+        eq(fileKeys.environmentId, environmentId),
+        eq(fileKeys.status, "pending"),
+      ),
+    );
+
+  for (const pending of pendingUploads) {
+    try {
+      await markUploadAsFailed(db, {
+        projectId,
+        environmentId,
+        fileKeyId: pending.fileKeyId,
+        error: "Upload cancelled because environment is being deleted",
+      });
+    } catch (error) {
+      if (error instanceof UploadFailureError) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  await drainLifecycleCleanup(
+    db,
+    projectId,
+    environmentId,
+    `environment-delete:${environmentId}`,
+  );
+
   if (_deleteObjects) {
     await scheduleEnvironmentObjectDeletion({
       projectId,
@@ -290,6 +347,49 @@ export async function deleteEnvironment(
 
   throw new Error(
     `Failed to delete environment metadata after object cleanup for environment ${environmentId}: ${lastError instanceof Error ? lastError.message : "Unknown error"}`,
+  );
+}
+
+async function drainLifecycleCleanup(
+  db: Db,
+  projectId: string,
+  environmentId: string,
+  leaseOwner: string,
+): Promise<void> {
+  const limit = 200;
+
+  for (let batch = 0; batch < 50; batch++) {
+    await runLifecycleJobBatch(db, {
+      limit,
+      leaseSeconds: 60,
+      leaseOwner,
+    });
+
+    const remainingCleanupJobs = await db
+      .select({ id: fileLifecycleJobs.id })
+      .from(fileLifecycleJobs)
+      .where(
+        and(
+          eq(fileLifecycleJobs.projectId, projectId),
+          eq(fileLifecycleJobs.environmentId, environmentId),
+          inArray(fileLifecycleJobs.kind, ["delete_object", "abort_multipart"]),
+          inArray(fileLifecycleJobs.state, [
+            "pending",
+            "retry",
+            "leased",
+            "dead",
+          ]),
+        ),
+      )
+      .limit(1);
+
+    if (remainingCleanupJobs.length === 0) {
+      return;
+    }
+  }
+
+  throw new Error(
+    "Lifecycle cleanup exceeded maximum batches while deleting environment",
   );
 }
 

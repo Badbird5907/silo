@@ -11,8 +11,8 @@ import {
   requireMainDomain,
   requireProject,
 } from "./middleware/project";
-import { handleDownload } from "./routes/download";
 import { handleDevR2ListAll } from "./routes/dev/r2-list-all";
+import { handleDownload } from "./routes/download";
 import { handleInternalDelete } from "./routes/internal/delete";
 import { handleInternalDeletePrefix } from "./routes/internal/delete-prefix";
 import { handleInternalList } from "./routes/internal/list";
@@ -171,6 +171,43 @@ export default {
         });
 
         if (isDlqBatch) {
+          const now = new Date();
+          const key = `dlq:delete-prefix:${requestId}:${now.getTime()}`;
+
+          await env.PROJECT_CACHE.put(
+            key,
+            JSON.stringify({
+              queue: batch.queue,
+              requestId,
+              prefix,
+              cursor,
+              failedAt: now.toISOString(),
+              error:
+                error instanceof Error
+                  ? {
+                      name: error.name,
+                      message: error.message,
+                    }
+                  : String(error),
+            }),
+            { expirationTtl: 60 * 60 * 24 * 14 },
+          ).catch((kvError: unknown) => {
+            console.error("Failed to persist DLQ failure record", {
+              queue: batch.queue,
+              requestId,
+              prefix,
+              cursor,
+              kvError,
+            });
+          });
+
+          console.error("DLQ delete-prefix failure was acked", {
+            queue: batch.queue,
+            requestId,
+            prefix,
+            cursor,
+            dlqRecordKey: key,
+          });
           message.ack();
           continue;
         }

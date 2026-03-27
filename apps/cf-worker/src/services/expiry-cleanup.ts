@@ -34,6 +34,10 @@ function resolvePositiveInt(
   return parsed;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function fetchExpiredBatch(env: Bindings, limit: number) {
   const response = await fetch(
     `${env.NEXTJS_CALLBACK_URL}/api/internal/expiry/list`,
@@ -94,6 +98,34 @@ async function finalizeExpiredBatch(env: Bindings, fileIds: string[]) {
   return parsed.data;
 }
 
+async function finalizeExpiredBatchWithRetry(
+  env: Bindings,
+  fileIds: string[],
+): Promise<z.infer<typeof expiryFinalizeResponseSchema>> {
+  const maxAttempts = 3;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await finalizeExpiredBatch(env, fileIds);
+    } catch (error) {
+      if (attempt >= maxAttempts) {
+        throw error;
+      }
+
+      console.error("Failed to finalize expired files, retrying", {
+        fileIds,
+        attempt,
+        maxAttempts,
+        error,
+      });
+
+      await sleep(Math.min(200 * 2 ** (attempt - 1), 2000));
+    }
+  }
+
+  throw new Error("Failed to finalize expired files");
+}
+
 export async function runExpiryCleanup(env: Bindings) {
   const batchSize = resolvePositiveInt(env.EXPIRY_CLEANUP_BATCH_SIZE, 100);
   const maxBatches = resolvePositiveInt(env.EXPIRY_CLEANUP_MAX_BATCHES, 10);
@@ -130,7 +162,9 @@ export async function runExpiryCleanup(env: Bindings) {
         }
 
         try {
-          const finalized = await finalizeExpiredBatch(env, [item.fileId]);
+          const finalized = await finalizeExpiredBatchWithRetry(env, [
+            item.fileId,
+          ]);
           totalDbDeleted += finalized.deletedCount;
           finalizedInBatch.add(item.fileId);
         } catch (finalizeError) {

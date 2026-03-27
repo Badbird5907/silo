@@ -253,6 +253,11 @@ export async function POST(request: Request) {
         where: eq(projectEnvironments.id, data.environmentId),
       });
 
+      const project = await db.query.projects.findFirst({
+        where: eq(projects.id, data.projectId),
+        columns: { id: true, lifecycleState: true },
+      });
+
       if (!environment) {
         try {
           await scheduleAdapterKeyCleanup({
@@ -281,6 +286,42 @@ export async function POST(request: Request) {
             cleanupScheduled: true,
           }),
           { status: 404, headers: { "Content-Type": "application/json" } },
+        );
+      }
+
+      if (
+        !project ||
+        project.lifecycleState === "deleting" ||
+        environment.lifecycleState === "deleting"
+      ) {
+        try {
+          await scheduleAdapterKeyCleanup({
+            projectId: data.projectId,
+            environmentId: data.environmentId,
+            fileKeyId: data.fileKeyId,
+            storageKey: data.adapterKey,
+          });
+        } catch (cleanupError) {
+          console.error(
+            "Failed to enqueue cleanup for deleting project/environment callback",
+            cleanupError,
+          );
+          return new Response(
+            JSON.stringify({
+              error:
+                "Temporary cleanup scheduling failure for deleting project/environment callback",
+            }),
+            { status: 503, headers: { "Content-Type": "application/json" } },
+          );
+        }
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            status: "failed",
+            note: "Project or environment is deleting; completion callback ignored.",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
         );
       }
 

@@ -314,11 +314,25 @@ export class TusStateDO {
           },
         );
       } catch (persistError) {
-        await abortMultipartUpload({
-          storageKey: metadata.storageKey,
-          uploadId: createdUploadId,
-          env: this.env,
-        }).catch((abortError: unknown) => {
+        let abortFailed = false;
+
+        try {
+          await retry(
+            () =>
+              abortMultipartUpload({
+                storageKey: metadata.storageKey,
+                uploadId: createdUploadId,
+                env: this.env,
+              }),
+            {
+              maxAttempts: 3,
+              baseDelayMs: 150,
+              maxDelayMs: 1000,
+            },
+          );
+        } catch (abortError) {
+          abortFailed = true;
+          metadata.multipartUploadId = createdUploadId;
           console.error(
             "Failed to abort multipart upload after persist failure",
             {
@@ -327,19 +341,36 @@ export class TusStateDO {
               abortError,
             },
           );
+
+          await this.persistMetadata(metadata).catch(
+            (metadataPersistError: unknown) => {
+              console.error(
+                "Failed to persist upload metadata after multipart cleanup failure",
+                {
+                  uploadId: metadata.uploadId,
+                  metadataPersistError,
+                },
+              );
+            },
+          );
+        }
+
+        if (abortFailed) {
+          throw new TusError(
+            "INVALID_REQUEST",
+            503,
+            "Upload cleanup temporarily unavailable. Retry shortly.",
+          );
+        }
+
+        await this.deleteMetadata().catch((deleteMetadataError: unknown) => {
+          console.error("Failed to clear upload metadata after setup failure", {
+            uploadId: metadata.uploadId,
+            deleteMetadataError,
+          });
         });
 
         if (isTerminalSessionRegistrationError(persistError)) {
-          await this.deleteMetadata().catch((deleteMetadataError: unknown) => {
-            console.error(
-              "Failed to clear upload metadata after terminal registration failure",
-              {
-                uploadId: metadata.uploadId,
-                deleteMetadataError,
-              },
-            );
-          });
-
           throw new TusError(
             "INVALID_REQUEST",
             409,

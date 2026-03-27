@@ -172,6 +172,18 @@ export async function validateProjectAccess(
   return project;
 }
 
+export function ensureProjectWritable(project: Project): Response | null {
+  if (project.lifecycleState === "deleting") {
+    return jsonError(
+      "Conflict",
+      "Project is currently being deleted and cannot accept upload writes.",
+      409,
+    );
+  }
+
+  return null;
+}
+
 export async function validateEnvironmentAccess(
   environmentId: string,
   projectId: string,
@@ -192,4 +204,18 @@ export async function validateEnvironmentAccess(
   }
 
   return environment;
+}
+
+export function ensureEnvironmentWritable(
+  environment: ProjectEnvironment,
+): Response | null {
+  if (environment.lifecycleState === "deleting") {
+    return jsonError(
+      "Conflict",
+      "Environment is currently being deleted and cannot accept upload writes.",
+      409,
+    );
+  }
+
+  return null;
 }

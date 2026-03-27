@@ -231,6 +231,10 @@ export interface ReportMissingObjectData {
   storageKey: string;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function trackDownload(
   data: TrackDownloadData,
   env: Bindings,
@@ -260,30 +264,56 @@ export async function reportMissingObject(
   data: ReportMissingObjectData,
   env: Bindings,
 ): Promise<void> {
-  try {
-    const response = await fetch(
-      `${env.NEXTJS_CALLBACK_URL}/api/internal/files/repair-missing`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${env.CALLBACK_SECRET}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ...data,
-          adapterKey: data.storageKey,
-        }),
-      },
-    );
+  const maxAttempts = 4;
+  const retryableStatuses = new Set([408, 425, 429, 500, 502, 503, 504]);
 
-    if (!response.ok) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const response = await fetch(
+        `${env.NEXTJS_CALLBACK_URL}/api/internal/files/repair-missing`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${env.CALLBACK_SECRET}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            ...data,
+            adapterKey: data.storageKey,
+          }),
+        },
+      );
+
+      if (response.ok) {
+        return;
+      }
+
       const text = await response.text().catch(() => "");
+      const retryable = retryableStatuses.has(response.status);
+
       console.error("[repair] Failed to report missing object", {
+        attempt,
+        maxAttempts,
         status: response.status,
+        retryable,
         details: text,
       });
+
+      if (!retryable || attempt >= maxAttempts) {
+        return;
+      }
+    } catch (error) {
+      console.error("[repair] Error reporting missing object", {
+        attempt,
+        maxAttempts,
+        error,
+      });
+
+      if (attempt >= maxAttempts) {
+        return;
+      }
     }
-  } catch (error) {
-    console.error("[repair] Error reporting missing object", error);
+
+    await sleep(Math.min(200 * 2 ** (attempt - 1), 2000));
   }
 }

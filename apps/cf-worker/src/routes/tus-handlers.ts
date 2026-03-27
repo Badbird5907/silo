@@ -20,7 +20,7 @@ import {
   UPLOAD_METADATA_HEADER,
   UPLOAD_OFFSET_HEADER,
 } from "../utils/constants";
-import { Errors } from "../utils/errors";
+import { Errors, TusError } from "../utils/errors";
 import {
   isValidBase64,
   isValidMetadataKey,
@@ -29,6 +29,16 @@ import {
 } from "../utils/validation";
 
 type AppContext = Context<{ Bindings: Bindings; Variables: Variables }>;
+
+function assertProjectUploadWritable(c: AppContext): void {
+  if (c.get("projectLifecycleState") === "deleting") {
+    throw new TusError(
+      "INVALID_REQUEST",
+      409,
+      "Project is currently being deleted and cannot accept upload writes.",
+    );
+  }
+}
 
 export function handleTusOptions(c: AppContext): Response {
   return new Response(null, {
@@ -54,6 +64,7 @@ export async function handleTusHead(c: AppContext): Promise<Response> {
 }
 
 export async function handleTusPatch(c: AppContext): Promise<Response> {
+  assertProjectUploadWritable(c);
   return await proxyTusPatchToDo(
     c.req.param("uploadId"),
     c.get("projectId"),
@@ -73,6 +84,7 @@ export async function handleTusDelete(c: AppContext): Promise<Response> {
 }
 
 export async function handleTusCreate(c: AppContext): Promise<Response> {
+  assertProjectUploadWritable(c);
   const tusResumable = c.req.header("Tus-Resumable");
   if (tusResumable !== TUS_VERSION) {
     throw Errors.invalidTusVersion(TUS_VERSION, tusResumable);
@@ -208,34 +220,39 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
     const uploadUrl = `${url.protocol}//${url.host}/ingest/tus/${uploadId}`;
 
     if (uploadLength === 0) {
-      await registerUploadSession(
-        {
-          projectId,
-          environmentId,
-          fileKeyId,
-          uploadId,
-          storageKey,
-        },
-        c.env,
-      );
-
       const zeroByteMimeType = "application/octet-stream";
-      if (
-        verificationResult.acceptedMimeTypes &&
-        !isAllowedMimeType(
-          zeroByteMimeType,
-          verificationResult.acceptedMimeTypes,
-        )
-      ) {
-        throw Errors.mimeTypeNotAllowed(
-          zeroByteMimeType,
-          verificationResult.acceptedMimeTypes,
-        );
-      }
-
-      await c.env.R2_BUCKET.put(storageKey, new Uint8Array(0));
+      let sessionRegistered = false;
+      let objectStored = false;
 
       try {
+        if (
+          verificationResult.acceptedMimeTypes &&
+          !isAllowedMimeType(
+            zeroByteMimeType,
+            verificationResult.acceptedMimeTypes,
+          )
+        ) {
+          throw Errors.mimeTypeNotAllowed(
+            zeroByteMimeType,
+            verificationResult.acceptedMimeTypes,
+          );
+        }
+
+        await registerUploadSession(
+          {
+            projectId,
+            environmentId,
+            fileKeyId,
+            uploadId,
+            storageKey,
+          },
+          c.env,
+        );
+        sessionRegistered = true;
+
+        await c.env.R2_BUCKET.put(storageKey, new Uint8Array(0));
+        objectStored = true;
+
         await sendUploadCallback(
           {
             type: "upload-completed",
@@ -258,16 +275,45 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
           },
           c.env,
         );
-      } catch (callbackError) {
-        await c.env.R2_BUCKET.delete(storageKey).catch(
-          (deleteError: unknown) => {
-            console.error("Failed to rollback zero-byte upload object", {
+      } catch (error) {
+        if (objectStored) {
+          await c.env.R2_BUCKET.delete(storageKey).catch(
+            (deleteError: unknown) => {
+              console.error("Failed to rollback zero-byte upload object", {
+                storageKey,
+                deleteError,
+              });
+            },
+          );
+        }
+
+        if (sessionRegistered) {
+          await sendUploadCallback(
+            {
+              type: "upload-failed",
+              data: {
+                environmentId,
+                fileKeyId,
+                projectId,
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : "Zero-byte upload failed",
+              },
+            },
+            c.env,
+          ).catch((failureCallbackError: unknown) => {
+            console.error("Failed to send zero-byte upload failure callback", {
+              projectId,
+              environmentId,
+              fileKeyId,
               storageKey,
-              deleteError,
+              failureCallbackError,
             });
-          },
-        );
-        throw callbackError;
+          });
+        }
+
+        throw error;
       }
 
       return new Response(null, {

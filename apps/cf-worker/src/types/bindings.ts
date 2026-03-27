@@ -28,4 +28,5 @@ export interface Variables {
   projectSlug: string | null;
   projectId: string;
   defaultFileAccess: "public" | "private";
+  projectLifecycleState: "active" | "deleting";
 }

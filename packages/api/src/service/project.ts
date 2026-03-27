@@ -1,14 +1,21 @@
 import type { Db } from "@silo-storage/db/client";
 
-import { eq } from "@silo-storage/db";
+import { and, eq, inArray } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
-import { projectEnvironments, projects } from "@silo-storage/db/schema";
+import {
+  fileKeys,
+  fileLifecycleJobs,
+  projectEnvironments,
+  projects,
+} from "@silo-storage/db/schema";
 import {
   sanitizeForSlug,
   validateProjectSlug,
 } from "@silo-storage/shared/slug";
 
 import { env } from "../env";
+import { markUploadAsFailed, UploadFailureError } from "./fileKey";
+import { runLifecycleJobBatch } from "./lifecycleJob";
 
 const DEFAULT_ENVIRONMENTS = [
   { name: "Production", slug: "production", type: "production" as const },
@@ -131,6 +138,43 @@ export async function updateProject(
 }
 
 export async function deleteProject(projectId: string) {
+  const [project] = await db
+    .update(projects)
+    .set({ lifecycleState: "deleting" })
+    .where(eq(projects.id, projectId))
+    .returning({ id: projects.id });
+
+  if (!project) {
+    return undefined;
+  }
+
+  const pendingUploads = await db
+    .select({
+      fileKeyId: fileKeys.id,
+      environmentId: fileKeys.environmentId,
+    })
+    .from(fileKeys)
+    .where(
+      and(eq(fileKeys.projectId, projectId), eq(fileKeys.status, "pending")),
+    );
+
+  for (const pending of pendingUploads) {
+    try {
+      await markUploadAsFailed(db, {
+        projectId,
+        environmentId: pending.environmentId,
+        fileKeyId: pending.fileKeyId,
+        error: "Upload cancelled because project is being deleted",
+      });
+    } catch (error) {
+      if (error instanceof UploadFailureError) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  await drainLifecycleCleanup(projectId, `project-delete:${projectId}`);
   await scheduleProjectObjectDeletion(projectId);
 
   let lastError: unknown;
@@ -153,6 +197,46 @@ export async function deleteProject(projectId: string) {
 
   throw new Error(
     `Failed to delete project metadata after object cleanup for project ${projectId}: ${lastError instanceof Error ? lastError.message : "Unknown error"}`,
+  );
+}
+
+async function drainLifecycleCleanup(
+  projectId: string,
+  leaseOwner: string,
+): Promise<void> {
+  const limit = 200;
+
+  for (let batch = 0; batch < 50; batch++) {
+    await runLifecycleJobBatch(db, {
+      limit,
+      leaseSeconds: 60,
+      leaseOwner,
+    });
+
+    const remainingCleanupJobs = await db
+      .select({ id: fileLifecycleJobs.id })
+      .from(fileLifecycleJobs)
+      .where(
+        and(
+          eq(fileLifecycleJobs.projectId, projectId),
+          inArray(fileLifecycleJobs.kind, ["delete_object", "abort_multipart"]),
+          inArray(fileLifecycleJobs.state, [
+            "pending",
+            "retry",
+            "leased",
+            "dead",
+          ]),
+        ),
+      )
+      .limit(1);
+
+    if (remainingCleanupJobs.length === 0) {
+      return;
+    }
+  }
+
+  throw new Error(
+    "Lifecycle cleanup exceeded maximum batches while deleting project",
   );
 }
 

@@ -39,17 +39,17 @@ export async function lookupProject(
       );
     }
 
-    const project: ProjectInfo = await response.json();
+    const project = (await response.json());
 
     try {
       await env.PROJECT_CACHE.put(cacheKey, JSON.stringify(project), {
-        expirationTtl: 3600, // 1h
+        expirationTtl: 60,
       });
     } catch (error) {
       console.error("Failed to write to KV cache:", error);
     }
 
-    return project;
+    return project as ProjectInfo;
   } catch (error) {
     if (error instanceof Error && error.message.includes("project_not_found")) {
       throw error;
