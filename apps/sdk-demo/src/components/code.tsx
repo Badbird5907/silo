@@ -1,17 +1,19 @@
-import { Highlight, themes } from "prism-react-renderer"
-import TsLogo from "./ts-logo";
+"use client";
 
-export function CodeHighlighter({ fileName, code }: { fileName: string, code: string }) {
+import { Highlight, themes } from "prism-react-renderer"
+import { useTheme } from "next-themes"
+
+export function CodeHighlighter({ code }: { code: string }) {
+  const theme = useTheme()
   return (
-    <Highlight theme={themes.vsDark} language="typescript" code={code}>
+    <Highlight theme={theme.resolvedTheme === "dark" ? themes.vsDark : themes.vsLight} language="typescript" code={code}>
       {({ style, tokens, getLineProps, getTokenProps }) => {
         const lineNumWidthCh = String(tokens.length).length;
         return (
-        <div className="h-full overflow-auto" style={{ backgroundColor: style.backgroundColor }}>
-          <div className="px-4 pt-3 pb-2 text-xs font-mono text-gray-400 select-none border-b border-white/10 flex">
-            <TsLogo className="w-4 h-4 mr-2" />
-            {fileName}
-          </div>
+        <div
+          className="h-full min-h-0 overflow-auto"
+          style={{ backgroundColor: style.backgroundColor }}
+        >
           <pre
             style={{ ...style, backgroundColor: "transparent" }}
             className="min-h-full px-4 pt-3 m-0"

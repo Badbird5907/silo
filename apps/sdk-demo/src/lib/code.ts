@@ -1,20 +1,14 @@
 export const uploadCode = 
-`import { createSiloUpload, FileRouter } from "@silo-storage/sdk-server";
+`import {
+  createSiloUpload,
+  FileRouter,
+} from "@silo-storage/sdk-server";
 
 type UploadContext = {
   userId: string | null;
 };
 
 const f = createSiloUpload<Request, UploadContext>();
-
-export type UploadCompleteResult = {
-  uploadedBy: string;
-  fileKeyId: string;
-  accessKey: string;
-  fileName: string;
-  size: number;
-  mimeType: string;
-};
 
 export const fileRouter = {
   imageOrVideoUploader: f({
@@ -26,10 +20,6 @@ export const fileRouter = {
       maxFileSize: "256MB",
       maxFileCount: 1,
     },
-    "application/x-msdownload": {
-      maxFileSize: "512MB",
-      maxFileCount: 1,
-    },
   })
     .middleware(async ({ context }) => {
       if (!context?.userId) {
@@ -39,8 +29,8 @@ export const fileRouter = {
         userId: context.userId,
       };
     })
-    .public(true) // either this, or pass in a function
-    .expires({ ttl: "2 minutes" }) // either this, or pass in a function
+    .public(true) // either this, or pass in a async function
+    .expires({ ttl: "2 minutes" }) // same here
     .onUploadComplete(async ({ metadata, file }) => {
       console.info("[onUploadComplete]", { metadata, file });
       return {
@@ -65,11 +55,10 @@ import { createSiloCoreFromToken } from "@silo-storage/sdk-core";
 import { createRouteHandler } from "@silo-storage/sdk-next";
 
 import { fileRouter } from "@/upload";
-import { env } from "@/env";
 
 const core = createSiloCoreFromToken({
-  url: env.SILO_URL,
-  token: env.SILO_TOKEN,
+  url: process.env.SILO_URL!,
+  token: process.env.SILO_TOKEN!,
 });
 
 export const { GET, POST } = createRouteHandler({

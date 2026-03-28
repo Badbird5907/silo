@@ -42,7 +42,7 @@ export function UploadDemo() {
     },
   });
 
-  async function handleDownload(item: UploadedItem) {
+  function handleDownload(item: UploadedItem) {
     try {
       setLoadingDownloadFor(item.fileKeyId);
       setLastError(null);

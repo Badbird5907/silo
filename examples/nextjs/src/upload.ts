@@ -6,15 +6,6 @@ type UploadContext = {
 
 const f = createSiloUpload<Request, UploadContext>();
 
-export type UploadCompleteResult = {
-  uploadedBy: string;
-  fileKeyId: string;
-  accessKey: string;
-  fileName: string;
-  size: number;
-  mimeType: string;
-};
-
 export const fileRouter = {
   imageOrVideoUploader: f({
     image: {
