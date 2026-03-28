@@ -126,7 +126,7 @@ export interface CreateRouteHandlerOptions<
 > {
   router: TRouter;
   core: UploadCore;
-  signingSecret: string;
+  // signingSecret: string;
   resolveContext?: (request: Request) => Promise<TContext> | TContext;
   callbackUrl?: string | ((request: Request) => string | Promise<string>);
   completionTtlMs?: number;
@@ -165,7 +165,8 @@ export function createRouteHandler<
       >({
         router: options.router,
         request,
-        signingSecret: options.signingSecret,
+        // signingSecret: options.signingSecret,
+        signingSecret: options.core.config.signingSecret,
         context,
       });
 
@@ -210,6 +211,8 @@ export function createRouteHandler<
     }
     const routeSlug = action.endpoint as keyof TRouter & string;
     const callbackUrl = await resolveCallbackUrl(request, options.callbackUrl);
+
+    
     const registerResult = await registerRouteUpload({
       core: options.core,
       router: options.router,

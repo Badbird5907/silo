@@ -1,0 +1,19 @@
+
+{
+  "extends": "@silo-storage/tsconfig/base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "dom", "dom.iterable"],
+    "jsx": "preserve",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@silo-storage/sdk-core": ["../../sdk/core/src/index.ts"],
+      "@silo-storage/sdk-next": ["../../sdk/next/src/index.ts"],
+      "@silo-storage/sdk-react": ["../../sdk/react/src/index.ts"],
+      "@silo-storage/sdk-server": ["../../sdk/server/src/index.ts"]
+    },
+    "plugins": [{ "name": "next" }]
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["node_modules", ".next"]
+}
+

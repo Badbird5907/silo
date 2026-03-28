@@ -354,6 +354,7 @@ export function createSiloCore(config: UploadCoreConfig) {
     listFiles,
     getFile,
     updateFileExpiry,
+    config,
   };
 }
 
