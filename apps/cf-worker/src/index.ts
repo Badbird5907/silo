@@ -54,6 +54,50 @@ app.delete("/ingest/tus/:uploadId", requireProject, handleTusDelete);
 
 app.get("/f/:accessKey", requireProject, handleDownload);
 
+// Path-mode project routes (e.g. /p/:projectSlug/...)
+app.options(
+  "/:projectRoutePrefix/:projectSlug/ingest/tus",
+  requireProject,
+  handleTusOptions,
+);
+app.options(
+  "/:projectRoutePrefix/:projectSlug/ingest/tus/:uploadId",
+  requireProject,
+  handleTusOptions,
+);
+app.post(
+  "/:projectRoutePrefix/:projectSlug/ingest/tus",
+  requireProject,
+  handleTusCreate,
+);
+app.get(
+  "/:projectRoutePrefix/:projectSlug/ingest/tus/:uploadId",
+  requireProject,
+  handleTusHead,
+);
+app.on(
+  "HEAD",
+  "/:projectRoutePrefix/:projectSlug/ingest/tus/:uploadId",
+  requireProject,
+  handleTusHead,
+);
+app.patch(
+  "/:projectRoutePrefix/:projectSlug/ingest/tus/:uploadId",
+  requireProject,
+  handleTusPatch,
+);
+app.delete(
+  "/:projectRoutePrefix/:projectSlug/ingest/tus/:uploadId",
+  requireProject,
+  handleTusDelete,
+);
+
+app.get(
+  "/:projectRoutePrefix/:projectSlug/f/:accessKey",
+  requireProject,
+  handleDownload,
+);
+
 // internal routes
 app.delete(
   "/internal/delete/*",

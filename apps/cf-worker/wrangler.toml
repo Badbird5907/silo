@@ -2,6 +2,7 @@ name = "silo-worker"
 main = "src/index.ts"
 compatibility_date = "2024-12-01"
 compatibility_flags = ["nodejs_compat"]
+workers_dev = false
 
 # R2 bucket for uploads (configure with your bucket name)
 [[r2_buckets]]
@@ -11,7 +12,8 @@ preview_bucket_name = "silo-uploads-preview"
 
 [[kv_namespaces]]
 binding = "PROJECT_CACHE"
-id = "project-cache-placeholder"
+id = "a0757c0d8b3b425cab809627e475ac85"
+preview_id = "9e99fefbb2ac475c81fe48b51d733cae"
 
 [[durable_objects.bindings]]
 name = "TUS_STATE_DO"
@@ -19,7 +21,7 @@ class_name = "TusStateDO"
 
 [[migrations]]
 tag = "v1-tus-state-do"
-new_classes = ["TusStateDO"]
+new_sqlite_classes = ["TusStateDO"]
 
 [[queues.producers]]
 binding = "DELETE_PREFIX_QUEUE"
@@ -39,11 +41,13 @@ max_batch_timeout = 5
 max_retries = 1
 
 [vars]
-WORKER_DOMAIN = "files.evanyu.dev"
+WORKER_DOMAIN = "cdn.evanyu.dev"
+PROJECT_ROUTE_MODE = "subdomain"
+PROJECT_ROUTE_PREFIX = "/p"
 NEXTJS_CALLBACK_URL = "http://localhost:3000"
 TUS_MAX_SIZE = "106300440576"  # 99GB in bytes
 # TUS_MAX_PATCH_SIZE = "536870912"  # 512MB per PATCH in bytes
-TUS_MAX_PATCH_SIZE = "106300440576"  # 99GB per PATCH in bytes
+TUS_MAX_PATCH_SIZE = "106300440576"  # 99GB per PATCH in bytes (need to tune!)
 TUS_EXPIRATION_HOURS = "24"
 EXPIRY_CLEANUP_BATCH_SIZE = "100"
 EXPIRY_CLEANUP_MAX_BATCHES = "10"
@@ -60,15 +64,60 @@ crons = ["*/5 * * * *"]
 [env.development]
 name = "silo-worker-dev"
 vars.WORKER_DOMAIN = "lvh.me:8787"
+vars.PROJECT_ROUTE_MODE = "subdomain"
+vars.PROJECT_ROUTE_PREFIX = "/p"
 vars.NEXTJS_CALLBACK_URL = "http://localhost:3000"
 vars.ENV = "development"
 
 # Production environment (override these values)
 [env.production]
 name = "silo-worker"
-vars.WORKER_DOMAIN = "files.evanyu.dev"
-vars.NEXTJS_CALLBACK_URL = "https://your-nextjs-app.com"  # TODO: Set your production URL
+vars.WORKER_DOMAIN = "cdn.evanyu.dev"
+vars.PROJECT_ROUTE_MODE = "path"
+vars.PROJECT_ROUTE_PREFIX = "/p"
+vars.NEXTJS_CALLBACK_URL = "https://fs.evanyu.dev"  # TODO: Set your production URL
 vars.ENV = "production"
+vars.TUS_MAX_SIZE = "106300440576"  # 99GB in bytes
+vars.TUS_MAX_PATCH_SIZE = "106300440576"  # 99GB per PATCH in bytes (need to tune!)
+vars.TUS_EXPIRATION_HOURS = "24"
+vars.EXPIRY_CLEANUP_BATCH_SIZE = "100"
+vars.EXPIRY_CLEANUP_MAX_BATCHES = "10"
+vars.PENDING_UPLOAD_CLEANUP_BATCH_SIZE = "100"
+vars.PENDING_UPLOAD_CLEANUP_MAX_BATCHES = "10"
+vars.LIFECYCLE_JOB_BATCH_SIZE = "100"
+vars.LIFECYCLE_JOB_MAX_BATCHES = "10"
+vars.LIFECYCLE_JOB_LEASE_SECONDS = "60"
+
+[[env.production.r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "silo-uploads"
+preview_bucket_name = "silo-uploads-preview"
+
+[[env.production.kv_namespaces]]
+binding = "PROJECT_CACHE"
+id = "a0757c0d8b3b425cab809627e475ac85"
+preview_id = "9e99fefbb2ac475c81fe48b51d733cae"
+
+[[env.production.durable_objects.bindings]]
+name = "TUS_STATE_DO"
+class_name = "TusStateDO"
+
+[[env.production.queues.producers]]
+binding = "DELETE_PREFIX_QUEUE"
+queue = "silo-delete-prefix"
+
+[[env.production.queues.consumers]]
+queue = "silo-delete-prefix"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 5
+dead_letter_queue = "silo-delete-prefix-dlq"
+
+[[env.production.queues.consumers]]
+queue = "silo-delete-prefix-dlq"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 1
 
 # Secrets (set via: wrangler secret put <NAME>)
 # CALLBACK_SECRET - Shared secret for internal API authentication

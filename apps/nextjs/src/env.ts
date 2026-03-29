@@ -20,6 +20,8 @@ export const env = createEnv({
     POSTGRES_URL: z.url(),
     WORKER_URL: z.url(),
     WORKER_DOMAIN: z.string().min(1), // e.g., "files.evanyu.dev" (without protocol)
+    PROJECT_ROUTE_MODE: z.enum(["subdomain", "path"]).default("subdomain"),
+    PROJECT_ROUTE_PREFIX: z.string().min(1).default("/p"),
     SIGNING_SECRET: z.string().min(32),
     CALLBACK_SECRET: z.string().min(32),
     WEBHOOK_DELIVERY_ENABLED: z.boolean().default(true),

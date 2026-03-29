@@ -62,6 +62,10 @@ export async function getDownloadUrl({
       project.slug,
       fileKey.accessKey,
       fileKey.fileName,
+      {
+        routeMode: env.PROJECT_ROUTE_MODE,
+        routePrefix: env.PROJECT_ROUTE_PREFIX,
+      },
     );
     return { url: url.replace("https://", `${protocol}://`), isPublic: true };
   }
@@ -76,6 +80,10 @@ export async function getDownloadUrl({
       expiresIn: 3600,
     },
     env.SIGNING_SECRET,
+    {
+      routeMode: env.PROJECT_ROUTE_MODE,
+      routePrefix: env.PROJECT_ROUTE_PREFIX,
+    },
   );
 
   return { url: url.replace("https://", `${protocol}://`), isPublic: false };

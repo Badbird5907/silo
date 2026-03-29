@@ -3,6 +3,7 @@ import type { Context } from "hono";
 import type { Bindings, Variables } from "../types/bindings";
 import type { TusUploadMetadata } from "../types/tus";
 import { isAllowedMimeType } from "../lib/file-types";
+import { toProjectScopedPath } from "../lib/subdomain";
 import {
   registerUploadSession,
   sendUploadCallback,
@@ -227,7 +228,18 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
     };
 
     const url = new URL(c.req.url);
-    const uploadUrl = `${url.protocol}//${url.host}/ingest/tus/${uploadId}`;
+    const projectSlug = c.get("projectSlug");
+    if (!projectSlug) {
+      throw Errors.projectNotFound("missing-project-scope");
+    }
+
+    const uploadLocationPath = toProjectScopedPath(
+      `/ingest/tus/${uploadId}`,
+      projectSlug,
+      c.env.PROJECT_ROUTE_MODE,
+      c.env.PROJECT_ROUTE_PREFIX,
+    );
+    const uploadUrl = `${url.protocol}//${url.host}${uploadLocationPath}`;
     const bodyContentLength = parseNonNegativeInt(contentLengthHeader) ?? 0;
     const body = c.req.raw.body as ReadableStream<Uint8Array> | null;
 

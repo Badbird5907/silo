@@ -118,6 +118,10 @@ export async function POST(request: Request) {
       },
       apiKey,
       env.SIGNING_SECRET,
+      {
+        routeMode: env.PROJECT_ROUTE_MODE,
+        routePrefix: env.PROJECT_ROUTE_PREFIX,
+      },
     );
 
     await registerFileKeyIntent({

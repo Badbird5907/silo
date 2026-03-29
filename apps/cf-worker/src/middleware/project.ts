@@ -2,17 +2,22 @@ import type { MiddlewareHandler } from "hono";
 
 import type { Bindings, Variables } from "../types/bindings";
 import { lookupProject } from "../lib/project-lookup";
-import { extractProjectSlug } from "../lib/subdomain";
+import { extractProjectSlugFromUrl } from "../lib/subdomain";
 import { Errors } from "../utils/errors";
 
 export const requireProject: MiddlewareHandler<{
   Bindings: Bindings;
   Variables: Variables;
 }> = async (c, next) => {
-  const hostname = new URL(c.req.url).hostname;
-  const projectSlug = extractProjectSlug(hostname, c.env.WORKER_DOMAIN);
+  const url = new URL(c.req.raw.url);
+  const projectSlug = extractProjectSlugFromUrl(
+    url,
+    c.env.WORKER_DOMAIN,
+    c.env.PROJECT_ROUTE_MODE,
+    c.env.PROJECT_ROUTE_PREFIX,
+  );
   if (!projectSlug) {
-    throw Errors.projectNotFound("no-subdomain");
+    throw Errors.projectNotFound("missing-project-scope");
   }
 
   const project = await lookupProject(projectSlug, c.env);
@@ -29,8 +34,13 @@ export const extractProject: MiddlewareHandler<{
   Bindings: Bindings;
   Variables: Variables;
 }> = async (c, next) => {
-  const hostname = new URL(c.req.url).hostname;
-  const projectSlug = extractProjectSlug(hostname, c.env.WORKER_DOMAIN);
+  const url = new URL(c.req.raw.url);
+  const projectSlug = extractProjectSlugFromUrl(
+    url,
+    c.env.WORKER_DOMAIN,
+    c.env.PROJECT_ROUTE_MODE,
+    c.env.PROJECT_ROUTE_PREFIX,
+  );
 
   c.set("projectSlug", projectSlug);
 

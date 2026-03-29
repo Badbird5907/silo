@@ -63,8 +63,48 @@ export interface ParsedSignedDownloadUrl {
 
 export type ParsedSignedUrl = ParsedSignedUploadUrl | ParsedSignedDownloadUrl;
 
+export type ProjectRouteMode = "subdomain" | "path";
+
+export interface SignedUrlRoutingOptions {
+  routeMode?: ProjectRouteMode;
+  routePrefix?: string;
+}
+
 const ACCEPTED_MIME_VALUE_REGEX =
   /^[a-z0-9!#$&^_.+-]+(?:\/[a-z0-9!#$&^_.+-]+)?$/;
+
+function normalizeRoutePrefix(prefix: string | undefined): string {
+  const normalized = (prefix ?? "/p").trim();
+  const withLeadingSlash = normalized.startsWith("/")
+    ? normalized
+    : `/${normalized}`;
+  const stripped = withLeadingSlash.replace(/\/+$/, "");
+
+  if (!stripped || stripped === "/") {
+    return "/p";
+  }
+
+  const [firstSegment] = stripped.split("/").filter(Boolean);
+  return `/${firstSegment ?? "p"}`;
+}
+
+function buildProjectScopedUrl(
+  workerDomain: string,
+  projectSlug: string,
+  routePath: string,
+  protocol: "http" | "https",
+  routing?: SignedUrlRoutingOptions,
+): URL {
+  const normalizedPath = routePath.startsWith("/") ? routePath : `/${routePath}`;
+  if (routing?.routeMode === "path") {
+    const routePrefix = normalizeRoutePrefix(routing.routePrefix);
+    return new URL(
+      `${protocol}://${workerDomain}${routePrefix}/${projectSlug}${normalizedPath}`,
+    );
+  }
+
+  return new URL(`${protocol}://${projectSlug}.${workerDomain}${normalizedPath}`);
+}
 
 export function normalizeAcceptedMimeTypePattern(pattern: string): string {
   const normalized = pattern.trim().toLowerCase();
@@ -189,6 +229,7 @@ export async function generateSignedUploadUrl(
   params: SignedUploadUrlParams,
   apiKey: string,
   masterSigningSecret: string,
+  routing?: SignedUrlRoutingOptions,
 ): Promise<string> {
   const signingSecret = await deriveSigningSecret(apiKey, masterSigningSecret);
 
@@ -225,8 +266,12 @@ export async function generateSignedUploadUrl(
   const signature = await createSignature(payload, signingSecret);
 
   const protocol = params.protocol ?? "https";
-  const url = new URL(
-    `${protocol}://${projectSlug}.${workerDomain}/ingest/tus`,
+  const url = buildProjectScopedUrl(
+    workerDomain,
+    projectSlug,
+    "/ingest/tus",
+    protocol,
+    routing,
   );
   Object.entries(payload).forEach(([key, value]) => {
     if (key !== "type") {
@@ -249,6 +294,7 @@ export async function generateSignedUploadUrlWithSecret(
   projectSlug: string,
   params: SignedUploadUrlParams,
   signingSecret: string,
+  routing?: SignedUrlRoutingOptions,
 ): Promise<string> {
   const payload: Record<string, string> = {
     type: "upload",
@@ -283,8 +329,12 @@ export async function generateSignedUploadUrlWithSecret(
   const signature = await createSignature(payload, signingSecret);
 
   const protocol = params.protocol ?? "https";
-  const url = new URL(
-    `${protocol}://${projectSlug}.${workerDomain}/ingest/tus`,
+  const url = buildProjectScopedUrl(
+    workerDomain,
+    projectSlug,
+    "/ingest/tus",
+    protocol,
+    routing,
   );
   Object.entries(payload).forEach(([key, value]) => {
     if (key !== "type") {
@@ -308,6 +358,7 @@ export async function generateSignedUploadUrlFromHash(
   params: SignedUploadUrlParams,
   keyHash: string,
   masterSigningSecret: string,
+  routing?: SignedUrlRoutingOptions,
 ): Promise<string> {
   const signingSecret = await deriveSigningSecretFromHash(
     keyHash,
@@ -319,6 +370,7 @@ export async function generateSignedUploadUrlFromHash(
     projectSlug,
     params,
     signingSecret,
+    routing,
   );
 }
 
@@ -338,6 +390,7 @@ export async function generateSignedDownloadUrl(
   projectSlug: string,
   params: SignedDownloadUrlParams,
   signingSecret: string,
+  routing?: SignedUrlRoutingOptions,
 ): Promise<string> {
   const expiresAt = Math.floor(Date.now() / 1000) + (params.expiresIn ?? 3600);
 
@@ -348,8 +401,12 @@ export async function generateSignedDownloadUrl(
 
   const signature = await createSignature(payload, signingSecret);
 
-  const url = new URL(
-    `https://${projectSlug}.${workerDomain}/f/${params.accessKey}`,
+  const url = buildProjectScopedUrl(
+    workerDomain,
+    projectSlug,
+    `/f/${params.accessKey}`,
+    "https",
+    routing,
   );
   url.searchParams.set("expiresAt", expiresAt.toString());
   url.searchParams.set("sig", signature);
@@ -376,8 +433,15 @@ export function generatePublicDownloadUrl(
   projectSlug: string,
   accessKey: string,
   fileName?: string,
+  routing?: SignedUrlRoutingOptions,
 ): string {
-  const url = new URL(`https://${projectSlug}.${workerDomain}/f/${accessKey}`);
+  const url = buildProjectScopedUrl(
+    workerDomain,
+    projectSlug,
+    `/f/${accessKey}`,
+    "https",
+    routing,
+  );
 
   if (fileName) {
     url.searchParams.set("fileName", fileName);

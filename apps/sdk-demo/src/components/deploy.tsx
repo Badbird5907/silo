@@ -163,8 +163,10 @@ wrangler kv namespace create PROJECT_CACHE
 wrangler kv namespace create PROJECT_CACHE --preview
 
 # Queues (producer + dead-letter queue)
-wrangler queues create silo-delete-prefix
-wrangler queues create silo-delete-prefix-dlq`}
+# If you are on the free plan, queues have a 24 hour message retention period.
+# You must set the --message-retention-period-secs flag. Omit if you are on workers paid
+wrangler queues create silo-delete-prefix --message-retention-period-secs 86400
+wrangler queues create silo-delete-prefix-dlq --message-retention-period-secs 86400`}
         />
         <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
           Copy both KV namespace IDs that Wrangler prints (the regular one and
@@ -193,13 +195,22 @@ preview_id = "<your-kv-preview-id>"   # ← from: wrangler kv namespace create P
 
 [vars]
 WORKER_DOMAIN = "worker.your-domain.com"   # public hostname for the Worker
-TUS_MAX_SIZE = "10737418240"              # 10 GB in bytes
+PROJECT_ROUTE_MODE = "subdomain"           # "subdomain" or "path"
+PROJECT_ROUTE_PREFIX = "/p"                # used when PROJECT_ROUTE_MODE="path"
 
 [env.production]
 vars.WORKER_DOMAIN = "worker.your-domain.com"
+vars.PROJECT_ROUTE_MODE = "subdomain"
+vars.PROJECT_ROUTE_PREFIX = "/p"
 vars.NEXTJS_CALLBACK_URL = "https://your-silo-app.com"  # where the nextjs app is hosted (vercel)
 vars.ENV = "production"`}
         />
+        <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
+          Use <InlineCode>subdomain</InlineCode> mode for{" "}
+          <InlineCode>project-slug.worker.your-domain.com</InlineCode> URLs (requires wildcard DNS),
+          or <InlineCode>path</InlineCode> mode for{" "}
+          <InlineCode>worker.your-domain.com/p/project-slug/*</InlineCode> URLs.
+        </p>
       </>
     ),
   },
@@ -308,7 +319,9 @@ AUTH_GITHUB_SECRET=''
 
 # Cloudflare Worker URL for file uploads/downloads
 WORKER_URL="http://localhost:8787"
-WORKER_DOMAIN="ingest.your-domain.com" # public hostname for the Worker, make sure all subdomains also point to this
+WORKER_DOMAIN="ingest.your-domain.com" # public hostname for the Worker
+PROJECT_ROUTE_MODE="subdomain" # "subdomain" => {projectSlug}.{WORKER_DOMAIN}, "path" => {WORKER_DOMAIN}/p/{projectSlug}
+PROJECT_ROUTE_PREFIX="/p" # only used when PROJECT_ROUTE_MODE="path"
 
 # Signing secret for generating signed URLs (generate via 'openssl rand -hex 32')
 SIGNING_SECRET="your-secure-random-secret-here"
