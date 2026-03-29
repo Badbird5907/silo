@@ -19,7 +19,7 @@ catalogs:
       specifier: ^1.23.8
       version: 1.28.0
     '@tanstack/react-query':
-      specifier: ^5.90.8
+      specifier: 5.90.20
       version: 5.90.20
     '@trpc/client':
       specifier: ^11.7.1
@@ -307,6 +307,9 @@ importers:
       '@t3-oss/env-nextjs':
         specifier: ^0.13.10
         version: 0.13.10(typescript@5.9.3)(zod@4.3.6)
+      '@tanstack/react-query':
+        specifier: 'catalog:'
+        version: 5.90.20(react@19.2.3)
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -362,6 +365,9 @@ importers:
       '@silo-storage/tsconfig':
         specifier: workspace:*
         version: link:../../tooling/typescript
+      '@tailwindcss/postcss':
+        specifier: 'catalog:'
+        version: 4.1.18
       '@types/node':
         specifier: 'catalog:'
         version: 22.19.2

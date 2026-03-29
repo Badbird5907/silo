@@ -14,6 +14,7 @@ import type {
 } from "./types";
 import {
   buildAcceptAttribute,
+  getRouteMaxFileCount,
   getRouteFileTypeKeys,
   isFileAllowedByRouteFileTypes,
   routeAllowsMultipleFiles,
@@ -131,6 +132,10 @@ export function useUploadInternal<
     () => routeAllowsMultipleFiles(effectiveRouterConfig, options.endpoint),
     [effectiveRouterConfig, options.endpoint],
   );
+  const maxFileCountByRoute = React.useMemo(
+    () => getRouteMaxFileCount(effectiveRouterConfig, options.endpoint),
+    [effectiveRouterConfig, options.endpoint],
+  );
 
   React.useEffect(() => {
     if (effectiveRouterConfig?.[options.endpoint]) return;
@@ -183,6 +188,15 @@ export function useUploadInternal<
           throw new SiloUploadError({
             code: "FILE_TYPE_NOT_ALLOWED",
             message: `File type not allowed for route "${options.endpoint}": "${firstDisallowed.name}"`,
+          });
+        }
+        if (
+          maxFileCountByRoute !== undefined &&
+          files.length > maxFileCountByRoute
+        ) {
+          throw new SiloUploadError({
+            code: "TOO_MANY_FILES",
+            message: `Route "${options.endpoint}" allows at most ${maxFileCountByRoute} file(s).`,
           });
         }
 
@@ -290,7 +304,7 @@ export function useUploadInternal<
         abortRef.current = null;
       }
     },
-    [factoryContext, options, routeFileTypeKeys],
+    [factoryContext, maxFileCountByRoute, options, routeFileTypeKeys],
   );
 
   const uploadFile = React.useCallback<
@@ -323,6 +337,15 @@ export function useUploadInternal<
         if (selected.length === 0) {
           return [];
         }
+        if (
+          maxFileCountByRoute !== undefined &&
+          selected.length > maxFileCountByRoute
+        ) {
+          throw new SiloUploadError({
+            code: "TOO_MANY_FILES",
+            message: `Route "${options.endpoint}" allows at most ${maxFileCountByRoute} file(s).`,
+          });
+        }
 
         return uploadFiles(selected, {
           input: beginOptions?.input,
@@ -348,7 +371,7 @@ export function useUploadInternal<
         throw normalized;
       }
     },
-    [accept, options, supportsMultipleByRoute, uploadFiles],
+    [accept, maxFileCountByRoute, options, supportsMultipleByRoute, uploadFiles],
   );
 
   const aggregateLoaded = Object.values(progressByFile).reduce(
@@ -399,6 +422,10 @@ export function useStagedUploadInternal<
     () => routeAllowsMultipleFiles(effectiveRouterConfig, options.endpoint),
     [effectiveRouterConfig, options.endpoint],
   );
+  const maxFileCountByRoute = React.useMemo(
+    () => getRouteMaxFileCount(effectiveRouterConfig, options.endpoint),
+    [effectiveRouterConfig, options.endpoint],
+  );
 
   const openFilePicker = React.useCallback<
     UseStagedUploadResult<TRouter, TEndpoint>["openFilePicker"]
@@ -421,6 +448,26 @@ export function useStagedUploadInternal<
         }
 
         setFiles((previous) => {
+          if (maxFileCountByRoute !== undefined) {
+            const remainingSlots = Math.max(
+              0,
+              maxFileCountByRoute - previous.length,
+            );
+            if (remainingSlots === 0) {
+              options.onError?.(
+                new SiloUploadError({
+                  code: "TOO_MANY_FILES",
+                  message: `Route "${options.endpoint}" allows at most ${maxFileCountByRoute} file(s).`,
+                }),
+              );
+              return previous;
+            }
+            const limitedSelection = selected.slice(0, remainingSlots);
+            return shouldAllowMultiple
+              ? [...previous, ...limitedSelection]
+              : limitedSelection.slice(0, 1);
+          }
+
           if (!shouldAllowMultiple) {
             return selected.slice(0, 1);
           }
@@ -444,7 +491,7 @@ export function useStagedUploadInternal<
         throw normalized;
       }
     },
-    [options, supportsMultipleByRoute, upload.accept],
+    [maxFileCountByRoute, options, supportsMultipleByRoute, upload.accept],
   );
 
   const removeFile = React.useCallback<

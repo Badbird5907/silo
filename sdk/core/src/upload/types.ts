@@ -42,12 +42,13 @@ export interface PrepareUploadInput extends Omit<
 }
 
 export interface ListFilesInput {
-  projectId: string;
+  projectId?: string;
   environmentId?: string;
   page?: number;
   pageSize?: number;
   search?: string;
   status?: "all" | "pending" | "completed" | "failed";
+  metadata?: Record<string, unknown>;
 }
 
 export interface SiloFileSummary {

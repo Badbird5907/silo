@@ -178,6 +178,7 @@ export const fileKeys = pgTable(
       table.accessKey,
     ),
     index("file_keys_status_expires_at_idx").on(table.status, table.expiresAt),
+    index("file_keys_metadata_gin_idx").using("gin", table.metadata),
   ],
 );
 

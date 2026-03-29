@@ -3,10 +3,12 @@
 import { Highlight, themes } from "prism-react-renderer"
 import { useTheme } from "next-themes"
 
+const dark = { ...themes.oneDark, plain: { ...themes.oneDark.plain, backgroundColor: "var(--card)" } }
+const light = { ...themes.oneLight, plain: { ...themes.oneLight.plain, backgroundColor: "var(--card)" } }
 export function CodeHighlighter({ code }: { code: string }) {
   const theme = useTheme()
   return (
-    <Highlight theme={theme.resolvedTheme === "dark" ? themes.vsDark : themes.vsLight} language="typescript" code={code}>
+    <Highlight theme={theme.resolvedTheme === "dark" ? dark : light} language="typescript" code={code}>
       {({ style, tokens, getLineProps, getTokenProps }) => {
         const lineNumWidthCh = String(tokens.length).length;
         return (

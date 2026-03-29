@@ -1,5 +1,5 @@
-import { nanoid } from "nanoid";
 import type { z } from "zod";
+import { nanoid } from "nanoid";
 
 import type { UpdateFileExpiryInput, UpdateFileExpiryResult } from "./expiry";
 import type { CreateSiloCoreFromTokenInput } from "./token";
@@ -290,10 +290,20 @@ export function createSiloCore(config: UploadCoreConfig) {
   }
 
   async function listFiles(input: ListFilesInput): Promise<ListFilesResult> {
-    const query = new URLSearchParams({
-      projectId: input.projectId,
-      environmentId: input.environmentId ?? config.environmentId,
-    });
+    const resolvedProjectId = input.projectId;
+    const resolvedEnvironmentId = input.environmentId ?? config.environmentId;
+
+    if (!resolvedProjectId && !resolvedEnvironmentId) {
+      throw new Error(
+        "listFiles requires projectId or environmentId. Provide projectId explicitly or configure/create from token with an environmentId.",
+      );
+    }
+
+    const query = new URLSearchParams();
+    if (resolvedProjectId) query.set("projectId", resolvedProjectId);
+    if (resolvedEnvironmentId) {
+      query.set("environmentId", resolvedEnvironmentId);
+    }
 
     if (input.page !== undefined) query.set("page", input.page.toString());
     if (input.pageSize !== undefined) {
@@ -301,6 +311,7 @@ export function createSiloCore(config: UploadCoreConfig) {
     }
     if (input.search) query.set("search", input.search);
     if (input.status) query.set("status", input.status);
+    if (input.metadata) query.set("metadata", JSON.stringify(input.metadata));
 
     const response = await fetchImpl(
       `${baseUrl}/api/v1/files?${query.toString()}`,

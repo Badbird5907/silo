@@ -1,52 +1,43 @@
 export const uploadCode = 
-`import {
-  createSiloUpload,
-  FileRouter,
-} from "@silo-storage/sdk-server";
+`import type { FileRouter } from "@silo-storage/sdk-server";
+import { createSiloUpload } from "@silo-storage/sdk-server";
 
-type UploadContext = {
+interface UploadContext {
   userId: string | null;
-};
+}
 
 const f = createSiloUpload<Request, UploadContext>();
 
 export const fileRouter = {
-  imageOrVideoUploader: f({
+  imageUploader: f({
     image: {
-      maxFileSize: "8MB",
-      maxFileCount: 4,
-    },
-    video: {
-      maxFileSize: "256MB",
-      maxFileCount: 1,
-    },
+      maxFileSize: "5MB",
+      maxFileCount: 2,
+    }
+  }).middleware(({ context }) => {
+    if (!context.userId) {
+      throw new Error("Unauthorized");
+    }
+    return {
+      userId: context.userId,
+    };
   })
-    .middleware(async ({ context }) => {
-      if (!context?.userId) {
-        throw new Error("Unauthorized");
-      }
-      return {
-        userId: context.userId,
-      };
-    })
-    .public(true) // either this, or pass in a async function
-    .expires({ ttl: "2 minutes" }) // same here
-    .onUploadComplete(async ({ metadata, file }) => {
-      console.info("[onUploadComplete]", { metadata, file });
-      return {
-        uploadedBy: metadata.userId,
-        fileKeyId: file.fileKeyId,
-        accessKey: file.accessKey,
-        fileName: file.fileName,
-        size: file.size,
-        mimeType: file.mimeType,
-      };
-    }),
+  .expires("2 minutes") // you can also pass in a fn
+  .public(false) // do we need a signed url to access?
+  .onUploadComplete(({ metadata, file }) => {
+    console.info("[onUploadComplete]", { metadata, file });
+    return {
+      uploadedBy: metadata.userId,
+      fileKeyId: file.fileKeyId,
+      accessKey: file.accessKey,
+      fileName: file.fileName,
+      size: file.size,
+      mimeType: file.mimeType,
+    };
+  }),
 } satisfies FileRouter<Request, UploadContext>;
 
-export type AppFileRouter = typeof fileRouter;
-
-`;
+export type AppFileRouter = typeof fileRouter;`;
 
 // src/app/api/upload/route.ts
 export const routeHandlerCode = 

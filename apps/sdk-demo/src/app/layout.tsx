@@ -4,6 +4,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 
 import { cn } from "@/lib/utils";
 import { Nav } from "@/components/nav";
+import { QueryProvider } from "@/components/query-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SiloRouterConfigProvider } from "@/lib/upload";
 import { fileRouter } from "@/upload";
@@ -45,9 +46,11 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
           <ClerkProvider>
             <Nav />
-            <SiloRouterConfigProvider routerConfig={extractRouterConfig(fileRouter)}>
-              {children}
-            </SiloRouterConfigProvider>
+            <QueryProvider>
+              <SiloRouterConfigProvider routerConfig={extractRouterConfig(fileRouter)}>
+                {children}
+              </SiloRouterConfigProvider>
+            </QueryProvider>
           </ClerkProvider>
         </ThemeProvider>
       </body>

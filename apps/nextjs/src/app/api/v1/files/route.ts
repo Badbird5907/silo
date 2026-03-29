@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { and, count, desc, eq, ilike } from "@silo-storage/db";
+import { and, count, desc, eq, ilike, sql } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import { fileKeys, files } from "@silo-storage/db/schema";
 
@@ -13,13 +13,35 @@ import {
 } from "@/lib/api-key-middleware";
 
 const querySchema = z.object({
-  projectId: z.string().min(1),
+  projectId: z.string().min(1).optional(),
   environmentId: z.string().min(1).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
   search: z.string().min(1).optional(),
   status: z.enum(["all", "pending", "completed", "failed"]).default("all"),
+  metadata: z.string().optional(),
 });
+
+function parseMetadataFilter(
+  value?: string,
+): Record<string, unknown> | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new Error("Invalid metadata filter JSON");
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("metadata must be a JSON object");
+  }
+
+  return parsed as Record<string, unknown>;
+}
 
 // GET /api/v1/files
 export async function GET(request: Request) {
@@ -34,6 +56,7 @@ export async function GET(request: Request) {
     pageSize: url.searchParams.get("pageSize") ?? undefined,
     search: url.searchParams.get("search") ?? undefined,
     status: url.searchParams.get("status") ?? undefined,
+    metadata: url.searchParams.get("metadata") ?? undefined,
   });
 
   if (!parsedQuery.success) {
@@ -47,19 +70,44 @@ export async function GET(request: Request) {
 
   const input = parsedQuery.data;
 
-  const project = await validateProjectAccess(authResult, input.projectId);
+  const resolvedProjectId =
+    input.projectId ??
+    (authResult.type === "apiKey" ? authResult.projectId : undefined);
+
+  if (!resolvedProjectId) {
+    return jsonError(
+      "Bad Request",
+      "projectId is required for session-based auth or unscoped API keys.",
+      400,
+    );
+  }
+
+  let metadataFilter: Record<string, unknown> | undefined;
+  try {
+    metadataFilter = parseMetadataFilter(input.metadata);
+  } catch (error) {
+    return jsonError(
+      "Bad Request",
+      error instanceof Error
+        ? error.message
+        : "Invalid metadata filter query parameter.",
+      400,
+    );
+  }
+
+  const project = await validateProjectAccess(authResult, resolvedProjectId);
   if (project instanceof Response) return project;
 
   if (input.environmentId) {
     const environment = await validateEnvironmentAccess(
       input.environmentId,
-      input.projectId,
+      resolvedProjectId,
     );
     if (environment instanceof Response) return environment;
   }
 
   try {
-    const conditions = [eq(fileKeys.projectId, input.projectId)];
+    const conditions = [eq(fileKeys.projectId, resolvedProjectId)];
 
     if (input.environmentId) {
       conditions.push(eq(fileKeys.environmentId, input.environmentId));
@@ -71,6 +119,12 @@ export async function GET(request: Request) {
 
     if (input.status !== "all") {
       conditions.push(eq(fileKeys.status, input.status));
+    }
+
+    if (metadataFilter) {
+      conditions.push(
+        sql`${fileKeys.metadata} @> ${JSON.stringify(metadataFilter)}::jsonb`,
+      );
     }
 
     const where = and(...conditions);

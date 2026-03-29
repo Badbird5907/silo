@@ -1,17 +1,24 @@
 "use client";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import CodeDemoStuff from "./code";
+
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
+import { UserFilesWorkspace } from "@/components/user-files-workspace";
 import { useIsMobile } from "@/hooks/use-is-mobile";
+import CodeDemoStuff from "./code";
 
 export default function Home() {
-  const isMobile = useIsMobile()
+  const isMobile = useIsMobile();
   return (
-    <main className="w-full h-[calc(100vh-70px)]">
-      <ResizablePanelGroup orientation={isMobile ? "vertical" : "horizontal"} className="w-full h-full">
+    <main className="h-[calc(100vh-70px)] w-full">
+      <ResizablePanelGroup
+        orientation={isMobile ? "vertical" : "horizontal"}
+        className="h-full w-full"
+      >
         <ResizablePanel defaultSize={"60%"}>
-          <div className="w-full h-full">
-            One
-          </div>
+          <UserFilesWorkspace />
         </ResizablePanel>
         <ResizableHandle withHandle />
         <ResizablePanel defaultSize={"40%"} className="min-h-0">

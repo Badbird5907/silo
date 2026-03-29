@@ -136,3 +136,52 @@ export function routeAllowsMultipleFiles(
 
   return maxFileCount > 1;
 }
+
+export function getRouteMaxFileCount(
+  routerConfig: RouterConfigLike | null | undefined,
+  endpoint: string,
+): number | undefined {
+  const routeConfig = routerConfig?.[endpoint];
+  if (
+    !routeConfig ||
+    typeof routeConfig !== "object" ||
+    Array.isArray(routeConfig)
+  ) {
+    return undefined;
+  }
+
+  let hasConstraint = false;
+  let hasUnlimitedConstraint = false;
+  let maxFileCount = 1;
+
+  for (const constraint of Object.values(
+    routeConfig as Record<string, unknown>,
+  )) {
+    if (
+      !constraint ||
+      typeof constraint !== "object" ||
+      Array.isArray(constraint)
+    ) {
+      continue;
+    }
+
+    hasConstraint = true;
+    const maybeMax = (constraint as { maxFileCount?: unknown }).maxFileCount;
+    if (maybeMax === undefined) {
+      hasUnlimitedConstraint = true;
+      continue;
+    }
+
+    if (typeof maybeMax !== "number" || !Number.isFinite(maybeMax)) {
+      continue;
+    }
+
+    maxFileCount = Math.max(maxFileCount, maybeMax);
+  }
+
+  if (!hasConstraint || hasUnlimitedConstraint) {
+    return undefined;
+  }
+
+  return maxFileCount;
+}
