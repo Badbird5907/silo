@@ -26,7 +26,6 @@ export const registerFileKeySchema = z.object({
 export const registerUploadBodySchema = z.object({
   environmentId: z.string(),
   fileKeys: z.array(registerFileKeySchema).min(1),
-  metadata: unknownRecordSchema.optional(),
   callbackUrl: z.url().optional(),
   callbackMetadata: unknownRecordSchema.optional(),
   dev: z.boolean().optional(),
@@ -51,10 +50,7 @@ type FileKeyMetadata = Record<string, unknown>;
 
 function mergeMetadata(
   existing: unknown,
-  input: {
-    requestMetadata?: Record<string, unknown>;
-    fileMetadata?: Record<string, unknown>;
-  },
+  fileMetadata?: Record<string, unknown>,
 ): FileKeyMetadata {
   const existingObject =
     existing && typeof existing === "object" && !Array.isArray(existing)
@@ -63,8 +59,7 @@ function mergeMetadata(
 
   const merged: FileKeyMetadata = {
     ...existingObject,
-    ...(input.requestMetadata ?? {}),
-    ...(input.fileMetadata ?? {}),
+    ...(fileMetadata ?? {}),
   };
 
   return merged;
@@ -121,7 +116,6 @@ export async function registerFileKeyIntent(input: {
   environmentId: string;
   fileKey: RegisterUploadFileKey;
   expiresAt?: Date | null;
-  requestMetadata?: Record<string, unknown>;
   callbackUrl?: string;
   callbackMetadata?: Record<string, unknown>;
   apiKeyId?: string;
@@ -173,10 +167,7 @@ export async function registerFileKeyIntent(input: {
         });
 
     const existing = byId ?? byAccessKey;
-    const mergedMetadata = mergeMetadata(existing?.metadata, {
-      requestMetadata: input.requestMetadata,
-      fileMetadata: input.fileKey.metadata,
-    });
+    const mergedMetadata = mergeMetadata(existing?.metadata, input.fileKey.metadata);
     const mergedCallbackMetadata = mergeCallbackMetadata(
       existing?.callbackMetadata,
       {
@@ -298,9 +289,7 @@ export async function completeFileKeyFromCallback(input: {
         });
 
     const existing = existingById ?? existingByAccess;
-    const mergedMetadata = mergeMetadata(existing?.metadata, {
-      requestMetadata: input.metadata,
-    });
+    const mergedMetadata = mergeMetadata(existing?.metadata, input.metadata);
 
     let claimedFileKey = existing;
     if (!claimedFileKey) {

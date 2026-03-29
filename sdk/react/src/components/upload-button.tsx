@@ -14,7 +14,6 @@ export interface UploadButtonProps<
   multiple?: boolean;
   disabled?: boolean;
   input?: unknown;
-  requestMetadata?: Record<string, unknown>;
   awaitTimeoutMs?: number;
   children?: React.ReactNode;
   useUpload: (
@@ -38,7 +37,6 @@ export function UploadButton<
     disabled,
     multiple,
     input,
-    requestMetadata,
     awaitTimeoutMs,
     children,
   } = props;
@@ -68,7 +66,6 @@ export function UploadButton<
           if (selected.length === 0) return;
           void upload.uploadFiles(selected, {
             input,
-            requestMetadata,
             awaitTimeoutMs,
           });
           event.currentTarget.value = "";

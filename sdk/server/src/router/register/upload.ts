@@ -87,9 +87,12 @@ export async function registerRouteUpload<
       )
     : {};
 
+  for (const file of files) {
+    file.metadata = { ...middlewareData };
+  }
+
   const callbackMetadata = buildInternalCallbackMetadata({
     routeSlug: input.routeSlug,
-    middlewareData,
   });
 
   const routeOptionData: SiloRouteOptionResolverArgs<
@@ -150,7 +153,6 @@ export async function registerRouteUpload<
     files,
     callbackUrl: input.callbackUrl,
     callbackMetadata,
-    requestMetadata: input.requestMetadata,
     fileExpiry: resolvedFileExpiry,
     dev: input.dev,
     expiresIn: input.expiresIn,

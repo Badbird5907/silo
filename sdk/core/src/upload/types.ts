@@ -25,7 +25,6 @@ export interface UploadFileInput {
 
 export interface RegisterUploadBatchInput {
   files: UploadFileInput[];
-  requestMetadata?: Record<string, unknown>;
   callbackMetadata?: Record<string, unknown>;
   callbackUrl?: string;
   dev?: boolean;

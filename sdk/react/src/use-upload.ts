@@ -208,7 +208,6 @@ export function useUploadInternal<
           {
             endpoint: options.endpoint,
             input: uploadOptions?.input,
-            requestMetadata: uploadOptions?.requestMetadata,
             expiresIn: uploadOptions?.expiresIn,
             protocol: uploadOptions?.protocol,
             files: files.map((file) => ({
@@ -349,7 +348,6 @@ export function useUploadInternal<
 
         return uploadFiles(selected, {
           input: beginOptions?.input,
-          requestMetadata: beginOptions?.requestMetadata,
           expiresIn: beginOptions?.expiresIn,
           protocol: beginOptions?.protocol,
           awaitTimeoutMs: beginOptions?.awaitTimeoutMs,
@@ -519,8 +517,6 @@ export function useStagedUploadInternal<
 
       const mergedOptions: UploadRequestOptions = {
         input: requestOptions?.input ?? options.input,
-        requestMetadata:
-          requestOptions?.requestMetadata ?? options.requestMetadata,
         expiresIn: requestOptions?.expiresIn ?? options.expiresIn,
         protocol: requestOptions?.protocol ?? options.protocol,
         awaitTimeoutMs:

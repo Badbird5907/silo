@@ -44,7 +44,6 @@ export async function POST(request: Request) {
   const {
     environmentId,
     fileKeys,
-    metadata,
     callbackUrl,
     callbackMetadata,
     dev,
@@ -86,7 +85,6 @@ export async function POST(request: Request) {
         environmentId,
         fileKey,
         expiresAt: resolvedExpiresAt,
-        requestMetadata: metadata,
         callbackUrl,
         callbackMetadata,
         apiKeyId: authResult.apiKeyId,

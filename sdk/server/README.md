@@ -52,6 +52,9 @@ export const fileRouter = {
 } satisfies FileRouter;
 ```
 
+Middleware return values are persisted as file metadata during registration and
+are provided back to `onUploadComplete` via the callback event file payload.
+
 `mimeTypes(...)` accepts all of these forms:
 
 - `.mimeTypes("image")`

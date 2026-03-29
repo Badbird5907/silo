@@ -13,7 +13,6 @@ export interface UploadDropzoneProps<
 > extends UseUploadOptions<TRouter, TEndpoint> {
   disabled?: boolean;
   input?: unknown;
-  requestMetadata?: Record<string, unknown>;
   awaitTimeoutMs?: number;
   className?: string;
   children?: React.ReactNode;
@@ -37,7 +36,6 @@ export function UploadDropzone<
     onFileDialogCancel,
     disabled,
     input,
-    requestMetadata,
     awaitTimeoutMs,
     className,
     children,
@@ -75,7 +73,6 @@ export function UploadDropzone<
         if (dropped.length === 0) return;
         void upload.uploadFiles(dropped, {
           input,
-          requestMetadata,
           awaitTimeoutMs,
         });
       }}

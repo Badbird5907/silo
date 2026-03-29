@@ -50,7 +50,6 @@ callbackMetadata: {
   __silo: {
     version: 1;
     routeSlug: string;
-    middlewareData: Record<string, unknown>;
   }
 }
 ```
@@ -58,7 +57,6 @@ callbackMetadata: {
 Reserved behavior:
 
 - `__silo` is reserved and must never be user-writable from React APIs.
-- Middleware return values are stored in `__silo.middlewareData`.
 - Callback dispatch resolves route via `__silo.routeSlug`.
 
 ## React API contract
@@ -119,7 +117,7 @@ Type behavior:
 ## End-to-end flow reference
 
 1. React client requests upload registration for a route slug.
-2. App server runs middleware and stores result in `callbackMetadata.__silo`.
+2. App server runs middleware and writes middleware return values to per-file metadata.
 3. Upload is performed against signed URL.
 4. Silo callback reaches app callback action and dispatches `onUploadComplete`.
 5. Client waits on completion action and receives typed `onComplete` payload.

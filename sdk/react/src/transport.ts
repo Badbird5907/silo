@@ -75,7 +75,6 @@ export async function registerUpload(
   payload: {
     endpoint: string;
     input?: unknown;
-    requestMetadata?: Record<string, unknown>;
     expiresIn?: number;
     protocol?: "http" | "https";
     files: {

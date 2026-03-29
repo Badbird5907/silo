@@ -46,8 +46,8 @@ handled by framework-specific adapters.
 
 `callbackMetadata` is intentionally low-level in `sdk-core`.
 If you are building route-based uploads, prefer `@silo-storage/sdk-server`, which
-stores internal router state in `callbackMetadata.__silo` and keeps that envelope
-library-owned.
+stores internal route dispatch state in `callbackMetadata.__silo` and keeps that
+envelope library-owned.
 
 ## Dev SSE Consumption
 

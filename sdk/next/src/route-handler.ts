@@ -12,7 +12,6 @@ const registerRequestSchema = z.object({
   action: z.literal("register"),
   endpoint: z.string().min(1),
   input: z.unknown().optional(),
-  requestMetadata: z.record(z.string(), z.unknown()).optional(),
   expiresIn: z.number().int().positive().optional(),
   protocol: z.enum(["http", "https"]).optional(),
   files: z
@@ -22,7 +21,6 @@ const registerRequestSchema = z.object({
       mimeType: z.string().optional(),
       hash: z.string().optional(),
       isPublic: z.boolean().optional(),
-      metadata: z.record(z.string(), z.unknown()).optional(),
     })
     .array()
     .min(1),
@@ -106,7 +104,6 @@ function toUploadFiles(
     mimeType: file.mimeType,
     hash: file.hash,
     isPublic: file.isPublic,
-    metadata: file.metadata,
   }));
 }
 
@@ -220,7 +217,6 @@ export function createRouteHandler<
       req: request,
       context,
       input: action.input as never,
-      requestMetadata: action.requestMetadata,
       expiresIn: action.expiresIn,
       protocol: action.protocol,
       callbackUrl,

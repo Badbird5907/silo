@@ -3,12 +3,9 @@ import { z } from "zod";
 export const SILO_CALLBACK_ENVELOPE_KEY = "__silo";
 export const SILO_CALLBACK_ENVELOPE_VERSION = 1 as const;
 
-const unknownRecordSchema = z.record(z.string(), z.unknown());
-
 const siloCallbackEnvelopeSchema = z.object({
   version: z.literal(SILO_CALLBACK_ENVELOPE_VERSION),
   routeSlug: z.string().min(1),
-  middlewareData: unknownRecordSchema,
 });
 
 export type SiloCallbackEnvelope = z.infer<typeof siloCallbackEnvelopeSchema>;
@@ -22,7 +19,6 @@ function toRecord(value: unknown): Record<string, unknown> {
 
 export interface BuildInternalCallbackMetadataInput {
   routeSlug: string;
-  middlewareData: Record<string, unknown>;
   extraMetadata?: Record<string, unknown>;
 }
 
@@ -34,7 +30,6 @@ export function buildInternalCallbackMetadata(
     [SILO_CALLBACK_ENVELOPE_KEY]: {
       version: SILO_CALLBACK_ENVELOPE_VERSION,
       routeSlug: input.routeSlug,
-      middlewareData: input.middlewareData,
     },
   };
 }

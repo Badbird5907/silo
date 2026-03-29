@@ -104,7 +104,6 @@ export interface OpenFilePickerOptions {
 
 export interface UploadRequestOptions {
   input?: unknown;
-  requestMetadata?: Record<string, unknown>;
   expiresIn?: number;
   protocol?: "http" | "https";
   awaitTimeoutMs?: number;

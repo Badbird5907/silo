@@ -133,7 +133,6 @@ export async function POST(request: Request) {
         isPublic: resolvedIsPublic,
         metadata,
       },
-      requestMetadata: metadata,
       callbackUrl,
       callbackMetadata,
       apiKeyId: authResult.apiKeyId,

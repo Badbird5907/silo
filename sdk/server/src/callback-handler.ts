@@ -124,8 +124,9 @@ export async function handleUploadCallback<
     throw new Error(`No route found for slug "${routeSlug}"`);
   }
 
+  const fileMetadata = completedEvent.data.data.metadata;
   const onUploadCompleteResult = await route.onUploadComplete({
-    metadata: internalEnvelope.middlewareData,
+    metadata: fileMetadata,
     context: resolvedContext,
     file: completedEvent.data.data,
     event: completedEvent.data,
@@ -136,7 +137,7 @@ export async function handleUploadCallback<
     routeSlug,
     eventType: "upload.completed",
     event: completedEvent.data,
-    middlewareData: internalEnvelope.middlewareData,
+    middlewareData: fileMetadata,
     callbackMetadata: getUserVisibleCallbackMetadata(envelope.metadata),
     onUploadCompleteResult,
   };

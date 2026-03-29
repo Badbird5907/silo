@@ -158,7 +158,6 @@ export function createSiloCore(config: UploadCoreConfig) {
         acceptedMimeTypes: file.acceptedMimeTypes,
         metadata: file.metadata,
       })),
-      metadata: input.requestMetadata,
       dev: input.dev === true,
     };
 

@@ -25,7 +25,6 @@ export interface RegisterRouteUploadInput<
   input?: RouteInputBySlug<TRouter, TRouteSlug>;
   files: UploadFileInput[];
   callbackUrl?: string;
-  requestMetadata?: Record<string, unknown>;
   fileExpiry?: SiloFileExpiryInput;
   dev?: boolean;
   expiresIn?: number;
