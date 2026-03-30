@@ -30,6 +30,29 @@ function getDbTargetLabel(): string | null {
   }
 }
 
+async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function readVisibleFileKeyIds(input: {
+  registeredIds: string[];
+  projectId: string;
+  environmentId: string;
+}): Promise<string[]> {
+  if (input.registeredIds.length === 0) return [];
+  const visibleRows = await db.query.fileKeys.findMany({
+    where: and(
+      inArray(fileKeysTable.id, input.registeredIds),
+      eq(fileKeysTable.projectId, input.projectId),
+      eq(fileKeysTable.environmentId, input.environmentId),
+    ),
+    columns: {
+      id: true,
+    },
+  });
+  return visibleRows.map((row) => row.id);
+}
+
 export async function POST(request: Request) {
   console.log("[upload-register] Diagnostic context", {
     diagVersion: UPLOAD_REGISTER_DIAG_VERSION,
@@ -119,28 +142,40 @@ export async function POST(request: Request) {
     }
 
     const registeredIds = registered.map((item) => item.fileKeyId);
-    const visibleRows =
-      registeredIds.length > 0
-        ? await db.query.fileKeys.findMany({
-            where: and(
-              inArray(fileKeysTable.id, registeredIds),
-              eq(fileKeysTable.projectId, projectId),
-              eq(fileKeysTable.environmentId, environmentId),
-            ),
-            columns: {
-              id: true,
-            },
-          })
-        : [];
+    const readBackDelaysMs = [0, 200, 600, 1500, 3000] as const;
+    let visibleIds: string[] = [];
+    for (const delayMs of readBackDelaysMs) {
+      if (delayMs > 0) await sleep(delayMs);
+      visibleIds = await readVisibleFileKeyIds({
+        registeredIds,
+        projectId,
+        environmentId,
+      });
+      if (visibleIds.length >= registeredIds.length) break;
+    }
     console.log("[upload-register] Persisted file key intents", {
       projectId,
       environmentId,
       requestedCount: fileKeys.length,
       registeredCount: registered.length,
-      visibleCount: visibleRows.length,
+      visibleCount: visibleIds.length,
       registeredIds,
-      visibleIds: visibleRows.map((row) => row.id),
+      visibleIds,
     });
+
+    if (visibleIds.length < registeredIds.length) {
+      console.error("[upload-register] Registration visibility check failed", {
+        projectId,
+        environmentId,
+        registeredIds,
+        visibleIds,
+      });
+      return jsonError(
+        "Service Unavailable",
+        "Upload registration is temporarily unavailable. Please retry.",
+        503,
+      );
+    }
 
     if (dev) {
       if (!env.DEV_UPLOAD_SSE_ENABLED) {
