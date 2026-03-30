@@ -105,40 +105,67 @@ export async function registerUpload(
   return data.files;
 }
 
+const DEFAULT_COMPLETION_TOTAL_MS = 20_000;
+/** Max time each await-completion HTTP request holds the server polling in-memory state. */
+const MAX_COMPLETION_POLL_PER_REQUEST_MS = 4_000;
+
+/**
+ * Waits until the route's `onUploadComplete` has run and the result is available.
+ * Uses several short server polls so that serverless deployments where the webhook
+ * hits a different instance than the poller can succeed on a later attempt.
+ */
 export async function awaitCompletion(
   endpointUrl: string,
   fetchImpl: typeof fetch,
   fileKeyId: string,
   timeoutMs?: number,
 ): Promise<NonNullable<AwaitCompletionResponse["completion"]>> {
-  const response = await fetchImpl(endpointUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      action: "await-completion",
-      fileKeyId,
-      timeoutMs,
-    }),
+  const totalBudgetMs = timeoutMs ?? DEFAULT_COMPLETION_TOTAL_MS;
+  const deadline = Date.now() + totalBudgetMs;
+
+  while (Date.now() < deadline) {
+    const remaining = deadline - Date.now();
+    const serverWaitMs = Math.min(
+      MAX_COMPLETION_POLL_PER_REQUEST_MS,
+      Math.max(1, remaining),
+    );
+
+    const response = await fetchImpl(endpointUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "await-completion",
+        fileKeyId,
+        timeoutMs: serverWaitMs,
+      }),
+    });
+
+    const data = await readJson<AwaitCompletionResponse>(response);
+
+    if (response.status === 202 && data.pending) {
+      const pauseMs = Math.min(250, Math.max(0, deadline - Date.now()));
+      if (pauseMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, pauseMs));
+      }
+      continue;
+    }
+
+    if (!response.ok || !data.ok || !data.completion) {
+      throw new SiloUploadError({
+        code: data.error?.code ?? "COMPLETION_FAILED",
+        message: data.error?.message ?? "Failed awaiting upload completion",
+        cause: data,
+      });
+    }
+
+    return data.completion;
+  }
+
+  throw new SiloUploadError({
+    code: "COMPLETION_PENDING",
+    message: "Upload is complete but onUploadComplete has not finished yet.",
+    cause: { pending: true },
   });
-
-  const data = await readJson<AwaitCompletionResponse>(response);
-  if (response.status === 202 && data.pending) {
-    throw new SiloUploadError({
-      code: "COMPLETION_PENDING",
-      message: "Upload is complete but onUploadComplete has not finished yet.",
-      cause: data,
-    });
-  }
-
-  if (!response.ok || !data.ok || !data.completion) {
-    throw new SiloUploadError({
-      code: data.error?.code ?? "COMPLETION_FAILED",
-      message: data.error?.message ?? "Failed awaiting upload completion",
-      cause: data,
-    });
-  }
-
-  return data.completion;
 }
 
 export async function uploadFileWithProgress(
