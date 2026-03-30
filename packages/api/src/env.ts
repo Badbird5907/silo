@@ -11,6 +11,7 @@ export const env = createEnv({
       .enum(["development", "production", "test"])
       .default("development"),
     WORKER_URL: z.url(),
+    PROJECT_ROUTE_MODE: z.enum(["subdomain", "path"]).default("subdomain"),
     CALLBACK_SECRET: z.string().min(32),
   },
   /**
@@ -28,6 +29,7 @@ export const env = createEnv({
   runtimeEnv: {
     NODE_ENV: process.env.NODE_ENV,
     WORKER_URL: process.env.WORKER_URL,
+    PROJECT_ROUTE_MODE: process.env.PROJECT_ROUTE_MODE,
     CALLBACK_SECRET: process.env.CALLBACK_SECRET,
   },
   clientPrefix: "NEXT_PUBLIC_",

@@ -13,8 +13,6 @@ export const requireProject: MiddlewareHandler<{
   const projectSlug = extractProjectSlugFromUrl(
     url,
     c.env.WORKER_DOMAIN,
-    c.env.PROJECT_ROUTE_MODE,
-    c.env.PROJECT_ROUTE_PREFIX,
   );
   if (!projectSlug) {
     throw Errors.projectNotFound("missing-project-scope");
@@ -38,8 +36,6 @@ export const extractProject: MiddlewareHandler<{
   const projectSlug = extractProjectSlugFromUrl(
     url,
     c.env.WORKER_DOMAIN,
-    c.env.PROJECT_ROUTE_MODE,
-    c.env.PROJECT_ROUTE_PREFIX,
   );
 
   c.set("projectSlug", projectSlug);

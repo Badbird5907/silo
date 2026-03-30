@@ -1,28 +1,5 @@
 export type ProjectRouteMode = "subdomain" | "path";
-
-const DEFAULT_PROJECT_ROUTE_PREFIX = "/p";
-
-export function resolveProjectRouteMode(
-  routeMode: string | undefined,
-): ProjectRouteMode {
-  return routeMode === "path" ? "path" : "subdomain";
-}
-
-export function normalizeProjectRoutePrefix(prefix: string | undefined): string {
-  const normalized = (prefix ?? DEFAULT_PROJECT_ROUTE_PREFIX).trim();
-  const withLeadingSlash = normalized.startsWith("/")
-    ? normalized
-    : `/${normalized}`;
-  const stripped = withLeadingSlash.replace(/\/+$/, "");
-
-  if (!stripped || stripped === "/") {
-    return DEFAULT_PROJECT_ROUTE_PREFIX;
-  }
-
-  // Prefix is expected to be one path segment (e.g. "/p").
-  const [firstSegment] = stripped.split("/").filter(Boolean);
-  return `/${firstSegment ?? "p"}`;
-}
+export const PROJECT_ROUTE_PREFIX = "/p";
 
 export function extractProjectSlug(
   hostname: string,
@@ -46,11 +23,9 @@ export function extractProjectSlug(
 
 export function extractProjectSlugFromPath(
   pathname: string,
-  routePrefix: string,
 ): string | null {
   const normalizedPath = pathname.startsWith("/") ? pathname : `/${pathname}`;
-  const normalizedPrefix = normalizeProjectRoutePrefix(routePrefix);
-  const prefixWithSlash = `${normalizedPrefix}/`;
+  const prefixWithSlash = `${PROJECT_ROUTE_PREFIX}/`;
 
   if (!normalizedPath.startsWith(prefixWithSlash)) {
     return null;
@@ -64,30 +39,38 @@ export function extractProjectSlugFromPath(
 export function extractProjectSlugFromUrl(
   url: URL,
   workerDomain: string,
-  routeModeRaw: string | undefined,
-  routePrefixRaw: string | undefined,
 ): string | null {
-  const routeMode = resolveProjectRouteMode(routeModeRaw);
+  return (
+    extractProjectSlug(url.hostname, workerDomain) ??
+    extractProjectSlugFromPath(url.pathname)
+  );
+}
 
-  if (routeMode === "path") {
-    return extractProjectSlugFromPath(url.pathname, routePrefixRaw ?? "/p");
+export function detectProjectRouteModeFromPath(
+  pathname: string,
+  projectSlug: string,
+): ProjectRouteMode {
+  const normalizedPath = pathname.startsWith("/") ? pathname : `/${pathname}`;
+  const pathPrefix = `${PROJECT_ROUTE_PREFIX}/${projectSlug}/`;
+  if (
+    normalizedPath === `${PROJECT_ROUTE_PREFIX}/${projectSlug}` ||
+    normalizedPath.startsWith(pathPrefix)
+  ) {
+    return "path";
   }
 
-  return extractProjectSlug(url.hostname, workerDomain);
+  return "subdomain";
 }
 
 export function toProjectScopedPath(
   path: string,
   projectSlug: string,
-  routeModeRaw: string | undefined,
-  routePrefixRaw: string | undefined,
+  routeMode: ProjectRouteMode,
 ): string {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  const routeMode = resolveProjectRouteMode(routeModeRaw);
 
   if (routeMode === "path") {
-    const routePrefix = normalizeProjectRoutePrefix(routePrefixRaw);
-    return `${routePrefix}/${projectSlug}${normalizedPath}`;
+    return `${PROJECT_ROUTE_PREFIX}/${projectSlug}${normalizedPath}`;
   }
 
   return normalizedPath;

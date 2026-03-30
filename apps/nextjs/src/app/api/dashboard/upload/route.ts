@@ -183,7 +183,6 @@ export async function POST(request: Request) {
       env.SIGNING_SECRET,
       {
         routeMode: env.PROJECT_ROUTE_MODE,
-        routePrefix: env.PROJECT_ROUTE_PREFIX,
       },
     );
 

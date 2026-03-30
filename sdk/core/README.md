@@ -27,6 +27,12 @@ const prepared = await uploadCore.prepareUpload({
     mimeType: "image/png",
   },
 });
+
+const downloadUrl = await uploadCore.generateDownloadUrl({
+  accessKey: "file-access-key",
+  isPublic: false,
+  fileName: "photo.png",
+});
 ```
 
 `SILO_TOKEN` is a base64url JSON payload with compact keys:
@@ -36,6 +42,8 @@ const prepared = await uploadCore.prepareUpload({
 - `eid` environmentId
 - `is` ingestServer
 - `ss` signingSecret
+- `rm` routeMode (`s` = subdomain, `p` = path)
+- `ps` projectSlug
 
 ## Callback URL
 

@@ -6,9 +6,20 @@ export interface UploadCoreConfig {
   environmentId: string;
   ingestServer: string;
   signingSecret: string;
+  routeMode?: "subdomain" | "path";
+  projectSlug?: string;
   keyId?: string;
   callbackUrl?: string;
   fetch?: typeof fetch;
+}
+
+export interface GenerateDownloadUrlInput {
+  accessKey: string;
+  isPublic: boolean;
+  fileKeyId?: string;
+  fileName?: string;
+  expiresIn?: number;
+  projectSlug?: string;
 }
 
 export interface UploadFileInput {

@@ -196,12 +196,10 @@ preview_id = "<your-kv-preview-id>"   # ← from: wrangler kv namespace create P
 [vars]
 WORKER_DOMAIN = "worker.your-domain.com"   # public hostname for the Worker
 PROJECT_ROUTE_MODE = "subdomain"           # "subdomain" or "path"
-PROJECT_ROUTE_PREFIX = "/p"                # used when PROJECT_ROUTE_MODE="path"
 
 [env.production]
 vars.WORKER_DOMAIN = "worker.your-domain.com"
 vars.PROJECT_ROUTE_MODE = "subdomain"
-vars.PROJECT_ROUTE_PREFIX = "/p"
 vars.NEXTJS_CALLBACK_URL = "https://your-silo-app.com"  # where the nextjs app is hosted (vercel)
 vars.ENV = "production"`}
         />
@@ -209,7 +207,8 @@ vars.ENV = "production"`}
           Use <InlineCode>subdomain</InlineCode> mode for{" "}
           <InlineCode>project-slug.worker.your-domain.com</InlineCode> URLs (requires wildcard DNS),
           or <InlineCode>path</InlineCode> mode for{" "}
-          <InlineCode>worker.your-domain.com/p/project-slug/*</InlineCode> URLs.
+          <InlineCode>worker.your-domain.com/p/project-slug/*</InlineCode> URLs. Path mode always uses{" "}
+          <InlineCode>/p</InlineCode>.
         </p>
       </>
     ),
@@ -324,8 +323,7 @@ AUTH_GITHUB_SECRET=''
 # Cloudflare Worker URL for file uploads/downloads
 WORKER_URL="http://localhost:8787"
 WORKER_DOMAIN="ingest.your-domain.com" # public hostname for the Worker
-PROJECT_ROUTE_MODE="subdomain" # "subdomain" => {projectSlug}.{WORKER_DOMAIN}, "path" => {WORKER_DOMAIN}/p/{projectSlug}
-PROJECT_ROUTE_PREFIX="/p" # only used when PROJECT_ROUTE_MODE="path"
+PROJECT_ROUTE_MODE="subdomain" # "subdomain" => {projectSlug}.{WORKER_DOMAIN}, "path" => {WORKER_DOMAIN}/p/{projectSlug} (fixed /p prefix)
 
 # Signing secret for generating signed URLs (generate via 'openssl rand -hex 32')
 SIGNING_SECRET="your-secure-random-secret-here"

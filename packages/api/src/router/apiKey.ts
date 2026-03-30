@@ -22,6 +22,8 @@ function encodeSiloToken(payload: {
   eid: string;
   is: string;
   ss: string;
+  rm: "s" | "p";
+  ps: string;
 }): string {
   const json = JSON.stringify(payload);
   return Buffer.from(json, "utf8")
@@ -29,6 +31,10 @@ function encodeSiloToken(payload: {
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/g, "");
+}
+
+function toCompactRouteMode(mode: "subdomain" | "path"): "s" | "p" {
+  return mode === "path" ? "p" : "s";
 }
 
 // Helper to hash the API key using SHA-256
@@ -208,6 +214,8 @@ export const apiKeyRouter = {
         eid: input.environmentId,
         is: ingestServer,
         ss: signingSecret,
+        rm: toCompactRouteMode(env.PROJECT_ROUTE_MODE),
+        ps: project.slug,
       });
 
       return {

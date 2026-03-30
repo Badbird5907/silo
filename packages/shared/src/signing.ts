@@ -67,26 +67,12 @@ export type ProjectRouteMode = "subdomain" | "path";
 
 export interface SignedUrlRoutingOptions {
   routeMode?: ProjectRouteMode;
-  routePrefix?: string;
 }
 
 const ACCEPTED_MIME_VALUE_REGEX =
   /^[a-z0-9!#$&^_.+-]+(?:\/[a-z0-9!#$&^_.+-]+)?$/;
 
-function normalizeRoutePrefix(prefix: string | undefined): string {
-  const normalized = (prefix ?? "/p").trim();
-  const withLeadingSlash = normalized.startsWith("/")
-    ? normalized
-    : `/${normalized}`;
-  const stripped = withLeadingSlash.replace(/\/+$/, "");
-
-  if (!stripped || stripped === "/") {
-    return "/p";
-  }
-
-  const [firstSegment] = stripped.split("/").filter(Boolean);
-  return `/${firstSegment ?? "p"}`;
-}
+const PROJECT_ROUTE_PREFIX = "/p";
 
 function buildProjectScopedUrl(
   workerDomain: string,
@@ -97,9 +83,8 @@ function buildProjectScopedUrl(
 ): URL {
   const normalizedPath = routePath.startsWith("/") ? routePath : `/${routePath}`;
   if (routing?.routeMode === "path") {
-    const routePrefix = normalizeRoutePrefix(routing.routePrefix);
     return new URL(
-      `${protocol}://${workerDomain}${routePrefix}/${projectSlug}${normalizedPath}`,
+      `${protocol}://${workerDomain}${PROJECT_ROUTE_PREFIX}/${projectSlug}${normalizedPath}`,
     );
   }
 

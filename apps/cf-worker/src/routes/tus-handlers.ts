@@ -3,7 +3,10 @@ import type { Context } from "hono";
 import type { Bindings, Variables } from "../types/bindings";
 import type { TusUploadMetadata } from "../types/tus";
 import { isAllowedMimeType } from "../lib/file-types";
-import { toProjectScopedPath } from "../lib/subdomain";
+import {
+  detectProjectRouteModeFromPath,
+  toProjectScopedPath,
+} from "../lib/subdomain";
 import {
   registerUploadSession,
   sendUploadCallback,
@@ -232,12 +235,12 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
     if (!projectSlug) {
       throw Errors.projectNotFound("missing-project-scope");
     }
+    const routeMode = detectProjectRouteModeFromPath(url.pathname, projectSlug);
 
     const uploadLocationPath = toProjectScopedPath(
       `/ingest/tus/${uploadId}`,
       projectSlug,
-      c.env.PROJECT_ROUTE_MODE,
-      c.env.PROJECT_ROUTE_PREFIX,
+      routeMode,
     );
     const uploadUrl = `${url.protocol}//${url.host}${uploadLocationPath}`;
     const bodyContentLength = parseNonNegativeInt(contentLengthHeader) ?? 0;

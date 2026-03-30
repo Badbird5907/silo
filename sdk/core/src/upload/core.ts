@@ -4,6 +4,7 @@ import { nanoid } from "nanoid";
 import type { UpdateFileExpiryInput, UpdateFileExpiryResult } from "./expiry";
 import type { CreateSiloCoreFromTokenInput } from "./token";
 import type {
+  GenerateDownloadUrlInput,
   GetFileInput,
   ListFilesInput,
   ListFilesResult,
@@ -14,7 +15,11 @@ import type {
   SiloFileDetail,
   UploadCoreConfig,
 } from "./types";
-import { generateSignedUploadUrlWithSecret } from "../signing";
+import {
+  generatePublicDownloadUrl,
+  generateSignedDownloadUrl,
+  generateSignedUploadUrlWithSecret,
+} from "../signing";
 import {
   applyFileExpiryToRegisterBody,
   createUpdateFileExpiryRequestBody,
@@ -65,6 +70,7 @@ export function createSiloCore(config: UploadCoreConfig) {
   const baseUrl = stripTrailingSlash(config.apiBaseUrl);
   const fetchImpl = config.fetch ?? fetch;
   const resolvedKeyId = config.keyId ?? config.apiKey.slice(0, 11);
+  const resolvedRouteMode = config.routeMode ?? "subdomain";
 
   async function parseApiResponse<T>(
     response: Response,
@@ -216,6 +222,7 @@ export function createSiloCore(config: UploadCoreConfig) {
             protocol,
           },
           config.signingSecret,
+          { routeMode: resolvedRouteMode },
         );
         preparedFiles.push({
           ...file,
@@ -358,11 +365,46 @@ export function createSiloCore(config: UploadCoreConfig) {
     return parseApiResponse(response, fileDetailSchema);
   }
 
+  async function generateDownloadUrl(
+    input: GenerateDownloadUrlInput,
+  ): Promise<string> {
+    const projectSlug = input.projectSlug ?? config.projectSlug;
+    if (!projectSlug) {
+      throw new Error(
+        "Missing projectSlug for download URL generation. Provide projectSlug in SILO_TOKEN or input.",
+      );
+    }
+
+    if (input.isPublic) {
+      return generatePublicDownloadUrl(
+        config.ingestServer,
+        projectSlug,
+        input.accessKey,
+        input.fileName,
+        { routeMode: resolvedRouteMode },
+      );
+    }
+
+    return generateSignedDownloadUrl(
+      config.ingestServer,
+      projectSlug,
+      {
+        fileKeyId: input.fileKeyId ?? input.accessKey,
+        accessKey: input.accessKey,
+        fileName: input.fileName,
+        expiresIn: input.expiresIn,
+      },
+      config.signingSecret,
+      { routeMode: resolvedRouteMode },
+    );
+  }
+
   return {
     registerUploadBatch,
     prepareUpload,
     listFiles,
     getFile,
+    generateDownloadUrl,
     updateFileExpiry,
     config,
   };
@@ -381,6 +423,8 @@ export function createSiloCoreFromToken(
     environmentId: parsed.environmentId,
     ingestServer: parsed.ingestServer,
     signingSecret: parsed.signingSecret,
+    routeMode: parsed.routeMode,
+    projectSlug: parsed.projectSlug,
     callbackUrl: input.callbackUrl,
     fetch: input.fetch,
   });

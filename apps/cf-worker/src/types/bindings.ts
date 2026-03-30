@@ -9,8 +9,6 @@ export interface Bindings {
   };
 
   WORKER_DOMAIN: string;
-  PROJECT_ROUTE_MODE: "subdomain" | "path";
-  PROJECT_ROUTE_PREFIX: string;
   NEXTJS_CALLBACK_URL: string;
   ENV: string;
   CALLBACK_SECRET: string;

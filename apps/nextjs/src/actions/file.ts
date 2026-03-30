@@ -64,7 +64,6 @@ export async function getDownloadUrl({
       fileKey.fileName,
       {
         routeMode: env.PROJECT_ROUTE_MODE,
-        routePrefix: env.PROJECT_ROUTE_PREFIX,
       },
     );
     return { url: url.replace("https://", `${protocol}://`), isPublic: true };
@@ -82,7 +81,6 @@ export async function getDownloadUrl({
     env.SIGNING_SECRET,
     {
       routeMode: env.PROJECT_ROUTE_MODE,
-      routePrefix: env.PROJECT_ROUTE_PREFIX,
     },
   );
 
