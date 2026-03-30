@@ -1,6 +1,7 @@
 import type { Bindings } from "../types/bindings";
 import type { ProjectInfo } from "../types/project";
 import { Errors, TusError } from "../utils/errors";
+import { buildNextJsInternalHeaders } from "./nextjs-internal";
 
 export async function lookupProject(
   slug: string,
@@ -22,10 +23,9 @@ export async function lookupProject(
       `${env.NEXTJS_CALLBACK_URL}/api/internal/lookup-project-slug`,
       {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${env.CALLBACK_SECRET}`,
+        headers: buildNextJsInternalHeaders(env, {
           "Content-Type": "application/json",
-        },
+        }),
         body: JSON.stringify({ slug }),
       },
     );
@@ -34,6 +34,7 @@ export async function lookupProject(
       if (response.status === 404) {
         throw Errors.projectNotFound(slug);
       }
+      console.error("Failed to lookup project:", response.status, response.statusText);
       throw new Error(
         `Failed to lookup project: ${response.status} ${response.statusText}`,
       );

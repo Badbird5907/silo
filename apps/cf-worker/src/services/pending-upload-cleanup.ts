@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { buildNextJsInternalHeaders } from "../lib/nextjs-internal";
 import type { Bindings } from "../types/bindings";
 
 const pendingUploadCleanupResponseSchema = z.object({
@@ -24,10 +25,9 @@ async function processStalePendingBatch(env: Bindings, limit: number) {
     `${env.NEXTJS_CALLBACK_URL}/api/internal/pending-uploads/mark-stale-failed`,
     {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${env.CALLBACK_SECRET}`,
+      headers: buildNextJsInternalHeaders(env, {
         "Content-Type": "application/json",
-      },
+      }),
       body: JSON.stringify({ limit }),
     },
   );

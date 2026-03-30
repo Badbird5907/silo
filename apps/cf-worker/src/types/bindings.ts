@@ -25,6 +25,8 @@ export interface Bindings {
   LIFECYCLE_JOB_BATCH_SIZE: string;
   LIFECYCLE_JOB_MAX_BATCHES: string;
   LIFECYCLE_JOB_LEASE_SECONDS: string;
+
+  VERCEL_AUTOMATION_BYPASS_SECRET?: string;
 }
 
 export interface Variables {

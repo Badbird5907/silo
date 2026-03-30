@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { buildNextJsInternalHeaders } from "../lib/nextjs-internal";
 import type { Bindings } from "../types/bindings";
 import { reportMissingObject } from "./callback";
 import { deleteObject } from "./r2/upload";
@@ -43,10 +44,9 @@ async function fetchExpiredBatch(env: Bindings, limit: number) {
     `${env.NEXTJS_CALLBACK_URL}/api/internal/expiry/list`,
     {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${env.CALLBACK_SECRET}`,
+      headers: buildNextJsInternalHeaders(env, {
         "Content-Type": "application/json",
-      },
+      }),
       body: JSON.stringify({ limit }),
     },
   );
@@ -72,10 +72,9 @@ async function finalizeExpiredBatch(env: Bindings, fileIds: string[]) {
     `${env.NEXTJS_CALLBACK_URL}/api/internal/expiry/finalize`,
     {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${env.CALLBACK_SECRET}`,
+      headers: buildNextJsInternalHeaders(env, {
         "Content-Type": "application/json",
-      },
+      }),
       body: JSON.stringify({ fileIds }),
     },
   );

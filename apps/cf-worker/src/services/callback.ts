@@ -1,4 +1,5 @@
 import type { Bindings } from "../types/bindings";
+import { buildNextJsInternalHeaders } from "../lib/nextjs-internal";
 import type {
   FileKeyInfo,
   SignatureVerificationRequest,
@@ -33,10 +34,9 @@ export async function verifyUploadSignature(
     `${env.NEXTJS_CALLBACK_URL}/api/internal/verify-signature`,
     {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${env.CALLBACK_SECRET}`,
+      headers: buildNextJsInternalHeaders(env, {
         "Content-Type": "application/json",
-      },
+      }),
       body: JSON.stringify(request),
     },
   );
@@ -65,10 +65,9 @@ export async function sendUploadCallback(
   try {
     const response = await fetch(url, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${env.CALLBACK_SECRET}`,
+      headers: buildNextJsInternalHeaders(env, {
         "Content-Type": "application/json",
-      },
+      }),
       body: JSON.stringify(data),
     });
 
@@ -118,10 +117,9 @@ export async function lookupFileKey(
     `${env.NEXTJS_CALLBACK_URL}/api/internal/lookup-file-key`,
     {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${env.CALLBACK_SECRET}`,
+      headers: buildNextJsInternalHeaders(env, {
         "Content-Type": "application/json",
-      },
+      }),
       body: JSON.stringify({ accessKey, projectId }),
     },
   );
@@ -184,10 +182,9 @@ export async function registerUploadSession(
     `${env.NEXTJS_CALLBACK_URL}/api/internal/upload-session/start`,
     {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${env.CALLBACK_SECRET}`,
+      headers: buildNextJsInternalHeaders(env, {
         "Content-Type": "application/json",
-      },
+      }),
       body: JSON.stringify({
         ...data,
         adapterKey: data.storageKey,
@@ -225,10 +222,9 @@ export async function registerMultipartUploadSession(
     `${env.NEXTJS_CALLBACK_URL}/api/internal/upload-session/multipart`,
     {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${env.CALLBACK_SECRET}`,
+      headers: buildNextJsInternalHeaders(env, {
         "Content-Type": "application/json",
-      },
+      }),
       body: JSON.stringify(data),
     },
   );
@@ -278,10 +274,9 @@ export async function trackDownload(
       `${env.NEXTJS_CALLBACK_URL}/api/internal/track-download`,
       {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${env.CALLBACK_SECRET}`,
+        headers: buildNextJsInternalHeaders(env, {
           "Content-Type": "application/json",
-        },
+        }),
         body: JSON.stringify(data),
       },
     );
@@ -308,10 +303,9 @@ export async function reportMissingObject(
         `${env.NEXTJS_CALLBACK_URL}/api/internal/files/repair-missing`,
         {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${env.CALLBACK_SECRET}`,
+          headers: buildNextJsInternalHeaders(env, {
             "Content-Type": "application/json",
-          },
+          }),
           body: JSON.stringify({
             ...data,
             adapterKey: data.storageKey,

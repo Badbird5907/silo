@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { buildNextJsInternalHeaders } from "../lib/nextjs-internal";
 import type { Bindings } from "../types/bindings";
 
 const lifecycleJobRunResponseSchema = z.object({
@@ -29,10 +30,9 @@ async function runLifecycleBatch(
     `${env.NEXTJS_CALLBACK_URL}/api/internal/lifecycle-jobs/run`,
     {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${env.CALLBACK_SECRET}`,
+      headers: buildNextJsInternalHeaders(env, {
         "Content-Type": "application/json",
-      },
+      }),
       body: JSON.stringify(input),
     },
   );

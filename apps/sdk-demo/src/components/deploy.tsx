@@ -220,9 +220,8 @@ vars.ENV = "production"`}
     content: (
       <>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Two shared secrets are required. The Worker and your app must have
-          both values. Keep them long, random, and out of source control.
-          You can generate a secure random secret using the following command:
+          Three secrets are required for production. Keep them long, random,
+          and out of source control. Generate each one with:
           <br />
           <InlineCode>openssl rand -base64 32</InlineCode>
         </p>
@@ -231,7 +230,11 @@ vars.ENV = "production"`}
 wrangler secret put CALLBACK_SECRET --env production
 
 # Secret used to sign upload tokens (must match SIGNING_SECRET in your app)
-wrangler secret put SIGNING_SECRET --env production`}
+wrangler secret put SIGNING_SECRET --env production
+
+# Secret used by the Worker to bypass Vercel deployment protection
+# Save this value; you'll add it in Vercel in Step 6.
+wrangler secret put VERCEL_AUTOMATION_BYPASS_SECRET --env production`}
         />
         <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
           For local development, create{" "}
@@ -241,7 +244,8 @@ wrangler secret put SIGNING_SECRET --env production`}
         <CodeBlock
           language="properties"
           code={`CALLBACK_SECRET=dev-callback-secret
-SIGNING_SECRET=dev-signing-secret`}
+SIGNING_SECRET=dev-signing-secret
+VERCEL_AUTOMATION_BYPASS_SECRET=dev-vercel-bypass-secret`}
         />
       </>
     ),
@@ -333,6 +337,11 @@ NEXT_PUBLIC_DISABLE_ORG_CREATION=false
 # Do we want to disable signup?
 DISABLE_SIGNUP="false"`}
         />
+        <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
+          In Vercel, go to Settings &rarr; Deployment Protection &rarr;
+          Protection Bypass for Automation and add the same token you set for{" "}
+          <InlineCode>VERCEL_AUTOMATION_BYPASS_SECRET</InlineCode> in Step 4.
+        </p>
         <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
           Deploy, then copy your production URL (e.g.{" "}
           <InlineCode>https://your-silo-app.vercel.app</InlineCode>). It must
