@@ -1,3 +1,7 @@
+import { and, eq, inArray } from "@silo-storage/db";
+import { db } from "@silo-storage/db/client";
+import { fileKeys as fileKeysTable } from "@silo-storage/db/schema";
+
 import { env } from "@/env";
 import {
   authenticateRequest,
@@ -13,7 +17,25 @@ import {
   registerUploadBodySchema,
 } from "@/lib/upload/register";
 
+const UPLOAD_REGISTER_DIAG_VERSION = "2026-03-30.2";
+
+function getDbTargetLabel(): string | null {
+  const raw = env.POSTGRES_URL;
+  if (!raw) return null;
+  try {
+    const parsed = new URL(raw);
+    return `${parsed.hostname}${parsed.pathname}`;
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(request: Request) {
+  console.log("[upload-register] Diagnostic context", {
+    diagVersion: UPLOAD_REGISTER_DIAG_VERSION,
+    dbTarget: getDbTargetLabel(),
+  });
+
   const authResult = await authenticateRequest(request);
   if (authResult instanceof Response) return authResult;
   if (authResult.type !== "apiKey" || !authResult.rawApiKey) {
@@ -95,6 +117,30 @@ export async function POST(request: Request) {
         status: row.status,
       });
     }
+
+    const registeredIds = registered.map((item) => item.fileKeyId);
+    const visibleRows =
+      registeredIds.length > 0
+        ? await db.query.fileKeys.findMany({
+            where: and(
+              inArray(fileKeysTable.id, registeredIds),
+              eq(fileKeysTable.projectId, projectId),
+              eq(fileKeysTable.environmentId, environmentId),
+            ),
+            columns: {
+              id: true,
+            },
+          })
+        : [];
+    console.log("[upload-register] Persisted file key intents", {
+      projectId,
+      environmentId,
+      requestedCount: fileKeys.length,
+      registeredCount: registered.length,
+      visibleCount: visibleRows.length,
+      registeredIds,
+      visibleIds: visibleRows.map((row) => row.id),
+    });
 
     if (dev) {
       if (!env.DEV_UPLOAD_SSE_ENABLED) {

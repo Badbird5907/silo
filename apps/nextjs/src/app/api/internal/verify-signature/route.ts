@@ -44,6 +44,19 @@ const schema = z.object({
   }),
 });
 
+const VERIFY_SIGNATURE_DIAG_VERSION = "2026-03-30.4";
+
+function getDbTargetLabel(): string | null {
+  const raw = env.POSTGRES_URL;
+  if (!raw) return null;
+  try {
+    const parsed = new URL(raw);
+    return `${parsed.hostname}${parsed.pathname}`;
+  } catch {
+    return null;
+  }
+}
+
 async function createSignature(
   payload: Record<string, string>,
   secret: string,
@@ -125,6 +138,11 @@ async function findPendingFileKeyWithRetry(input: {
 }
 
 export async function POST(request: Request) {
+  console.log("[verify-signature] Diagnostic context", {
+    diagVersion: VERIFY_SIGNATURE_DIAG_VERSION,
+    dbTarget: getDbTargetLabel(),
+  });
+
   const header = request.headers.get("Authorization");
   if (!header?.startsWith("Bearer ")) {
     console.log(
@@ -450,7 +468,8 @@ export async function POST(request: Request) {
     });
 
     if (!fileKey) {
-      const [fileKeyById, fileKeyByAccess] = await Promise.all([
+      const [fileKeyById, fileKeyByAccess, fileKeyByIdAnyScope, fileKeyByAccessAnyScope] =
+        await Promise.all([
         db.query.fileKeys.findFirst({
           where: and(
             eq(fileKeys.id, payload.fileKeyId),
@@ -475,6 +494,30 @@ export async function POST(request: Request) {
             id: true,
             accessKey: true,
             status: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        }),
+        db.query.fileKeys.findFirst({
+          where: eq(fileKeys.id, payload.fileKeyId),
+          columns: {
+            id: true,
+            accessKey: true,
+            status: true,
+            projectId: true,
+            environmentId: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        }),
+        db.query.fileKeys.findFirst({
+          where: eq(fileKeys.accessKey, payload.accessKey),
+          columns: {
+            id: true,
+            accessKey: true,
+            status: true,
+            projectId: true,
+            environmentId: true,
             createdAt: true,
             updatedAt: true,
           },
@@ -506,6 +549,30 @@ export async function POST(request: Request) {
               fileKeyIdMatches: fileKeyByAccess.id === payload.fileKeyId,
               createdAt: fileKeyByAccess.createdAt,
               updatedAt: fileKeyByAccess.updatedAt,
+            }
+          : null,
+        fileKeyByIdAnyScope: fileKeyByIdAnyScope
+          ? {
+              id: fileKeyByIdAnyScope.id,
+              status: fileKeyByIdAnyScope.status,
+              projectId: fileKeyByIdAnyScope.projectId,
+              environmentId: fileKeyByIdAnyScope.environmentId,
+              accessKeyMatches:
+                fileKeyByIdAnyScope.accessKey === payload.accessKey,
+              createdAt: fileKeyByIdAnyScope.createdAt,
+              updatedAt: fileKeyByIdAnyScope.updatedAt,
+            }
+          : null,
+        fileKeyByAccessAnyScope: fileKeyByAccessAnyScope
+          ? {
+              id: fileKeyByAccessAnyScope.id,
+              status: fileKeyByAccessAnyScope.status,
+              projectId: fileKeyByAccessAnyScope.projectId,
+              environmentId: fileKeyByAccessAnyScope.environmentId,
+              fileKeyIdMatches:
+                fileKeyByAccessAnyScope.id === payload.fileKeyId,
+              createdAt: fileKeyByAccessAnyScope.createdAt,
+              updatedAt: fileKeyByAccessAnyScope.updatedAt,
             }
           : null,
       });
