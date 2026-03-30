@@ -1,6 +1,7 @@
 import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
+import { text, timestamp, boolean, index, pgTableCreator } from "drizzle-orm/pg-core";
 
+const pgTable = pgTableCreator((name) => `silo_${name}`);
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),

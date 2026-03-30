@@ -6,8 +6,8 @@ import {
   index,
   integer,
   jsonb,
-  pgEnum,
-  pgTable,
+  pgEnum as pgEnumCore,
+  pgTableCreator,
   text,
   timestamp,
   uniqueIndex,
@@ -15,6 +15,12 @@ import {
 import { nanoid } from "nanoid";
 
 import * as auth from "./auth";
+
+const pgTable = pgTableCreator((name) => `silo_${name}`);
+const pgEnum = <TValues extends [string, ...string[]]>(
+  name: string,
+  values: TValues,
+) => pgEnumCore(`silo_${name}`, values);
 
 export const fileAccessTypes = pgEnum("file_access_types", [
   "public",
@@ -104,7 +110,7 @@ export const projectEnvironments = pgTable("project_environments", {
   webhookEvents: webhookEventTypes("webhook_events")
     .array()
     .notNull()
-    .default(sql`'{}'::webhook_event_types[]`),
+    .default(sql`'{}'::silo_webhook_event_types[]`),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()

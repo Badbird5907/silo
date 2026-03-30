@@ -53,3 +53,4 @@ docker/*/data
 
 .wrangler/
 .env*.local
+.env*.production
