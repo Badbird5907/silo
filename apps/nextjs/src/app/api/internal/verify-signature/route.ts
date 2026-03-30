@@ -84,6 +84,46 @@ function timingSafeEqual(a: string, b: string): boolean {
   return result === 0;
 }
 
+async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function findPendingFileKeyWithRetry(input: {
+  fileKeyId: string;
+  projectId: string;
+  environmentId: string;
+  accessKey: string;
+}): Promise<{ id: string; status: string } | null> {
+  // In production we can occasionally see very short read-after-write gaps
+  // between upload registration and signature verification.
+  const delaysMs = [0, 100, 250] as const;
+
+  for (const delayMs of delaysMs) {
+    if (delayMs > 0) {
+      await sleep(delayMs);
+    }
+
+    const fileKey = await db.query.fileKeys.findFirst({
+      where: and(
+        eq(fileKeys.id, input.fileKeyId),
+        eq(fileKeys.projectId, input.projectId),
+        eq(fileKeys.environmentId, input.environmentId),
+        eq(fileKeys.accessKey, input.accessKey),
+      ),
+      columns: {
+        id: true,
+        status: true,
+      },
+    });
+
+    if (fileKey) {
+      return fileKey;
+    }
+  }
+
+  return null;
+}
+
 export async function POST(request: Request) {
   const header = request.headers.get("Authorization");
   if (!header?.startsWith("Bearer ")) {
@@ -323,17 +363,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const fileKey = await db.query.fileKeys.findFirst({
-      where: and(
-        eq(fileKeys.id, payload.fileKeyId),
-        eq(fileKeys.projectId, apiKey.projectId),
-        eq(fileKeys.environmentId, payload.environmentId),
-        eq(fileKeys.accessKey, payload.accessKey),
-      ),
-      columns: {
-        id: true,
-        status: true,
-      },
+    const fileKey = await findPendingFileKeyWithRetry({
+      fileKeyId: payload.fileKeyId,
+      projectId: apiKey.projectId,
+      environmentId: payload.environmentId,
+      accessKey: payload.accessKey,
     });
 
     if (!fileKey) {

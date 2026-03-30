@@ -74,14 +74,39 @@ async function trackUsageEvent(
 
     const organizationId = project.parentOrganizationId;
 
-    await db.insert(usageEvents).values({
-      organizationId,
-      projectId,
-      environmentId,
-      eventType,
-      bytes: bytes ?? null,
-      fileId: fileId ?? null,
-    });
+    const insertUsageEvent = async (resolvedFileId?: string) =>
+      db.insert(usageEvents).values({
+        organizationId,
+        projectId,
+        environmentId,
+        eventType,
+        bytes: bytes ?? null,
+        fileId: resolvedFileId ?? null,
+      });
+
+    try {
+      await insertUsageEvent(fileId);
+    } catch (insertError) {
+      const errorCode =
+        (insertError as { cause?: { code?: string } })?.cause?.code ??
+        (insertError as { code?: string })?.code;
+      const isFileFkViolation = errorCode === "23503";
+
+      if (!isFileFkViolation || !fileId) {
+        throw insertError;
+      }
+
+      console.warn(
+        "Usage event file_id FK violation, retrying without file_id",
+        {
+          projectId,
+          environmentId,
+          fileId,
+          eventType,
+        },
+      );
+      await insertUsageEvent(undefined);
+    }
 
     const today = new Date().toISOString().substring(0, 10);
 
