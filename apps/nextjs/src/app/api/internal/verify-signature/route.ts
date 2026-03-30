@@ -96,7 +96,7 @@ async function findPendingFileKeyWithRetry(input: {
 }): Promise<{ id: string; status: string } | null> {
   // In production we can occasionally see very short read-after-write gaps
   // between upload registration and signature verification.
-  const delaysMs = [0, 100, 250] as const;
+  const delaysMs = [0, 150, 500, 1200] as const;
 
   for (const delayMs of delaysMs) {
     if (delayMs > 0) {
@@ -450,11 +450,64 @@ export async function POST(request: Request) {
     });
 
     if (!fileKey) {
+      const [fileKeyById, fileKeyByAccess] = await Promise.all([
+        db.query.fileKeys.findFirst({
+          where: and(
+            eq(fileKeys.id, payload.fileKeyId),
+            eq(fileKeys.projectId, apiKey.projectId),
+            eq(fileKeys.environmentId, payload.environmentId),
+          ),
+          columns: {
+            id: true,
+            accessKey: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        }),
+        db.query.fileKeys.findFirst({
+          where: and(
+            eq(fileKeys.accessKey, payload.accessKey),
+            eq(fileKeys.projectId, apiKey.projectId),
+            eq(fileKeys.environmentId, payload.environmentId),
+          ),
+          columns: {
+            id: true,
+            accessKey: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        }),
+      ]);
+
       console.log("[verify-signature] File key not found", {
         fileKeyId: payload.fileKeyId,
         projectId: apiKey.projectId,
         environmentId: payload.environmentId,
         accessKey: payload.accessKey,
+      });
+      console.log("[verify-signature] File key lookup diagnostics", {
+        requestedFileKeyId: payload.fileKeyId,
+        requestedAccessKey: payload.accessKey,
+        fileKeyById: fileKeyById
+          ? {
+              id: fileKeyById.id,
+              status: fileKeyById.status,
+              accessKeyMatches: fileKeyById.accessKey === payload.accessKey,
+              createdAt: fileKeyById.createdAt,
+              updatedAt: fileKeyById.updatedAt,
+            }
+          : null,
+        fileKeyByAccess: fileKeyByAccess
+          ? {
+              id: fileKeyByAccess.id,
+              status: fileKeyByAccess.status,
+              fileKeyIdMatches: fileKeyByAccess.id === payload.fileKeyId,
+              createdAt: fileKeyByAccess.createdAt,
+              updatedAt: fileKeyByAccess.updatedAt,
+            }
+          : null,
       });
       return new Response(
         JSON.stringify({
