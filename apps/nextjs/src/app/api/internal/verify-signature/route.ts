@@ -44,19 +44,6 @@ const schema = z.object({
   }),
 });
 
-const VERIFY_SIGNATURE_DIAG_VERSION = "2026-03-30.4";
-
-function getDbTargetLabel(): string | null {
-  const raw = env.POSTGRES_URL;
-  if (!raw) return null;
-  try {
-    const parsed = new URL(raw);
-    return `${parsed.hostname}${parsed.pathname}`;
-  } catch {
-    return null;
-  }
-}
-
 async function createSignature(
   payload: Record<string, string>,
   secret: string,
@@ -138,11 +125,6 @@ async function findPendingFileKeyWithRetry(input: {
 }
 
 export async function POST(request: Request) {
-  console.log("[verify-signature] Diagnostic context", {
-    diagVersion: VERIFY_SIGNATURE_DIAG_VERSION,
-    dbTarget: getDbTargetLabel(),
-  });
-
   const header = request.headers.get("Authorization");
   if (!header?.startsWith("Bearer ")) {
     console.log(
@@ -216,14 +198,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const apiKeyCandidates = await db.query.apiKeys.findMany({
-      where: eq(apiKeys.keyPrefix, keyId),
+    const apiKey = await db.query.apiKeys.findFirst({
+      where: eq(apiKeys.id, keyId),
       with: {
         project: true,
       },
     });
 
-    if (apiKeyCandidates.length === 0) {
+    if (!apiKey) {
       console.log("[verify-signature] API key not found", {
         keyId,
       });
@@ -260,6 +242,23 @@ export async function POST(request: Request) {
       }
     }
 
+    if (apiKey.expiresAt && new Date(apiKey.expiresAt) < new Date()) {
+      console.log("[verify-signature] API key expired", {
+        keyId,
+        expiresAt: apiKey.expiresAt,
+      });
+      return new Response(
+        JSON.stringify({
+          error: "API key expired",
+          valid: false,
+        }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
     const payloadForSigning: Record<string, string> = {
       type: payload.type,
       environmentId: payload.environmentId,
@@ -286,62 +285,24 @@ export async function POST(request: Request) {
       ["sign"],
     );
 
-    const activeCandidates = apiKeyCandidates.filter(
-      (candidate) =>
-        !candidate.expiresAt || new Date(candidate.expiresAt) >= new Date(),
+    const derivedSecretBuffer = await crypto.subtle.sign(
+      "HMAC",
+      signingSecretData,
+      new TextEncoder().encode(apiKey.keyHash),
     );
 
-    if (activeCandidates.length > 1) {
-      console.warn("[verify-signature] API key prefix collision detected", {
-        keyId,
-        activeCandidateCount: activeCandidates.length,
-      });
-    }
+    const derivedSecret = Array.from(new Uint8Array(derivedSecretBuffer))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
 
-    if (activeCandidates.length === 0) {
-      console.log("[verify-signature] All API keys for prefix are expired", {
-        keyId,
-        candidateCount: apiKeyCandidates.length,
-      });
-      return new Response(
-        JSON.stringify({
-          error: "API key expired",
-          valid: false,
-        }),
-        {
-          status: 401,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
+    const expectedSignature = await createSignature(
+      payloadForSigning,
+      derivedSecret,
+    );
 
-    let apiKey: (typeof apiKeyCandidates)[number] | null = null;
-    for (const candidate of activeCandidates) {
-      const derivedSecretBuffer = await crypto.subtle.sign(
-        "HMAC",
-        signingSecretData,
-        new TextEncoder().encode(candidate.keyHash),
-      );
-
-      const derivedSecret = Array.from(new Uint8Array(derivedSecretBuffer))
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("");
-
-      const expectedSignature = await createSignature(
-        payloadForSigning,
-        derivedSecret,
-      );
-
-      if (timingSafeEqual(signature, expectedSignature)) {
-        apiKey = candidate;
-        break;
-      }
-    }
-
-    if (!apiKey) {
+    if (!timingSafeEqual(signature, expectedSignature)) {
       console.log("[verify-signature] Invalid signature", {
         keyId,
-        candidateCount: activeCandidates.length,
         providedSignature: signature.substring(0, 10) + "...",
       });
       return new Response(
@@ -468,8 +429,7 @@ export async function POST(request: Request) {
     });
 
     if (!fileKey) {
-      const [fileKeyById, fileKeyByAccess, fileKeyByIdAnyScope, fileKeyByAccessAnyScope] =
-        await Promise.all([
+      const [fileKeyById, fileKeyByAccess] = await Promise.all([
         db.query.fileKeys.findFirst({
           where: and(
             eq(fileKeys.id, payload.fileKeyId),
@@ -494,30 +454,6 @@ export async function POST(request: Request) {
             id: true,
             accessKey: true,
             status: true,
-            createdAt: true,
-            updatedAt: true,
-          },
-        }),
-        db.query.fileKeys.findFirst({
-          where: eq(fileKeys.id, payload.fileKeyId),
-          columns: {
-            id: true,
-            accessKey: true,
-            status: true,
-            projectId: true,
-            environmentId: true,
-            createdAt: true,
-            updatedAt: true,
-          },
-        }),
-        db.query.fileKeys.findFirst({
-          where: eq(fileKeys.accessKey, payload.accessKey),
-          columns: {
-            id: true,
-            accessKey: true,
-            status: true,
-            projectId: true,
-            environmentId: true,
             createdAt: true,
             updatedAt: true,
           },
@@ -549,30 +485,6 @@ export async function POST(request: Request) {
               fileKeyIdMatches: fileKeyByAccess.id === payload.fileKeyId,
               createdAt: fileKeyByAccess.createdAt,
               updatedAt: fileKeyByAccess.updatedAt,
-            }
-          : null,
-        fileKeyByIdAnyScope: fileKeyByIdAnyScope
-          ? {
-              id: fileKeyByIdAnyScope.id,
-              status: fileKeyByIdAnyScope.status,
-              projectId: fileKeyByIdAnyScope.projectId,
-              environmentId: fileKeyByIdAnyScope.environmentId,
-              accessKeyMatches:
-                fileKeyByIdAnyScope.accessKey === payload.accessKey,
-              createdAt: fileKeyByIdAnyScope.createdAt,
-              updatedAt: fileKeyByIdAnyScope.updatedAt,
-            }
-          : null,
-        fileKeyByAccessAnyScope: fileKeyByAccessAnyScope
-          ? {
-              id: fileKeyByAccessAnyScope.id,
-              status: fileKeyByAccessAnyScope.status,
-              projectId: fileKeyByAccessAnyScope.projectId,
-              environmentId: fileKeyByAccessAnyScope.environmentId,
-              fileKeyIdMatches:
-                fileKeyByAccessAnyScope.id === payload.fileKeyId,
-              createdAt: fileKeyByAccessAnyScope.createdAt,
-              updatedAt: fileKeyByAccessAnyScope.updatedAt,
             }
           : null,
       });

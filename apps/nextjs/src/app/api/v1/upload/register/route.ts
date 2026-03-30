@@ -1,7 +1,3 @@
-import { and, eq, inArray } from "@silo-storage/db";
-import { db } from "@silo-storage/db/client";
-import { fileKeys as fileKeysTable } from "@silo-storage/db/schema";
-
 import { env } from "@/env";
 import {
   authenticateRequest,
@@ -17,48 +13,7 @@ import {
   registerUploadBodySchema,
 } from "@/lib/upload/register";
 
-const UPLOAD_REGISTER_DIAG_VERSION = "2026-03-30.2";
-
-function getDbTargetLabel(): string | null {
-  const raw = env.POSTGRES_URL;
-  if (!raw) return null;
-  try {
-    const parsed = new URL(raw);
-    return `${parsed.hostname}${parsed.pathname}`;
-  } catch {
-    return null;
-  }
-}
-
-async function sleep(ms: number): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function readVisibleFileKeyIds(input: {
-  registeredIds: string[];
-  projectId: string;
-  environmentId: string;
-}): Promise<string[]> {
-  if (input.registeredIds.length === 0) return [];
-  const visibleRows = await db.query.fileKeys.findMany({
-    where: and(
-      inArray(fileKeysTable.id, input.registeredIds),
-      eq(fileKeysTable.projectId, input.projectId),
-      eq(fileKeysTable.environmentId, input.environmentId),
-    ),
-    columns: {
-      id: true,
-    },
-  });
-  return visibleRows.map((row) => row.id);
-}
-
 export async function POST(request: Request) {
-  console.log("[upload-register] Diagnostic context", {
-    diagVersion: UPLOAD_REGISTER_DIAG_VERSION,
-    dbTarget: getDbTargetLabel(),
-  });
-
   const authResult = await authenticateRequest(request);
   if (authResult instanceof Response) return authResult;
   if (authResult.type !== "apiKey" || !authResult.rawApiKey) {
@@ -141,41 +96,13 @@ export async function POST(request: Request) {
       });
     }
 
-    const registeredIds = registered.map((item) => item.fileKeyId);
-    const readBackDelaysMs = [0, 200, 600, 1500, 3000] as const;
-    let visibleIds: string[] = [];
-    for (const delayMs of readBackDelaysMs) {
-      if (delayMs > 0) await sleep(delayMs);
-      visibleIds = await readVisibleFileKeyIds({
-        registeredIds,
-        projectId,
-        environmentId,
-      });
-      if (visibleIds.length >= registeredIds.length) break;
-    }
-    console.log("[upload-register] Persisted file key intents", {
+    console.log("[upload-register] Registered file key intents", {
       projectId,
       environmentId,
       requestedCount: fileKeys.length,
       registeredCount: registered.length,
-      visibleCount: visibleIds.length,
-      registeredIds,
-      visibleIds,
+      fileKeyIds: registered.map((item) => item.fileKeyId),
     });
-
-    if (visibleIds.length < registeredIds.length) {
-      console.error("[upload-register] Registration visibility check failed", {
-        projectId,
-        environmentId,
-        registeredIds,
-        visibleIds,
-      });
-      return jsonError(
-        "Service Unavailable",
-        "Upload registration is temporarily unavailable. Please retry.",
-        503,
-      );
-    }
 
     if (dev) {
       if (!env.DEV_UPLOAD_SSE_ENABLED) {

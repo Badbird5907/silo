@@ -24,7 +24,7 @@ export interface SignedUploadUrlParams {
   hash?: string; // optional - if provided, worker validates against actual
   mimeType?: string; // optional - if provided, worker validates against actual
   expiresIn?: number; // seconds, optional - no expiry if omitted
-  keyId: string; // API key prefix (sk-silo-xxxx) to identify which key to look up
+  keyId: string; // Unique API key record id for server-side key lookup
   isPublic?: boolean; // optional - whether file should be publicly accessible
   protocol?: "http" | "https"; // optional - defaults to https
   acceptedMimeTypes?: string[]; // optional - shorthand keys or exact MIME values
@@ -439,7 +439,7 @@ export function generatePublicDownloadUrl(
  * Verify a signed upload URL and extract its parameters
  *
  * This is called by the Cloudflare Worker to validate incoming upload requests.
- * The worker must fetch the API key secret from the server using the keyId.
+ * The worker must fetch key metadata from the server using the unique keyId.
  */
 export async function verifySignedUploadUrl(
   url: string,

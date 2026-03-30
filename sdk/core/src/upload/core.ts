@@ -69,7 +69,6 @@ function requireAbsoluteCallbackUrl(value: string): string {
 export function createSiloCore(config: UploadCoreConfig) {
   const baseUrl = stripTrailingSlash(config.apiBaseUrl);
   const fetchImpl = config.fetch ?? fetch;
-  const resolvedKeyId = config.keyId ?? config.apiKey.slice(0, 11);
   const resolvedRouteMode = config.routeMode ?? "subdomain";
 
   async function parseApiResponse<T>(
@@ -217,7 +216,7 @@ export function createSiloCore(config: UploadCoreConfig) {
             mimeType: file.mimeType,
             acceptedMimeTypes: file.acceptedMimeTypes,
             isPublic: file.isPublic,
-            keyId: resolvedKeyId,
+            keyId: config.keyId,
             expiresIn,
             protocol,
           },
@@ -420,6 +419,7 @@ export function createSiloCoreFromToken(
   return createSiloCore({
     apiBaseUrl: input.url,
     apiKey: parsed.apiKey,
+    keyId: parsed.apiKeyId,
     environmentId: parsed.environmentId,
     ingestServer: parsed.ingestServer,
     signingSecret: parsed.signingSecret,

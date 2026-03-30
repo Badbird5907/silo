@@ -175,7 +175,7 @@ export async function POST(request: Request) {
         size,
         mimeType,
         isPublic: resolvedIsPublic,
-        keyId: apiKey.keyPrefix,
+        keyId: apiKey.id,
         expiresIn: 3600,
         protocol,
       },

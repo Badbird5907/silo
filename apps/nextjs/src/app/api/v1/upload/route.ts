@@ -42,6 +42,14 @@ export async function POST(request: Request) {
   }
 
   const apiKey = authResult.rawApiKey;
+  const apiKeyId = authResult.apiKeyId;
+  if (!apiKeyId) {
+    return jsonError(
+      "Unauthorized",
+      "API key id is required for upload signing.",
+      401,
+    );
+  }
 
   let body: unknown;
   try {
@@ -97,7 +105,6 @@ export async function POST(request: Request) {
     const fileKeyId = nanoid(16);
     const resolvedIsPublic = isPublic ?? project.defaultFileAccess === "public";
 
-    const keyId = apiKey.substring(0, 11);
     const protocol = env.NODE_ENV === "development" ? "http" : "https";
 
     const uploadUrl = await generateSignedUploadUrl(
@@ -112,7 +119,7 @@ export async function POST(request: Request) {
         hash,
         mimeType,
         isPublic: resolvedIsPublic,
-        keyId,
+        keyId: apiKeyId,
         expiresIn: 3600,
         protocol,
       },

@@ -19,6 +19,7 @@ import { organizationProcedure, requirePermission } from "../trpc";
 function encodeSiloToken(payload: {
   v: number;
   ak: string;
+  kid: string;
   eid: string;
   is: string;
   ss: string;
@@ -211,6 +212,7 @@ export const apiKeyRouter = {
       const siloToken = encodeSiloToken({
         v: 1,
         ak: fullKey,
+        kid: newKey.id,
         eid: input.environmentId,
         is: ingestServer,
         ss: signingSecret,

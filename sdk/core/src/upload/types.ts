@@ -3,12 +3,12 @@ import type { FileExpiryInput } from "./expiry";
 export interface UploadCoreConfig {
   apiBaseUrl: string;
   apiKey: string;
+  keyId: string;
   environmentId: string;
   ingestServer: string;
   signingSecret: string;
   routeMode?: "subdomain" | "path";
   projectSlug?: string;
-  keyId?: string;
   callbackUrl?: string;
   fetch?: typeof fetch;
 }

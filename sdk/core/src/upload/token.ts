@@ -4,6 +4,7 @@ const siloTokenSchema = z
   .object({
     v: z.number().int().positive(),
     ak: z.string().min(1),
+    kid: z.string().min(1),
     eid: z.string().min(1),
     is: z.string().min(1),
     ss: z.string().min(1),
@@ -15,6 +16,7 @@ const siloTokenSchema = z
 export interface ParsedSiloToken {
   version: number;
   apiKey: string;
+  apiKeyId: string;
   environmentId: string;
   ingestServer: string;
   signingSecret: string;
@@ -57,6 +59,7 @@ function decodeBase64UrlUtf8(input: string): string {
 export function encodeSiloToken(payload: {
   v: number;
   ak: string;
+  kid: string;
   eid: string;
   is: string;
   ss: string;
@@ -109,6 +112,7 @@ export function parseSiloToken(token: string): ParsedSiloToken {
   return {
     version: parsed.data.v,
     apiKey: parsed.data.ak,
+    apiKeyId: parsed.data.kid,
     environmentId: parsed.data.eid,
     ingestServer: parsed.data.is,
     signingSecret: parsed.data.ss,
