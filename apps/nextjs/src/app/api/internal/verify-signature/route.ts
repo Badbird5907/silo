@@ -198,37 +198,20 @@ export async function POST(request: Request) {
       );
     }
 
-    const apiKey = await db.query.apiKeys.findFirst({
+    const apiKeyCandidates = await db.query.apiKeys.findMany({
       where: eq(apiKeys.keyPrefix, keyId),
       with: {
         project: true,
       },
     });
 
-    if (!apiKey) {
+    if (apiKeyCandidates.length === 0) {
       console.log("[verify-signature] API key not found", {
         keyId,
       });
       return new Response(
         JSON.stringify({
           error: "Invalid API key",
-          valid: false,
-        }),
-        {
-          status: 401,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    if (apiKey.expiresAt && new Date(apiKey.expiresAt) < new Date()) {
-      console.log("[verify-signature] API key expired", {
-        keyId,
-        expiresAt: apiKey.expiresAt,
-      });
-      return new Response(
-        JSON.stringify({
-          error: "API key expired",
           valid: false,
         }),
         {
@@ -257,6 +240,102 @@ export async function POST(request: Request) {
           },
         );
       }
+    }
+
+    const payloadForSigning: Record<string, string> = {
+      type: payload.type,
+      environmentId: payload.environmentId,
+      fileKeyId: payload.fileKeyId,
+      accessKey: payload.accessKey,
+      fileName: payload.fileName,
+      size: payload.size,
+      keyId: payload.keyId,
+    };
+    if (payload.hash) payloadForSigning.hash = payload.hash;
+    if (payload.mimeType) payloadForSigning.mimeType = payload.mimeType;
+    if (acceptedMimeTypes) {
+      payloadForSigning.acceptedMimeTypes =
+        serializeAcceptedMimeTypePatterns(acceptedMimeTypes) ?? "";
+    }
+    if (payload.expiresAt) payloadForSigning.expiresAt = payload.expiresAt;
+    if (payload.isPublic) payloadForSigning.isPublic = payload.isPublic;
+
+    const signingSecretData = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(env.SIGNING_SECRET),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"],
+    );
+
+    const activeCandidates = apiKeyCandidates.filter(
+      (candidate) =>
+        !candidate.expiresAt || new Date(candidate.expiresAt) >= new Date(),
+    );
+
+    if (activeCandidates.length > 1) {
+      console.warn("[verify-signature] API key prefix collision detected", {
+        keyId,
+        activeCandidateCount: activeCandidates.length,
+      });
+    }
+
+    if (activeCandidates.length === 0) {
+      console.log("[verify-signature] All API keys for prefix are expired", {
+        keyId,
+        candidateCount: apiKeyCandidates.length,
+      });
+      return new Response(
+        JSON.stringify({
+          error: "API key expired",
+          valid: false,
+        }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    let apiKey: (typeof apiKeyCandidates)[number] | null = null;
+    for (const candidate of activeCandidates) {
+      const derivedSecretBuffer = await crypto.subtle.sign(
+        "HMAC",
+        signingSecretData,
+        new TextEncoder().encode(candidate.keyHash),
+      );
+
+      const derivedSecret = Array.from(new Uint8Array(derivedSecretBuffer))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+
+      const expectedSignature = await createSignature(
+        payloadForSigning,
+        derivedSecret,
+      );
+
+      if (timingSafeEqual(signature, expectedSignature)) {
+        apiKey = candidate;
+        break;
+      }
+    }
+
+    if (!apiKey) {
+      console.log("[verify-signature] Invalid signature", {
+        keyId,
+        candidateCount: activeCandidates.length,
+        providedSignature: signature.substring(0, 10) + "...",
+      });
+      return new Response(
+        JSON.stringify({
+          error: "Invalid signature",
+          valid: false,
+        }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }
 
     const environment = await db.query.projectEnvironments.findFirst({
@@ -404,79 +483,6 @@ export async function POST(request: Request) {
         }),
         {
           status: 409,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    // The API key is stored as a hash, but we need the original key to verify the signature.
-    // Since we can't reverse the hash, we need to store the key differently.
-    // For now, we'll use a workaround: the signing secret is derived from the key hash + a salt.
-    // This way, anyone with the original API key can generate the same signing secret.
-    //
-    // signingSecret = HMAC(SIGNING_SECRET, keyHash)
-    //
-    // The client SDK knows the full API key, so it can compute:
-    // 1. keyHash = SHA256(apiKey)
-    // 2. signingSecret = HMAC(SIGNING_SECRET, keyHash)
-    // 3. signature = HMAC(signingSecret, payload)
-    //
-    // We can do the same here since we have keyHash stored.
-
-    const signingSecretData = await crypto.subtle.importKey(
-      "raw",
-      new TextEncoder().encode(env.SIGNING_SECRET),
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["sign"],
-    );
-
-    const derivedSecretBuffer = await crypto.subtle.sign(
-      "HMAC",
-      signingSecretData,
-      new TextEncoder().encode(apiKey.keyHash),
-    );
-
-    const derivedSecret = Array.from(new Uint8Array(derivedSecretBuffer))
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
-
-    const payloadForSigning: Record<string, string> = {
-      type: payload.type,
-      environmentId: payload.environmentId,
-      fileKeyId: payload.fileKeyId,
-      accessKey: payload.accessKey,
-      fileName: payload.fileName,
-      size: payload.size,
-      keyId: payload.keyId,
-    };
-    if (payload.hash) payloadForSigning.hash = payload.hash;
-    if (payload.mimeType) payloadForSigning.mimeType = payload.mimeType;
-    if (acceptedMimeTypes) {
-      payloadForSigning.acceptedMimeTypes =
-        serializeAcceptedMimeTypePatterns(acceptedMimeTypes) ?? "";
-    }
-    if (payload.expiresAt) payloadForSigning.expiresAt = payload.expiresAt;
-    if (payload.isPublic) payloadForSigning.isPublic = payload.isPublic;
-
-    const expectedSignature = await createSignature(
-      payloadForSigning,
-      derivedSecret,
-    );
-
-    if (!timingSafeEqual(signature, expectedSignature)) {
-      console.log("[verify-signature] Invalid signature", {
-        keyId,
-        providedSignature: signature.substring(0, 10) + "...",
-        expectedSignature: expectedSignature.substring(0, 10) + "...",
-      });
-      return new Response(
-        JSON.stringify({
-          error: "Invalid signature",
-          valid: false,
-        }),
-        {
-          status: 401,
           headers: { "Content-Type": "application/json" },
         },
       );
