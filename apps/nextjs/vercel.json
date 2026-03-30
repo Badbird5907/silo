@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "turbo run build && pnpm run db:migrate",
   "functions": {
     "src/app/api/internal/webhooks/dispatch/route.ts": {
       "maxDuration": 60,
