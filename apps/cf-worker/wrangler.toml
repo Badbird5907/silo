@@ -40,6 +40,9 @@ max_batch_size = 10
 max_batch_timeout = 5
 max_retries = 1
 
+[triggers]
+crons = ["*/5 * * * *"]
+
 [vars]
 WORKER_DOMAIN = "cdn.evanyu.dev"
 NEXTJS_CALLBACK_URL = "http://localhost:3000"
@@ -54,9 +57,6 @@ PENDING_UPLOAD_CLEANUP_MAX_BATCHES = "10"
 LIFECYCLE_JOB_BATCH_SIZE = "100"
 LIFECYCLE_JOB_MAX_BATCHES = "10"
 LIFECYCLE_JOB_LEASE_SECONDS = "60"
-
-[triggers]
-crons = ["*/5 * * * *"]
 
 # Development environment
 [env.development]
