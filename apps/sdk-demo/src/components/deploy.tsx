@@ -272,6 +272,10 @@ wrangler deploy --env production`}
           ) in the Cloudflare dashboard under Workers &rarr; your worker &rarr;
           Custom Domains.
         </p>
+        <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
+          Note: Make sure your domain's SSL/TLS mode is set to Full (strict). Otherwise the Worker may
+          run into issues contacting the next app.
+        </p>
       </>
     ),
   },

@@ -109,12 +109,14 @@ export async function POST(request: Request) {
       headers: { "Content-Type": "application/json" },
     });
   }
+  console.log("[verify-signature] CALLBACK_SECRET token is valid")
 
   try {
     const body: unknown = await request.json();
     const parsed = schema.safeParse(body);
 
     if (!parsed.success) {
+      console.log("[verify-signature] Invalid request")
       return new Response(
         JSON.stringify({
           error: "Invalid request",
@@ -138,6 +140,9 @@ export async function POST(request: Request) {
         normalizeFileRouterInputKey(value),
       );
     } catch (error) {
+      console.log("[verify-signature] Invalid acceptedMimeTypes", {
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
       return new Response(
         JSON.stringify({
           error:
@@ -219,6 +224,9 @@ export async function POST(request: Request) {
     });
 
     if (!environment) {
+      console.log("[verify-signature] Environment not found", {
+        environmentId: payload.environmentId,
+      });
       return new Response(
         JSON.stringify({
           error: "Environment not found",
@@ -232,6 +240,11 @@ export async function POST(request: Request) {
     }
 
     if (environment.projectId !== apiKey.projectId) {
+      console.log("[verify-signature] Environment does not belong to the API key's project", {
+        environmentId: payload.environmentId,
+        projectId: apiKey.projectId,
+        environmentProjectId: environment.projectId,
+      });
       return new Response(
         JSON.stringify({
           error: "Environment does not belong to the API key's project",
@@ -245,6 +258,9 @@ export async function POST(request: Request) {
     }
 
     if (!apiKey.environmentId) {
+      console.log("[verify-signature] API key must be scoped to an environment", {
+        apiKeyId: apiKey.id,
+      });
       return new Response(
         JSON.stringify({
           error: "API key must be scoped to an environment",
@@ -258,6 +274,11 @@ export async function POST(request: Request) {
     }
 
     if (apiKey.environmentId !== payload.environmentId) {
+      console.log("[verify-signature] API key is not authorized for this environment", {
+        apiKeyId: apiKey.id,
+        environmentId: payload.environmentId,
+        apiKeyEnvironmentId: apiKey.environmentId,
+      });
       return new Response(
         JSON.stringify({
           error: "API key is not authorized for this environment",
@@ -271,6 +292,9 @@ export async function POST(request: Request) {
     }
 
     if (apiKey.project.lifecycleState === "deleting") {
+      console.log("[verify-signature] Project is currently deleting", {
+        projectId: apiKey.projectId,
+      });
       return new Response(
         JSON.stringify({
           error: "Project is currently deleting",
@@ -284,6 +308,9 @@ export async function POST(request: Request) {
     }
 
     if (environment.lifecycleState === "deleting") {
+      console.log("[verify-signature] Environment is currently deleting", {
+        environmentId: payload.environmentId,
+      });
       return new Response(
         JSON.stringify({
           error: "Environment is currently deleting",
@@ -310,6 +337,12 @@ export async function POST(request: Request) {
     });
 
     if (!fileKey) {
+      console.log("[verify-signature] File key not found", {
+        fileKeyId: payload.fileKeyId,
+        projectId: apiKey.projectId,
+        environmentId: payload.environmentId,
+        accessKey: payload.accessKey,
+      });
       return new Response(
         JSON.stringify({
           error: "File key not found",
@@ -323,6 +356,13 @@ export async function POST(request: Request) {
     }
 
     if (fileKey.status !== "pending") {
+      console.log("[verify-signature] File key is not pending", {
+        fileKeyId: payload.fileKeyId,
+        projectId: apiKey.projectId,
+        environmentId: payload.environmentId,
+        accessKey: payload.accessKey,
+        status: fileKey.status,
+      });
       return new Response(
         JSON.stringify({
           error: "File key is not pending",
@@ -410,6 +450,10 @@ export async function POST(request: Request) {
 
     const parsedSize = Number(payload.size);
     if (!Number.isSafeInteger(parsedSize) || parsedSize < 0) {
+      console.log("[verify-signature] Invalid size", {
+        size: payload.size,
+        parsedSize,
+      });
       return new Response(
         JSON.stringify({
           error: "Invalid size",
@@ -426,6 +470,13 @@ export async function POST(request: Request) {
       .update(apiKeys)
       .set({ lastUsedAt: new Date() })
       .where(eq(apiKeys.id, apiKey.id));
+
+    console.log("[verify-signature] Signature is valid", {
+      projectId: apiKey.projectId,
+      environmentId: payload.environmentId,
+      fileKeyId: payload.fileKeyId,
+      accessKey: payload.accessKey,
+    });
 
     return new Response(
       JSON.stringify({

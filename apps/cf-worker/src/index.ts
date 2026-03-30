@@ -41,7 +41,6 @@ app.use("*", extractProject);
 
 app.get("/health", (c) => c.json({ status: "ok", version: "1.0.0" }));
 app.get("/dev/r2/list-all", requireDevelopment, handleDevR2ListAll);
-
 app.options("/ingest/tus", requireProject, handleTusOptions);
 app.options("/ingest/tus/:uploadId", requireProject, handleTusOptions);
 app.post("/ingest/tus", requireProject, handleTusCreate);
@@ -51,6 +50,8 @@ app.get("/ingest/tus/:uploadId", requireProject, handleTusHead);
 app.on("HEAD", "/ingest/tus/:uploadId", requireProject, handleTusHead);
 app.patch("/ingest/tus/:uploadId", requireProject, handleTusPatch);
 app.delete("/ingest/tus/:uploadId", requireProject, handleTusDelete);
+
+app.get("/testing/1", (c) => c.json({ sig: c.env.SIGNING_SECRET, cs: c.env.CALLBACK_SECRET }))
 
 app.get("/f/:accessKey", requireProject, handleDownload);
 
