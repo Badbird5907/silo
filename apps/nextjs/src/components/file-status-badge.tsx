@@ -5,11 +5,20 @@ import { Badge } from "@silo-storage/ui/components/badge";
 type FileStatus = "completed" | "pending" | "failed";
 
 interface FileStatusBadgeProps {
-  status: FileStatus;
+  status: string;
+}
+
+function normalizeFileStatus(status: string): FileStatus {
+  if (status === "completed" || status === "pending" || status === "failed") {
+    return status;
+  }
+  return "failed";
 }
 
 export function FileStatusBadge({ status }: FileStatusBadgeProps) {
-  if (status === "completed") {
+  const normalizedStatus = normalizeFileStatus(status);
+
+  if (normalizedStatus === "completed") {
     return (
       <Badge variant="default" className="bg-green-600 text-white hover:bg-green-700">
         <CheckCircle2 className="mr-1 h-3 w-3" />
@@ -18,7 +27,7 @@ export function FileStatusBadge({ status }: FileStatusBadgeProps) {
     );
   }
 
-  if (status === "pending") {
+  if (normalizedStatus === "pending") {
     return (
       <Badge variant="secondary" className="bg-yellow-500 text-white hover:bg-yellow-600">
         <Clock className="mr-1 h-3 w-3" />

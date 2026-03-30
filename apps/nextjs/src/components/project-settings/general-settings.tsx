@@ -30,10 +30,14 @@ interface ProjectGeneralSettingsProps {
     id: string;
     name: string;
     slug: string;
-    defaultFileAccess: "public" | "private";
+    defaultFileAccess: string;
     pendingUploadFailAfterMinutes: number;
   };
   organizationId: string;
+}
+
+function parseDefaultFileAccess(value: string): "public" | "private" {
+  return value === "public" ? "public" : "private";
 }
 
 export function ProjectGeneralSettings({
@@ -42,8 +46,12 @@ export function ProjectGeneralSettings({
 }: ProjectGeneralSettingsProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const initialDefaultFileAccess = React.useMemo(
+    () => parseDefaultFileAccess(project.defaultFileAccess),
+    [project.defaultFileAccess],
+  );
   const [defaultFileAccess, setDefaultFileAccess] = React.useState(
-    project.defaultFileAccess,
+    initialDefaultFileAccess,
   );
   const [pendingUploadFailAfterMinutes, setPendingUploadFailAfterMinutes] =
     React.useState(project.pendingUploadFailAfterMinutes);
@@ -67,7 +75,7 @@ export function ProjectGeneralSettings({
 
   const handleSave = () => {
     if (
-      defaultFileAccess !== project.defaultFileAccess ||
+      defaultFileAccess !== initialDefaultFileAccess ||
       pendingUploadFailAfterMinutes !== project.pendingUploadFailAfterMinutes
     ) {
       updateMutation.mutate({
@@ -86,7 +94,7 @@ export function ProjectGeneralSettings({
   };
 
   const hasChanges =
-    defaultFileAccess !== project.defaultFileAccess ||
+    defaultFileAccess !== initialDefaultFileAccess ||
     pendingUploadFailAfterMinutes !== project.pendingUploadFailAfterMinutes;
 
   return (

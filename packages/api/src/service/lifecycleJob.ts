@@ -63,6 +63,16 @@ interface RequeueDeadOptions {
   kinds?: LifecycleJobKind[];
 }
 
+type LifecycleJobExecutionResult =
+  | { ok: true }
+  | {
+      ok: false;
+      retryable: boolean;
+      errorCode: string;
+      message: string;
+      httpStatus?: number;
+    };
+
 function resolveIdempotencyKey(input: EnqueueLifecycleJobInput): string {
   if (input.idempotencyKey) return input.idempotencyKey;
 
@@ -352,7 +362,9 @@ async function markJobFailed(
   const nextAttemptCount = job.attemptCount + 1;
   const shouldRetry = failure.retryable;
   const reachedMaxAttempts = nextAttemptCount >= job.maxAttempts;
-  const cleanupKindRetriesForever = ALWAYS_RETRY_CLEANUP_KINDS.has(job.kind);
+  const cleanupKindRetriesForever = ALWAYS_RETRY_CLEANUP_KINDS.has(
+    job.kind as LifecycleJobKind,
+  );
   const willRetry =
     shouldRetry && (cleanupKindRetriesForever || !reachedMaxAttempts);
   const nextAttemptAt = willRetry
@@ -592,7 +604,7 @@ async function performRepairMissingObject(
 async function executeLifecycleJob(
   db: Db,
   job: typeof fileLifecycleJobs.$inferSelect,
-) {
+): Promise<LifecycleJobExecutionResult> {
   try {
     switch (job.kind) {
       case "delete_object":
@@ -603,10 +615,17 @@ async function executeLifecycleJob(
         return await performFinalizeFailedFileKey(db, job);
       case "repair_missing_object":
         return await performRepairMissingObject(db, job);
+      default:
+        return {
+          ok: false,
+          retryable: false,
+          errorCode: "unknown_job_kind",
+          message: `Unknown lifecycle job kind: ${job.kind}`,
+        };
     }
   } catch (error) {
     return {
-      ok: false as const,
+      ok: false,
       retryable: true,
       errorCode: "job_exception",
       message: error instanceof Error ? error.message : "Unknown job exception",

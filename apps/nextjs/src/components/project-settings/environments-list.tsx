@@ -59,6 +59,24 @@ interface EnvironmentsListProps {
   organizationId: string;
 }
 
+type EnvironmentType = "development" | "staging" | "production";
+type WebhookEvent = "upload.completed" | "upload.failed";
+
+function parseEnvironmentType(value: string): EnvironmentType {
+  if (value === "development" || value === "staging" || value === "production") {
+    return value;
+  }
+  return "development";
+}
+
+function parseWebhookEvents(values: string[]): WebhookEvent[] {
+  const parsed = values.filter(
+    (value): value is WebhookEvent =>
+      value === "upload.completed" || value === "upload.failed",
+  );
+  return parsed.length > 0 ? parsed : ["upload.completed", "upload.failed"];
+}
+
 function getTypeBadgeVariant(
   type: string,
 ): "default" | "secondary" | "outline" {
@@ -84,18 +102,18 @@ export function EnvironmentsList({
   const [editTarget, setEditTarget] = React.useState<{
     id: string;
     name: string;
-    type: "development" | "staging" | "production";
+    type: EnvironmentType;
   } | null>(null);
   const [editName, setEditName] = React.useState("");
   const [editType, setEditType] = React.useState<
-    "development" | "staging" | "production"
+    EnvironmentType
   >("development");
   const [webhookTarget, setWebhookTarget] = React.useState<{
     id: string;
     name: string;
     webhookEnabled: boolean;
     webhookUrl: string | null;
-    webhookEvents: ("upload.completed" | "upload.failed")[];
+    webhookEvents: WebhookEvent[];
     webhookSecretSet: boolean;
   } | null>(null);
 
@@ -140,7 +158,7 @@ export function EnvironmentsList({
   const handleEdit = (env: {
     id: string;
     name: string;
-    type: "development" | "staging" | "production";
+    type: EnvironmentType;
   }) => {
     setEditTarget(env);
     setEditName(env.name);
@@ -276,7 +294,7 @@ export function EnvironmentsList({
                               handleEdit({
                                 id: env.id,
                                 name: env.name,
-                                type: env.type,
+                                type: parseEnvironmentType(env.type),
                               })
                             }
                           >
@@ -290,10 +308,9 @@ export function EnvironmentsList({
                                 name: env.name,
                                 webhookEnabled: env.webhookEnabled,
                                 webhookUrl: env.webhookUrl,
-                                webhookEvents:
-                                  env.webhookEvents.length > 0
-                                    ? env.webhookEvents
-                                    : ["upload.completed", "upload.failed"],
+                                webhookEvents: parseWebhookEvents(
+                                  env.webhookEvents,
+                                ),
                                 webhookSecretSet: env.webhookSecretSet,
                               })
                             }

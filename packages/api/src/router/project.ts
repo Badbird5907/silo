@@ -2,8 +2,6 @@ import type { TRPCRouterRecord } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod/v4";
 
-import { fileAccessTypes } from "@silo-storage/db/schema";
-
 import {
   checkProjectSlugAvailability,
   createProject,
@@ -100,7 +98,7 @@ export const projectRouter = {
       z.object({
         id: z.string(),
         name: z.string().min(1).max(100).optional(),
-        defaultFileAccess: z.enum(fileAccessTypes.enumValues).optional(),
+        defaultFileAccess: z.enum(["public", "private"]).optional(),
         pendingUploadFailAfterMinutes: z
           .number()
           .int()
@@ -146,7 +144,7 @@ export const projectRouter = {
           message: "Project not found",
         });
       }
-      if (project.parentOrganizationId !== input.organizationId) {
+      if (project.parentOrganizationId !== ctx.organizationId) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "You don't have access to this project",

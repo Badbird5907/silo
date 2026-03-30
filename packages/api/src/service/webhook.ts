@@ -21,6 +21,19 @@ interface WebhookEnvironmentConfig {
   webhookSecret: string | null;
   webhookEvents: string[];
 }
+
+function parseEnvironmentType(
+  value: unknown,
+): WebhookEnvironmentConfig["type"] | null {
+  if (
+    value === "development" ||
+    value === "staging" ||
+    value === "production"
+  ) {
+    return value;
+  }
+  return null;
+}
 export const queuedWebhookMessageSchema = z.object({
   idempotencyKey: z.string(),
   environmentId: z.string(),
@@ -137,8 +150,15 @@ export async function enqueueUploadWebhookEvent(
     return { enqueued: false as const, reason: "environment_not_found" as const };
   }
 
+  const parsedType = parseEnvironmentType(env.type);
+  if (!parsedType) {
+    console.log("invalid environment type", env.type);
+    return { enqueued: false as const, reason: "not_configured" as const };
+  }
+
   const normalizedEnvironment: WebhookEnvironmentConfig = {
     ...env,
+    type: parsedType,
     webhookEvents: Array.isArray(env.webhookEvents)
       ? (env.webhookEvents as string[])
       : [],
@@ -202,9 +222,13 @@ export async function getWebhookTargetForEvent(
 
   if (!environment) return null;
 
+  const parsedType = parseEnvironmentType(environment.type);
+  if (!parsedType) return null;
+
   const normalizedEnvironment: WebhookEnvironmentConfig = {
     ...environment,
     id: input.environmentId,
+    type: parsedType,
     webhookEvents: Array.isArray(environment.webhookEvents)
       ? (environment.webhookEvents as string[])
       : [],
