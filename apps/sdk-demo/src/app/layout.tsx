@@ -10,7 +10,6 @@ import { SiloRouterConfigProvider } from "@/lib/upload";
 import { fileRouter } from "@/upload";
 import { extractRouterConfig } from "@silo-storage/sdk-server";
 
-// @ts-expect-error - no idea why
 import "./globals.css";
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 

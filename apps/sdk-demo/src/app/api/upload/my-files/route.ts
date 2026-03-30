@@ -1,13 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 
-import { createSiloCoreFromToken } from "@silo-storage/sdk-core";
-
-import { env } from "@/env";
-
-const core = createSiloCoreFromToken({
-  url: env.SILO_URL,
-  token: env.SILO_TOKEN,
-});
+import { getSiloCore } from "@/lib/silo";
 
 export async function GET(request: Request) {
   const { userId } = await auth();
@@ -30,7 +23,7 @@ export async function GET(request: Request) {
   );
 
   try {
-    const result = await core.listFiles({
+    const result = await getSiloCore().listFiles({
       page,
       pageSize,
       status: "all",
