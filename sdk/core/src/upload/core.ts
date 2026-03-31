@@ -13,6 +13,7 @@ import type {
   RegisterUploadBatchInput,
   RegisterUploadBatchResult,
   SiloFileDetail,
+  UploadStrategy,
   UploadCoreConfig,
 } from "./types";
 import {
@@ -29,6 +30,7 @@ import {
   fileDetailSchema,
   listFilesResultSchema,
   parseRegisterResponseBody,
+  parseUploadResponseBody,
 } from "./schemas";
 import { parseSiloToken } from "./token";
 
@@ -129,6 +131,103 @@ export function createSiloCore(config: UploadCoreConfig) {
 
     const protocol = resolveProtocol(baseUrl, input.protocol);
     const expiresIn = input.expiresIn ?? 3600;
+    const resolvedUploadStrategy: UploadStrategy =
+      input.uploadStrategy ?? config.uploadStrategy ?? "server";
+    const effectiveUploadStrategy: UploadStrategy =
+      resolvedUploadStrategy === "server" && input.dev === true
+        ? "self"
+        : resolvedUploadStrategy;
+
+    const callbackUrlInput = input.callbackUrl ?? config.callbackUrl;
+    let callbackUrl: string | undefined;
+    if (!input.dev) {
+      if (!callbackUrlInput) {
+        throw new Error(
+          "Missing callbackUrl for production upload registration. Provide callbackUrl in createSiloCore config or per request.",
+        );
+      }
+      callbackUrl = requireAbsoluteCallbackUrl(callbackUrlInput);
+    }
+
+    if (effectiveUploadStrategy === "server") {
+      const preparedFiles: PreparedUploadFile[] = [];
+      for (const file of input.files) {
+        const response = await fetchImpl(`${baseUrl}/api/v1/upload`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${config.apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            environmentId: config.environmentId,
+            fileKeyId: file.fileKeyId,
+            accessKey: file.accessKey ?? createDefaultAccessKey(),
+            fileName: file.fileName,
+            size: file.size,
+            hash: file.hash,
+            mimeType: file.mimeType,
+            acceptedMimeTypes: file.acceptedMimeTypes,
+            isPublic: file.isPublic,
+            metadata: file.metadata,
+            callbackUrl,
+            callbackMetadata: input.callbackMetadata ?? {},
+            dev: input.dev === true,
+          }),
+        });
+
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(
+            `Upload request failed (${response.status}): ${text || response.statusText}`,
+          );
+        }
+
+        const parsed = parseUploadResponseBody(await response.json());
+        preparedFiles.push({
+          fileKeyId: parsed.fileKeyId,
+          accessKey: parsed.accessKey,
+          uploadUrl: parsed.uploadUrl,
+          fileName: file.fileName,
+          size: file.size,
+          hash: file.hash,
+          mimeType: file.mimeType,
+          acceptedMimeTypes: file.acceptedMimeTypes,
+          isPublic: file.isPublic,
+          metadata: file.metadata,
+          expiresAt: parsed.expiresAt,
+        });
+      }
+
+      const registerResponse = {
+        success: true as const,
+        fileKeys: preparedFiles.map((file) => ({
+          fileKeyId: file.fileKeyId,
+          accessKey: file.accessKey,
+          status: "pending",
+        })),
+      };
+
+      const byFileKeyId = new Map(
+        registerResponse.fileKeys.map((item) => [item.fileKeyId, item]),
+      );
+
+      return {
+        mode: "production",
+        registerResponse,
+        files: preparedFiles.map((file) => ({
+          ...file,
+          registration: byFileKeyId.get(file.fileKeyId) ?? null,
+        })),
+      };
+    }
+
+    if (!config.signingSecret || !config.keyId) {
+      throw new Error(
+        "Self upload strategy requires keyId and signingSecret. Provide these in createSiloCore config or switch to uploadStrategy: \"server\".",
+      );
+    }
+    const selfSigningSecret = config.signingSecret;
+    const selfKeyId = config.keyId;
 
     const preparedFilesWithoutUrl: (Omit<PreparedUploadFile, "uploadUrl"> & {
       uploadUrl?: string;
@@ -169,13 +268,6 @@ export function createSiloCore(config: UploadCoreConfig) {
     applyFileExpiryToRegisterBody(registerBody, input.fileExpiry);
 
     if (!input.dev) {
-      const callbackUrlInput = input.callbackUrl ?? config.callbackUrl;
-      if (!callbackUrlInput) {
-        throw new Error(
-          "Missing callbackUrl for production upload registration. Provide callbackUrl in createSiloCore config or per request.",
-        );
-      }
-      const callbackUrl = requireAbsoluteCallbackUrl(callbackUrlInput);
       registerBody.callbackUrl = callbackUrl;
       registerBody.callbackMetadata = input.callbackMetadata ?? {};
     }
@@ -216,11 +308,11 @@ export function createSiloCore(config: UploadCoreConfig) {
             mimeType: file.mimeType,
             acceptedMimeTypes: file.acceptedMimeTypes,
             isPublic: file.isPublic,
-            keyId: config.keyId,
+            keyId: selfKeyId,
             expiresIn,
             protocol,
           },
-          config.signingSecret,
+          selfSigningSecret,
           { routeMode: resolvedRouteMode },
         );
         preparedFiles.push({
@@ -393,7 +485,14 @@ export function createSiloCore(config: UploadCoreConfig) {
         fileName: input.fileName,
         expiresIn: input.expiresIn,
       },
-      config.signingSecret,
+      (() => {
+        if (!config.signingSecret) {
+          throw new Error(
+            "Missing signingSecret for private download URL generation.",
+          );
+        }
+        return config.signingSecret;
+      })(),
       { routeMode: resolvedRouteMode },
     );
   }
@@ -423,6 +522,7 @@ export function createSiloCoreFromToken(
     environmentId: parsed.environmentId,
     ingestServer: parsed.ingestServer,
     signingSecret: parsed.signingSecret,
+    uploadStrategy: input.uploadStrategy,
     routeMode: parsed.routeMode,
     projectSlug: parsed.projectSlug,
     callbackUrl: input.callbackUrl,

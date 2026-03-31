@@ -15,6 +15,10 @@ framework-agnostic router for defining typed file routes with middleware.
   `onUploadComplete` handlers
 - `extractRouterConfig(...)`: safe route config extraction for client hydration
 
+By default, router registration uses core `uploadStrategy: "server"` (combined
+`/api/v1/upload` registration + URL signing). You can opt into
+`uploadStrategy: "self"` per call when you need local signing behavior.
+
 ## Example
 
 ```ts

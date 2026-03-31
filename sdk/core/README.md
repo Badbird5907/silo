@@ -5,11 +5,44 @@ This package contains framework-agnostic primitives for Silo uploads and callbac
 ## Core Upload API
 
 Use `createSiloCoreFromToken` to:
-- generate signed upload URLs (via `@silo-storage/shared`)
-- register file intents with `/api/v1/upload/register`
+- prepare uploads through one endpoint (`/api/v1/upload`) by default
+- optionally use register + self-sign flow (`/api/v1/upload/register`)
 - enable dev streaming mode (`dev: true`)
 - configure callback URL behavior for production
 - power framework runtimes such as `@silo-storage/sdk-server`
+
+## Upload Strategies
+
+`sdk-core` supports two upload strategies:
+
+| Strategy | Behavior | Recommended |
+| --- | --- | --- |
+| `server` (default) | Calls `/api/v1/upload` to register + return signed upload URL in one request | Yes, default for most users |
+| `self` | Calls `/api/v1/upload/register` then signs URL locally | Advanced/custom signing flows |
+
+Set strategy in core config or per-call (`prepareUpload` / `registerUploadBatch`):
+
+```ts
+import { createSiloCoreFromToken } from "@silo-storage/sdk-core";
+
+const uploadCore = createSiloCoreFromToken({
+  url: process.env.SILO_URL!,
+  token: process.env.SILO_TOKEN!,
+  uploadStrategy: "server", // optional default
+  callbackUrl: "https://app.example.com/api/silo/callback",
+});
+
+await uploadCore.prepareUpload({
+  uploadStrategy: "server",
+  file: {
+    fileName: "photo.png",
+    size: 1234,
+  },
+});
+```
+
+Use `uploadStrategy: "self"` when you need full control over URL signing behavior.  
+`self` requires `keyId` and `signingSecret` in core config.
 
 ```ts
 import { createSiloCoreFromToken } from "@silo-storage/sdk-core";

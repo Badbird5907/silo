@@ -15,7 +15,7 @@ export default async function LoginPage() {
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <h1 className="text-4xl font-extrabold tracking-tight">
-            Welcome to <span className="text-primary">Turbo Kit</span>
+            Log in
           </h1>
           <p className="text-muted-foreground mt-2">
             Sign in to your account to continue

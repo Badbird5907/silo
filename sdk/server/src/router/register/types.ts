@@ -1,5 +1,6 @@
 import type {
   RegisterUploadBatchResult,
+  UploadStrategy,
   UploadCore,
   UploadFileInput,
 } from "@silo-storage/sdk-core";
@@ -26,6 +27,7 @@ export interface RegisterRouteUploadInput<
   files: UploadFileInput[];
   callbackUrl?: string;
   fileExpiry?: SiloFileExpiryInput;
+  uploadStrategy?: UploadStrategy;
   dev?: boolean;
   expiresIn?: number;
   protocol?: "http" | "https";

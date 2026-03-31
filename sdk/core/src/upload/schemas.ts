@@ -14,6 +14,13 @@ const registerResponseBodySchema = z.object({
   projectSlug: z.string().min(1),
 });
 
+const uploadResponseBodySchema = z.object({
+  uploadUrl: z.string().url(),
+  fileKeyId: z.string().min(1),
+  accessKey: z.string().min(1),
+  expiresAt: z.string().datetime(),
+});
+
 export const listFilesResultSchema = z.object({
   files: z.array(
     z.object({
@@ -88,6 +95,19 @@ export function parseRegisterResponseBody(value: unknown): {
     throw new Error(
       `Unexpected register response shape: ${parsed.error.message}`,
     );
+  }
+  return parsed.data;
+}
+
+export function parseUploadResponseBody(value: unknown): {
+  uploadUrl: string;
+  fileKeyId: string;
+  accessKey: string;
+  expiresAt: string;
+} {
+  const parsed = uploadResponseBodySchema.safeParse(value);
+  if (!parsed.success) {
+    throw new Error(`Unexpected upload response shape: ${parsed.error.message}`);
   }
   return parsed.data;
 }

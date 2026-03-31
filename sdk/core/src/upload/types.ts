@@ -1,12 +1,15 @@
 import type { FileExpiryInput } from "./expiry";
 
+export type UploadStrategy = "server" | "self";
+
 export interface UploadCoreConfig {
   apiBaseUrl: string;
   apiKey: string;
-  keyId: string;
+  keyId?: string;
   environmentId: string;
   ingestServer: string;
-  signingSecret: string;
+  signingSecret?: string;
+  uploadStrategy?: UploadStrategy;
   routeMode?: "subdomain" | "path";
   projectSlug?: string;
   callbackUrl?: string;
@@ -36,6 +39,7 @@ export interface UploadFileInput {
 
 export interface RegisterUploadBatchInput {
   files: UploadFileInput[];
+  uploadStrategy?: UploadStrategy;
   callbackMetadata?: Record<string, unknown>;
   callbackUrl?: string;
   dev?: boolean;

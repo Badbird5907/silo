@@ -17,15 +17,27 @@ import { registerFileKeyIntent } from "@/lib/upload/register";
 
 const schema = z.object({
   environmentId: z.string(),
+  fileKeyId: z.string().min(1).optional(),
   accessKey: z.string().min(1),
   fileName: z.string().min(1),
   size: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
   mimeType: z.string().optional(),
+  acceptedMimeTypes: z.array(z.string()).optional(),
   hash: z.string().optional(),
   isPublic: z.boolean().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
   callbackUrl: z.string().url().optional(),
   callbackMetadata: z.record(z.string(), z.unknown()).optional(),
+  fileExpiry: z
+    .union([
+      z.object({
+        ttlSeconds: z.number().int().positive(),
+      }),
+      z.object({
+        expiresAt: z.string().datetime().nullable(),
+      }),
+    ])
+    .optional(),
   dev: z.boolean().optional(),
 });
 
@@ -70,17 +82,29 @@ export async function POST(request: Request) {
 
   const {
     environmentId,
+    fileKeyId: providedFileKeyId,
     accessKey,
     fileName,
     size,
     mimeType,
+    acceptedMimeTypes,
     hash,
     isPublic,
     metadata,
     callbackUrl,
     callbackMetadata,
+    fileExpiry,
     dev: isDev,
   } = result.data;
+
+  const resolvedExpiresAt =
+    fileExpiry && "ttlSeconds" in fileExpiry
+      ? new Date(Date.now() + fileExpiry.ttlSeconds * 1000)
+      : fileExpiry && "expiresAt" in fileExpiry
+        ? fileExpiry.expiresAt
+          ? new Date(fileExpiry.expiresAt)
+          : null
+        : undefined;
 
   const projectId = authResult.projectId;
   if (!projectId) {
@@ -102,7 +126,7 @@ export async function POST(request: Request) {
   if (environmentWritable) return environmentWritable;
 
   try {
-    const fileKeyId = nanoid(16);
+    const fileKeyId = providedFileKeyId ?? nanoid(16);
     const resolvedIsPublic = isPublic ?? project.defaultFileAccess === "public";
 
     const protocol = env.NODE_ENV === "development" ? "http" : "https";
@@ -118,6 +142,7 @@ export async function POST(request: Request) {
         size,
         hash,
         mimeType,
+        acceptedMimeTypes,
         isPublic: resolvedIsPublic,
         keyId: apiKeyId,
         expiresIn: 3600,
@@ -145,6 +170,7 @@ export async function POST(request: Request) {
       },
       callbackUrl,
       callbackMetadata,
+      expiresAt: resolvedExpiresAt,
       apiKeyId: authResult.apiKeyId,
     });
 

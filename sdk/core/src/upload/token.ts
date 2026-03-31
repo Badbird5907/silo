@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { UploadStrategy } from "./types";
 
 const siloTokenSchema = z
   .object({
@@ -27,6 +28,7 @@ export interface ParsedSiloToken {
 export interface CreateSiloCoreFromTokenInput {
   url: string;
   token: string;
+  uploadStrategy?: UploadStrategy;
   callbackUrl?: string;
   fetch?: typeof fetch;
 }
