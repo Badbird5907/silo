@@ -60,6 +60,7 @@ export interface UseUploadResult<
 > {
   isIdle: boolean;
   isUploading: boolean;
+  currentUploadingFile: File | null;
   progress: {
     aggregatePercent: number;
     aggregateLoaded: number;

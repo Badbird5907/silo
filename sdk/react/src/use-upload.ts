@@ -108,6 +108,8 @@ export function useUploadInternal<
   options: UseUploadOptions<TRouter, TEndpoint>,
 ): UseUploadResult<TRouter, TEndpoint> {
   const [isUploading, setIsUploading] = React.useState(false);
+  const [currentUploadingFile, setCurrentUploadingFile] =
+    React.useState<File | null>(null);
   const [error, setError] = React.useState<SiloUploadError | null>(null);
   const [result, setResult] = React.useState<
     UploadCompletion<TRouter, TEndpoint>[] | null
@@ -156,6 +158,7 @@ export function useUploadInternal<
     setError(null);
     setResult(null);
     setProgressByFile({});
+    setCurrentUploadingFile(null);
     setIsUploading(false);
   }, []);
 
@@ -175,6 +178,7 @@ export function useUploadInternal<
       setError(null);
       setResult(null);
       setProgressByFile({});
+      setCurrentUploadingFile(null);
 
       const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
       let aggregateLoaded = 0;
@@ -220,6 +224,7 @@ export function useUploadInternal<
 
         const completions: UploadCompletion<TRouter, TEndpoint>[] = [];
         for (const [index, file] of files.entries()) {
+          setCurrentUploadingFile(file);
           const registration = registrations[index];
           if (!registration) {
             throw new SiloUploadError({
@@ -283,6 +288,7 @@ export function useUploadInternal<
 
         setResult(completions);
         options.onComplete?.(completions);
+        setCurrentUploadingFile(null);
         setIsUploading(false);
         return completions;
       } catch (cause) {
@@ -297,6 +303,7 @@ export function useUploadInternal<
               });
         setError(normalized);
         options.onError?.(normalized);
+        setCurrentUploadingFile(null);
         setIsUploading(false);
         throw normalized;
       } finally {
@@ -381,6 +388,7 @@ export function useUploadInternal<
   return {
     isIdle: !isUploading,
     isUploading,
+    currentUploadingFile,
     progress: {
       aggregatePercent: Math.round(aggregateLoaded / aggregateCount),
       aggregateLoaded: 0,

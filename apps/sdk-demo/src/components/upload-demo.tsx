@@ -182,6 +182,12 @@ export function UploadDemo() {
                   Upload progress:{" "}
                   {Math.round(upload.progress.aggregatePercent)}%
                 </p>
+                {upload.currentUploadingFile ? (
+                  <p className="text-muted-foreground mb-2 text-sm">
+                    Uploading: {upload.currentUploadingFile.name} (
+                    {formatBytes(upload.currentUploadingFile.size)})
+                  </p>
+                ) : null}
                 <Progress value={upload.progress.aggregatePercent} />
               </div>
             ) : null}
