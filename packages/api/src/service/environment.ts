@@ -440,3 +440,16 @@ export async function scheduleEnvironmentObjectDeletion(params: {
     "Environment object deletion exceeded maximum pagination depth",
   );
 }
+
+export async function updateEnvironmentCallbackHeaders(
+  db: Db,
+  environmentId: string,
+  headers: Record<string, string>,
+) {
+  const [updated] = await db
+    .update(projectEnvironments)
+    .set({ callbackHeaders: headers })
+    .where(eq(projectEnvironments.id, environmentId))
+    .returning();
+  return updated;
+}

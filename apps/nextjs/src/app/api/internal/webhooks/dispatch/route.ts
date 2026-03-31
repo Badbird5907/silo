@@ -6,6 +6,7 @@ import {
   getNextAttemptNumber,
   getNextCallbackAttemptNumber,
   getWebhookTargetForEvent,
+  normalizeEnvironmentCallbackHeaders,
   recordCallbackAttempt,
   webhookAttempt,
   shouldRetryAttempt,
@@ -13,7 +14,7 @@ import {
 } from "@silo-storage/api/services";
 import { eq } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
-import { apiKeys } from "@silo-storage/db/schema";
+import { apiKeys, projectEnvironments } from "@silo-storage/db/schema";
 import { handleCallback } from "@vercel/queue";
 import { queuedWebhookMessageSchema } from "@silo-storage/api/services";
 
@@ -56,6 +57,7 @@ async function deliverChannel(
   input: {
     maxAttempts: number;
     commonHeaders: Record<string, string>;
+    environmentCallbackHeaders: Record<string, string>;
   },
 ) {
   const latestStatus = await channel.getLatestStatus();
@@ -83,6 +85,7 @@ async function deliverChannel(
       method: "POST",
       headers: {
         ...input.commonHeaders,
+        ...input.environmentCallbackHeaders,
         "X-Silo-Signature": signed.signature,
         "X-Silo-Timestamp": String(signed.timestamp),
       },
@@ -153,6 +156,14 @@ export const POST = handleCallback(async (rawQueueMessage, metadata) => {
     projectId: queueMessage.projectId,
     eventData: queueMessage.event.data,
   });
+
+  const environmentRow = await db.query.projectEnvironments.findFirst({
+    where: eq(projectEnvironments.id, queueMessage.environmentId),
+    columns: { callbackHeaders: true },
+  });
+  const environmentCallbackHeaders = normalizeEnvironmentCallbackHeaders(
+    environmentRow?.callbackHeaders,
+  );
 
   const sharedAttemptFields = {
     eventId: queueMessage.event.id,
@@ -241,6 +252,7 @@ export const POST = handleCallback(async (rawQueueMessage, metadata) => {
     const retry = await deliverChannel(channel, {
       maxAttempts,
       commonHeaders,
+      environmentCallbackHeaders,
     });
     shouldRetryAny = shouldRetryAny || retry;
   }

@@ -111,6 +111,7 @@ export const projectEnvironments = pgTable("project_environments", {
     .array()
     .notNull()
     .default(sql`'{}'::silo_webhook_event_types[]`),
+  callbackHeaders: jsonb("callback_headers").notNull().default("{}").$type<Record<string, string>>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()

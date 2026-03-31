@@ -2,7 +2,14 @@
 
 import * as React from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Layers, MoreHorizontal, Pencil, Trash2, WebhookIcon } from "lucide-react";
+import {
+  KeyRound,
+  Layers,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  WebhookIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@silo-storage/ui/components/badge";
@@ -50,6 +57,7 @@ import {
 } from "@silo-storage/ui/components/table";
 
 import { useTRPC } from "@/trpc/react";
+import { CallbackHeadersDialog } from "./callback-headers-dialog";
 import { CreateEnvironmentDialog } from "./create-environment-dialog";
 import { ManageEnvironmentWebhookDialog } from "./manage-environment-webhook-dialog";
 import { Tooltip,TooltipContent,TooltipTrigger } from "@silo-storage/ui/components/tooltip";
@@ -75,6 +83,19 @@ function parseWebhookEvents(values: string[]): WebhookEvent[] {
       value === "upload.completed" || value === "upload.failed",
   );
   return parsed.length > 0 ? parsed : ["upload.completed", "upload.failed"];
+}
+
+function normalizeCallbackHeaders(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return {};
+  }
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof k === "string" && typeof v === "string") {
+      out[k] = v;
+    }
+  }
+  return out;
 }
 
 function getTypeBadgeVariant(
@@ -116,7 +137,11 @@ export function EnvironmentsList({
     webhookEvents: WebhookEvent[];
     webhookSecretSet: boolean;
   } | null>(null);
-
+  const [callbackHeadersTarget, setCallbackHeadersTarget] = React.useState<{
+    id: string;
+    name: string;
+    callbackHeaders: Record<string, string>;
+  } | null>(null);
   const environmentsQuery = useQuery(
     trpc.environment.list.queryOptions(
       { projectId, organizationId },
@@ -318,6 +343,20 @@ export function EnvironmentsList({
                             <WebhookIcon className="mr-2 h-4 w-4" />
                             Manage Webhook
                           </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() =>
+                              setCallbackHeadersTarget({
+                                id: env.id,
+                                name: env.name,
+                                callbackHeaders: normalizeCallbackHeaders(
+                                  env.callbackHeaders,
+                                ),
+                              })
+                            }
+                          >
+                            <KeyRound className="mr-2 h-4 w-4" />
+                            Callback headers
+                          </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             onClick={() =>
@@ -439,6 +478,16 @@ export function EnvironmentsList({
         }}
         organizationId={organizationId}
         environment={webhookTarget}
+        onUpdated={() => void environmentsQuery.refetch()}
+      />
+
+      <CallbackHeadersDialog
+        open={!!callbackHeadersTarget}
+        onOpenChange={(open) => {
+          if (!open) setCallbackHeadersTarget(null);
+        }}
+        organizationId={organizationId}
+        environment={callbackHeadersTarget}
         onUpdated={() => void environmentsQuery.refetch()}
       />
     </>

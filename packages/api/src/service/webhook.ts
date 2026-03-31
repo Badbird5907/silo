@@ -67,6 +67,22 @@ function getFileKeyIdFromEventData(data: unknown): string | null {
   return getStringField(data, "fileKeyId");
 }
 
+/** Safe string headers only; used when delivering webhooks/callbacks to customer URLs. */
+export function normalizeEnvironmentCallbackHeaders(
+  value: unknown,
+): Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof k === "string" && k.length > 0 && typeof v === "string") {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
 export async function getFileCallbackTargetForEvent(
   db: Db,
   input: {

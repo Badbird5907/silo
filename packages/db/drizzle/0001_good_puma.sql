@@ -1,0 +1,1 @@
+ALTER TABLE "silo_project_environments" ADD COLUMN "callback_headers" jsonb DEFAULT '{}' NOT NULL;

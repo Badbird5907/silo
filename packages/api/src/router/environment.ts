@@ -13,6 +13,7 @@ import {
   listEnvironments,
   rotateEnvironmentWebhookSecret,
   updateEnvironment,
+  updateEnvironmentCallbackHeaders,
   updateEnvironmentWebhookConfig,
 } from "../service/environment";
 import { organizationProcedure, requirePermission } from "../trpc";
@@ -215,6 +216,25 @@ export const environmentRouter = {
         ...toPublicEnvironment(result.environment),
         webhookSecret: result.secret,
       };
+    }),
+  
+  updateCallbackHeaders: organizationProcedure
+    .input(z.object({ id: z.string(), headers: z.record(z.string(), z.string()) }))
+    .use(requirePermission({ environment: ["update"] }))
+    .mutation(async ({ ctx, input }) => {
+      await validateEnvironmentAccess(ctx.db, input.id, ctx.organizationId);
+      const updated = await updateEnvironmentCallbackHeaders(
+        ctx.db,
+        input.id,
+        input.headers,
+      );
+      if (!updated) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Environment not found",
+        });
+      }
+      return toPublicEnvironment(updated);
     }),
 
   delete: organizationProcedure
