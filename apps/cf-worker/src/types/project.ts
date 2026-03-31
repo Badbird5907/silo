@@ -59,6 +59,7 @@ export const fileKeyInfoSchema = z.object({
 });
 
 export interface UploadCallbackData {
+  contractVersion?: 1;
   type: "upload-completed" | "upload-failed";
   data:
     | {
@@ -72,7 +73,11 @@ export interface UploadCallbackData {
         actualHash: string | null;
         actualMimeType: string;
         actualSize: number;
-        adapterKey: string;
+        storage?: {
+          provider: string;
+          objectKey: string;
+        };
+        adapterKey?: string;
         projectId: string;
         isPublic: boolean;
         metadata?: Record<string, unknown>;

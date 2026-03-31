@@ -6,7 +6,7 @@ import {
 } from "@silo-storage/api/services";
 import { db } from "@silo-storage/db/client";
 
-import { env } from "@/env";
+import { isCallbackAuthorized } from "@/lib/internal/callback-auth";
 
 const bodySchema = z.object({
   limit: z.number().int().positive().max(500).optional(),
@@ -15,11 +15,7 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const header = request.headers.get("Authorization");
-  if (
-    !header?.startsWith("Bearer ") ||
-    header.split(" ")[1] !== env.CALLBACK_SECRET
-  ) {
+  if (!isCallbackAuthorized(request)) {
     return new Response("Unauthorized", { status: 401 });
   }
 

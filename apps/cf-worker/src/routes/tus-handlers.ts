@@ -288,6 +288,7 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
 
         await sendUploadCallback(
           {
+            contractVersion: 1,
             type: "upload-completed",
             data: {
               environmentId,
@@ -300,6 +301,10 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
               actualHash: null,
               actualMimeType: zeroByteMimeType,
               actualSize: 0,
+              storage: {
+                provider: "r2",
+                objectKey: storageKey,
+              },
               adapterKey: storageKey,
               projectId,
               isPublic: verificationResult.isPublic ?? false,
@@ -323,6 +328,7 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
         if (sessionRegistered) {
           await sendUploadCallback(
             {
+              contractVersion: 1,
               type: "upload-failed",
               data: {
                 environmentId,

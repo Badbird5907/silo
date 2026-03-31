@@ -12,7 +12,7 @@ import {
   setUploadSessionAdapterData,
 } from "@silo-storage/shared";
 
-import { env } from "@/env";
+import { isCallbackAuthorized } from "@/lib/internal/callback-auth";
 
 const schema = z.object({
   projectId: z.string().min(1),
@@ -23,11 +23,7 @@ const schema = z.object({
 });
 
 export async function POST(request: Request) {
-  const header = request.headers.get("Authorization");
-  if (
-    !header?.startsWith("Bearer ") ||
-    header.split(" ")[1] !== env.CALLBACK_SECRET
-  ) {
+  if (!isCallbackAuthorized(request)) {
     return new Response("Unauthorized", { status: 401 });
   }
 

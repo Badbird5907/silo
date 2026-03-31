@@ -4,18 +4,14 @@ import { and, eq, inArray, isNotNull, lte } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import { fileKeys, files } from "@silo-storage/db/schema";
 
-import { env } from "@/env";
+import { isCallbackAuthorized } from "@/lib/internal/callback-auth";
 
 const bodySchema = z.object({
   fileIds: z.array(z.string().min(1)).min(1).max(1000),
 });
 
 export async function POST(request: Request) {
-  const header = request.headers.get("Authorization");
-  if (
-    !header?.startsWith("Bearer ") ||
-    header.split(" ")[1] !== env.CALLBACK_SECRET
-  ) {
+  if (!isCallbackAuthorized(request)) {
     return new Response("Unauthorized", { status: 401 });
   }
 

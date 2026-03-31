@@ -4,7 +4,7 @@ import { eq, sql } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import { projects, usageDaily, usageEvents } from "@silo-storage/db/schema";
 
-import { env } from "@/env";
+import { isCallbackAuthorized } from "@/lib/internal/callback-auth";
 
 const schema = z.object({
   projectId: z.string(),
@@ -14,12 +14,7 @@ const schema = z.object({
 });
 
 export async function POST(request: Request) {
-  const header = request.headers.get("Authorization");
-  if (!header?.startsWith("Bearer ")) {
-    return new Response("Unauthorized", { status: 401 });
-  }
-  const token = header.split(" ")[1];
-  if (!token || token !== env.CALLBACK_SECRET) {
+  if (!isCallbackAuthorized(request)) {
     return new Response("Unauthorized", { status: 401 });
   }
 

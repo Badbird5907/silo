@@ -670,6 +670,7 @@ export class TusStateDO {
 
     await sendUploadCallback(
       {
+        contractVersion: 1,
         type: "upload-failed",
         data: {
           environmentId: effectiveEnvironmentId ?? "unknown",
@@ -822,6 +823,7 @@ export class TusStateDO {
 
       await sendUploadCallback(
         {
+          contractVersion: 1,
           type: "upload-failed",
           data: {
             environmentId: metadata.environmentId,
@@ -851,6 +853,7 @@ export class TusStateDO {
       await this.deleteMetadata();
       await sendUploadCallback(
         {
+          contractVersion: 1,
           type: "upload-failed",
           data: {
             environmentId: metadata.environmentId,
@@ -890,6 +893,7 @@ export class TusStateDO {
       await this.deleteMetadata();
       await sendUploadCallback(
         {
+          contractVersion: 1,
           type: "upload-failed",
           data: {
             environmentId: metadata.environmentId,
@@ -921,6 +925,7 @@ export class TusStateDO {
       await this.deleteMetadata();
       await sendUploadCallback(
         {
+          contractVersion: 1,
           type: "upload-failed",
           data: {
             environmentId: metadata.environmentId,
@@ -994,6 +999,7 @@ export class TusStateDO {
         }
         return sendUploadCallback(
           {
+            contractVersion: 1,
             type: "upload-completed",
             data: {
               environmentId: metadata.environmentId,
@@ -1006,6 +1012,10 @@ export class TusStateDO {
               actualHash: actualHash ?? null,
               actualMimeType,
               actualSize,
+              storage: {
+                provider: "r2",
+                objectKey: metadata.storageKey,
+              },
               adapterKey: metadata.storageKey,
               projectId: metadata.projectId,
               isPublic: metadata.isPublic,

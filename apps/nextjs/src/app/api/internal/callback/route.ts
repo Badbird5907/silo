@@ -23,30 +23,43 @@ import {
   normalizeFileKeyMetadata,
 } from "@silo-storage/shared";
 
-import { env } from "@/env";
+import { isCallbackAuthorized } from "@/lib/internal/callback-auth";
+import { setCompletionRecord } from "@/lib/upload/completion";
 import { completeFileKeyFromCallback } from "@/lib/upload/register";
 
 const schema = z.union([
   z.object({
+    contractVersion: z.literal(1).optional(),
     type: z.literal("upload-completed"),
-    data: z.object({
-      environmentId: z.string(),
-      fileKeyId: z.string(),
-      accessKey: z.string(),
-      fileName: z.string(),
-      claimedSize: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
-      claimedHash: z.string().nullable(),
-      claimedMimeType: z.string().nullable(),
-      actualHash: z.string().nullable(),
-      actualMimeType: z.string(),
-      actualSize: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
-      adapterKey: z.string(),
-      projectId: z.string(),
-      isPublic: z.boolean().optional(),
-      metadata: z.record(z.string(), z.unknown()).optional(),
-    }),
+    data: z
+      .object({
+        environmentId: z.string(),
+        fileKeyId: z.string(),
+        accessKey: z.string(),
+        fileName: z.string(),
+        claimedSize: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+        claimedHash: z.string().nullable(),
+        claimedMimeType: z.string().nullable(),
+        actualHash: z.string().nullable(),
+        actualMimeType: z.string(),
+        actualSize: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+        storage: z
+          .object({
+            provider: z.string(),
+            objectKey: z.string().min(1),
+          })
+          .optional(),
+        adapterKey: z.string().optional(),
+        projectId: z.string(),
+        isPublic: z.boolean().optional(),
+        metadata: z.record(z.string(), z.unknown()).optional(),
+      })
+      .refine((value) => Boolean(value.storage?.objectKey ?? value.adapterKey), {
+        message: "storage.objectKey or adapterKey is required",
+      }),
   }),
   z.object({
+    contractVersion: z.literal(1).optional(),
     type: z.literal("upload-failed"),
     data: z.object({
       environmentId: z.string(),
@@ -248,12 +261,7 @@ async function scheduleAdapterKeyCleanup(input: {
 }
 
 export async function POST(request: Request) {
-  const header = request.headers.get("Authorization");
-  if (!header?.startsWith("Bearer ")) {
-    return new Response("Unauthorized", { status: 401 });
-  }
-  const token = header.split(" ")[1];
-  if (!token || token !== env.CALLBACK_SECRET) {
+  if (!isCallbackAuthorized(request)) {
     return new Response("Unauthorized", { status: 401 });
   }
 
@@ -274,6 +282,16 @@ export async function POST(request: Request) {
 
   if (type === "upload-completed") {
     try {
+      const resolvedStorageKey = data.storage?.objectKey ?? data.adapterKey;
+      if (!resolvedStorageKey) {
+        return new Response(
+          JSON.stringify({
+            error: "Missing storage object key in callback payload",
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+
       const environment = await db.query.projectEnvironments.findFirst({
         where: eq(projectEnvironments.id, data.environmentId),
       });
@@ -289,7 +307,7 @@ export async function POST(request: Request) {
             projectId: data.projectId,
             environmentId: data.environmentId,
             fileKeyId: data.fileKeyId,
-            storageKey: data.adapterKey,
+            storageKey: resolvedStorageKey,
           });
         } catch (cleanupError) {
           console.error(
@@ -324,7 +342,7 @@ export async function POST(request: Request) {
             projectId: data.projectId,
             environmentId: data.environmentId,
             fileKeyId: data.fileKeyId,
-            storageKey: data.adapterKey,
+            storageKey: resolvedStorageKey,
           });
         } catch (cleanupError) {
           console.error(
@@ -363,7 +381,7 @@ export async function POST(request: Request) {
         actualSize: data.actualSize,
         actualMimeType: data.actualMimeType,
         actualHash: data.actualHash,
-        storageKey: data.adapterKey,
+        storageKey: resolvedStorageKey,
         metadata: data.metadata,
       });
 
@@ -373,7 +391,7 @@ export async function POST(request: Request) {
             projectId: data.projectId,
             environmentId: data.environmentId,
             fileKeyId: data.fileKeyId,
-            storageKey: data.adapterKey,
+            storageKey: resolvedStorageKey,
           });
         } catch (cleanupError) {
           console.error(
@@ -402,13 +420,13 @@ export async function POST(request: Request) {
       const file = completion.file;
       const fileKey = completion.fileKey;
 
-      if (completion.alreadyCompleted && file.storageKey !== data.adapterKey) {
+      if (completion.alreadyCompleted && file.storageKey !== resolvedStorageKey) {
         try {
           await scheduleAdapterKeyCleanup({
             projectId: data.projectId,
             environmentId: data.environmentId,
             fileKeyId: data.fileKeyId,
-            storageKey: data.adapterKey,
+            storageKey: resolvedStorageKey,
           });
         } catch (cleanupError) {
           console.error(
@@ -446,6 +464,29 @@ export async function POST(request: Request) {
         await publishMessage(`upload:${data.fileKeyId}`, uploadCompletedEvent);
       } catch (pubError) {
         console.error("Failed to publish upload completion message:", pubError);
+      }
+
+      try {
+        await setCompletionRecord({
+          fileKeyId: data.fileKeyId,
+          completion: {
+            contractVersion: 1,
+            source: "nextjs.internal.callback",
+            routeSlug: "upload.completed",
+            completedAt: Date.now(),
+            onUploadCompleteResult: {
+              event: uploadCompletedEvent,
+              fileKeyId: fileKey.id,
+              fileId: file.id,
+              accessKey: fileKey.accessKey,
+            },
+          },
+        });
+      } catch (completionStoreError) {
+        console.error(
+          "Failed to persist upload completion ledger entry:",
+          completionStoreError,
+        );
       }
 
       if (!completion.alreadyCompleted) {

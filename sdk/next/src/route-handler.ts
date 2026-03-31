@@ -2,6 +2,8 @@ import type { UploadCore, UploadFileInput } from "@silo-storage/sdk-core";
 import type { FileRouter, RouterConfig } from "@silo-storage/sdk-server";
 import { z } from "zod";
 
+import { createHttpCompletionStore } from "./http-completion-store";
+
 import {
   extractRouterConfig as extractRouterConfigFromServer,
   handleUploadCallback,
@@ -36,21 +38,60 @@ type RouteActionRequest =
   | z.infer<typeof registerRequestSchema>
   | z.infer<typeof awaitCompletionSchema>;
 
-interface CompletionEntry {
+export interface CompletionEntry {
   routeSlug: string;
   fileKeyId: string;
   completedAt: number;
   onUploadCompleteResult: unknown;
 }
 
-const completionByFileKey = new Map<string, CompletionEntry>();
+export interface CompletionStore {
+  set(fileKeyId: string, value: CompletionEntry, ttlMs: number): Promise<void>;
+  get(fileKeyId: string): Promise<CompletionEntry | null>;
+  wait(fileKeyId: string, timeoutMs: number): Promise<CompletionEntry | null>;
+}
 
-function gcCompletions(ttlMs: number) {
-  const now = Date.now();
-  for (const [fileKeyId, entry] of completionByFileKey.entries()) {
-    if (now - entry.completedAt > ttlMs) {
-      completionByFileKey.delete(fileKeyId);
+class MemoryCompletionStore implements CompletionStore {
+  private readonly completionByFileKey = new Map<
+    string,
+    CompletionEntry & { expiresAt: number }
+  >();
+
+  set(
+    fileKeyId: string,
+    value: CompletionEntry,
+    ttlMs: number,
+  ): Promise<void> {
+    this.completionByFileKey.set(fileKeyId, {
+      ...value,
+      expiresAt: Date.now() + Math.max(1, ttlMs),
+    });
+    return Promise.resolve();
+  }
+
+  get(fileKeyId: string): Promise<CompletionEntry | null> {
+    const entry = this.completionByFileKey.get(fileKeyId);
+    if (!entry) return Promise.resolve(null);
+    if (entry.expiresAt <= Date.now()) {
+      this.completionByFileKey.delete(fileKeyId);
+      return Promise.resolve(null);
     }
+    return Promise.resolve({
+      routeSlug: entry.routeSlug,
+      fileKeyId: entry.fileKeyId,
+      completedAt: entry.completedAt,
+      onUploadCompleteResult: entry.onUploadCompleteResult,
+    });
+  }
+
+  async wait(fileKeyId: string, timeoutMs: number): Promise<CompletionEntry | null> {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt <= timeoutMs) {
+      const found = await this.get(fileKeyId);
+      if (found) return found;
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    return null;
   }
 }
 
@@ -107,16 +148,6 @@ function toUploadFiles(
   }));
 }
 
-async function waitForCompletion(fileKeyId: string, timeoutMs: number) {
-  const startedAt = Date.now();
-  while (Date.now() - startedAt <= timeoutMs) {
-    const found = completionByFileKey.get(fileKeyId);
-    if (found) return found;
-    await new Promise((resolve) => setTimeout(resolve, 200));
-  }
-  return null;
-}
-
 export interface CreateRouteHandlerOptions<
   TContext = undefined,
   TRouter extends FileRouter<Request, TContext> = FileRouter<Request, TContext>,
@@ -127,6 +158,10 @@ export interface CreateRouteHandlerOptions<
   resolveContext?: (request: Request) => Promise<TContext> | TContext;
   callbackUrl?: string | ((request: Request) => string | Promise<string>);
   completionTtlMs?: number;
+  completionStore?: CompletionStore;
+  completionStoreUrl?: string | URL;
+  completionStoreAuthToken?: string;
+  completionStorePathPrefix?: string;
 }
 
 export function extractRouterConfig<TRouter extends Record<string, unknown>>(
@@ -140,16 +175,27 @@ export function createRouteHandler<
   TRouter extends FileRouter<Request, TContext> = FileRouter<Request, TContext>,
 >(options: CreateRouteHandlerOptions<TContext, TRouter>) {
   const completionTtlMs = options.completionTtlMs ?? 10 * 60 * 1000;
+  const completionStore =
+    options.completionStore ??
+    (options.completionStoreUrl
+      ? createHttpCompletionStore({
+          baseUrl: options.completionStoreUrl,
+          pathPrefix: options.completionStorePathPrefix,
+          headers: options.completionStoreAuthToken
+            ? {
+                Authorization: `Bearer ${options.completionStoreAuthToken}`,
+              }
+            : undefined,
+        })
+      : new MemoryCompletionStore());
 
   function GET() {
-    gcCompletions(completionTtlMs);
     return json({
       routerConfig: extractRouterConfig(options.router),
     });
   }
 
   async function POST(request: Request) {
-    gcCompletions(completionTtlMs);
     const context = options.resolveContext
       ? await options.resolveContext(request)
       : undefined;
@@ -168,12 +214,12 @@ export function createRouteHandler<
       });
 
       if (callbackResult.status === "handled") {
-        completionByFileKey.set(callbackResult.event.data.fileKeyId, {
+        await completionStore.set(callbackResult.event.data.fileKeyId, {
           routeSlug: callbackResult.routeSlug,
           fileKeyId: callbackResult.event.data.fileKeyId,
           completedAt: Date.now(),
           onUploadCompleteResult: callbackResult.onUploadCompleteResult,
-        });
+        }, completionTtlMs);
       }
 
       return json({
@@ -186,7 +232,7 @@ export function createRouteHandler<
 
     if (action.action === "await-completion") {
       const timeoutMs = action.timeoutMs ?? 20_000;
-      const completion = await waitForCompletion(action.fileKeyId, timeoutMs);
+      const completion = await completionStore.wait(action.fileKeyId, timeoutMs);
       if (!completion) {
         return json(
           {

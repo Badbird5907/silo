@@ -13,6 +13,7 @@ import {
   serializeAcceptedMimeTypePatterns,
 } from "@silo-storage/shared/signing";
 
+import { checkCallbackAuthorization } from "@/lib/internal/callback-auth";
 import { env } from "@/env";
 
 /**
@@ -125,31 +126,27 @@ async function findPendingFileKeyWithRetry(input: {
 }
 
 export async function POST(request: Request) {
-  const header = request.headers.get("Authorization");
-  if (!header?.startsWith("Bearer ")) {
-    console.log(
-      "[verify-signature] Missing or invalid Authorization header format",
-      {
-        header: header ? "present" : "missing",
-      },
-    );
+  const auth = checkCallbackAuthorization(request);
+  if (auth !== true) {
+    if (auth.kind === "missing_format") {
+      console.log(
+        "[verify-signature] Missing or invalid Authorization header format",
+        {
+          header: auth.header ? "present" : "missing",
+        },
+      );
+    } else {
+      console.log("[verify-signature] Invalid CALLBACK_SECRET token", {
+        tokenLength: auth.token?.length,
+        expectedLength: env.CALLBACK_SECRET.length,
+      });
+    }
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { "Content-Type": "application/json" },
     });
   }
-  const token = header.split(" ")[1];
-  if (token !== env.CALLBACK_SECRET) {
-    console.log("[verify-signature] Invalid CALLBACK_SECRET token", {
-      tokenLength: token?.length,
-      expectedLength: env.CALLBACK_SECRET.length,
-    });
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-  console.log("[verify-signature] CALLBACK_SECRET token is valid")
+  console.log("[verify-signature] CALLBACK_SECRET token is valid");
 
   try {
     const body: unknown = await request.json();

@@ -5,15 +5,17 @@ import { fileRouter } from "@/upload";
 import { getSiloCore } from "@/lib/silo";
 
 function getRouteHandler() {
-  return createRouteHandler({
-    router: fileRouter,
-    core: getSiloCore(),
-    resolveContext: async () => {
-      const { userId } = await auth();
-      return { userId };
-    },
-  });
+  return routeHandler;
 }
+
+const routeHandler = createRouteHandler({
+  router: fileRouter,
+  core: getSiloCore(),
+  resolveContext: async () => {
+    const { userId } = await auth();
+    return { userId };
+  },
+});
 
 export function GET() {
   const handler = getRouteHandler();

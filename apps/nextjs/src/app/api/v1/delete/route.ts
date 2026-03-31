@@ -39,7 +39,6 @@ export async function POST(request: Request) {
   const authResult = await authenticateRequest(request);
   if (authResult instanceof Response) return authResult;
 
-  // Parse request body
   let body: unknown;
   try {
     body = await request.json();
@@ -59,16 +58,13 @@ export async function POST(request: Request) {
 
   const { projectId, environmentId, fileKeyId, accessKey } = result.data;
 
-  // Validate project access
   const project = await validateProjectAccess(authResult, projectId);
   if (project instanceof Response) return project;
 
-  // Validate environment access
   const environment = await validateEnvironmentAccess(environmentId, projectId);
   if (environment instanceof Response) return environment;
 
   try {
-    // Find the file key by either identifier
     const fileKey = await lookupFileKey(db, {
       projectId,
       fileKeyId,
@@ -79,7 +75,6 @@ export async function POST(request: Request) {
       return jsonError("Not Found", "File not found.", 404);
     }
 
-    // Idempotent success if already deleted/failed and no file remains
     if (!fileKey.file && fileKey.status === "failed") {
       return new Response(
         JSON.stringify({
@@ -98,12 +93,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check if the file has been uploaded (fileId is set)
     if (!fileKey.file) {
       return jsonError("Not Found", "File has not been uploaded yet.", 404);
     }
 
-    // Check environment ownership
     if (fileKey.environmentId !== environmentId) {
       return jsonError(
         "Forbidden",

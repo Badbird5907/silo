@@ -51,8 +51,6 @@ app.on("HEAD", "/ingest/tus/:uploadId", requireProject, handleTusHead);
 app.patch("/ingest/tus/:uploadId", requireProject, handleTusPatch);
 app.delete("/ingest/tus/:uploadId", requireProject, handleTusDelete);
 
-app.get("/testing/1", (c) => c.json({ sig: c.env.SIGNING_SECRET, cs: c.env.CALLBACK_SECRET }))
-
 app.get("/f/:accessKey", requireProject, handleDownload);
 
 // Path-mode project routes (e.g. /p/:projectSlug/...)
