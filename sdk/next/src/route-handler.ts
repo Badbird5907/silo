@@ -201,6 +201,13 @@ export function createRouteHandler<
       : undefined;
 
     if (isCallbackRequest(request)) {
+      const signingSecret = options.core.config.signingSecret;
+      if (!signingSecret) {
+        throw new Error(
+          "Missing signingSecret for callback verification. Provide signingSecret when creating the core client.",
+        );
+      }
+
       const callbackResult = await handleUploadCallback<
         Request,
         Awaited<TContext>,
@@ -208,8 +215,7 @@ export function createRouteHandler<
       >({
         router: options.router,
         request,
-        // signingSecret: options.signingSecret,
-        signingSecret: options.core.config.signingSecret,
+        signingSecret,
         context,
       });
 
