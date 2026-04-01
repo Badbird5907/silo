@@ -32,7 +32,10 @@ export async function GET(request: Request) {
       }),
       {
         status: 400,
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store, no-cache, max-age=0, must-revalidate",
+        },
       },
     );
   }
@@ -46,7 +49,10 @@ export async function GET(request: Request) {
       }),
       {
         status: 202,
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store, no-cache, max-age=0, must-revalidate",
+        },
       },
     );
   }
@@ -58,7 +64,10 @@ export async function GET(request: Request) {
     }),
     {
       status: 200,
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store, no-cache, max-age=0, must-revalidate",
+      },
     },
   );
 }

@@ -67,6 +67,7 @@ export function createHttpCompletionStore(
       url.searchParams.set("fileKeyId", fileKeyId);
       const response = await fetchImpl(url, {
         method: "GET",
+        cache: "no-store",
         headers: await resolveHeaders(options.headers),
       });
       if (response.status === 202) return null;
@@ -85,6 +86,7 @@ export function createHttpCompletionStore(
       url.searchParams.set("timeoutMs", String(Math.max(1, timeoutMs)));
       const response = await fetchImpl(url, {
         method: "GET",
+        cache: "no-store",
         headers: await resolveHeaders(options.headers),
       });
       if (response.status === 202) return null;
