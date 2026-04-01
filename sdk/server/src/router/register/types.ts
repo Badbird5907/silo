@@ -1,15 +1,15 @@
 import type {
   RegisterUploadBatchResult,
-  UploadStrategy,
   UploadCore,
   UploadFileInput,
+  UploadStrategy,
 } from "@silo-storage/sdk-core";
 
 import type {
   FileRouter,
   InferMiddlewareData,
   RouteInputBySlug,
-  SiloFileExpiryInput,
+  SiloRouteExpiryInput,
 } from "../types";
 
 export interface RegisterRouteUploadInput<
@@ -26,7 +26,7 @@ export interface RegisterRouteUploadInput<
   input?: RouteInputBySlug<TRouter, TRouteSlug>;
   files: UploadFileInput[];
   callbackUrl?: string;
-  fileExpiry?: SiloFileExpiryInput;
+  fileExpiry?: SiloRouteExpiryInput;
   uploadStrategy?: UploadStrategy;
   dev?: boolean;
   expiresIn?: number;

@@ -17,7 +17,6 @@ import type {
 import { buildInternalCallbackMetadata } from "../../envelope";
 import { enforceRouteConfigConstraints } from "../constraints";
 import {
-  normalizeFileExpiry,
   normalizeResolvedMimeTypesInput,
   normalizeRouteExpiryInput,
 } from "../normalize";
@@ -137,11 +136,12 @@ export async function registerRouteUpload<
     }
   }
 
-  const resolvedFileExpiry = input.fileExpiry
-    ? normalizeFileExpiry(input.fileExpiry)
-    : routeFileExpiry !== undefined
-      ? normalizeRouteExpiryInput(routeFileExpiry)
-      : undefined;
+  const resolvedFileExpiry =
+    input.fileExpiry !== undefined
+      ? normalizeRouteExpiryInput(input.fileExpiry)
+      : routeFileExpiry !== undefined
+        ? normalizeRouteExpiryInput(routeFileExpiry)
+        : undefined;
 
   const registerUploadBatchWithExpiry = input.core.registerUploadBatch as (
     value: Parameters<UploadCore["registerUploadBatch"]>[0] & {

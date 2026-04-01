@@ -13,8 +13,8 @@ import type {
   RegisterUploadBatchInput,
   RegisterUploadBatchResult,
   SiloFileDetail,
-  UploadStrategy,
   UploadCoreConfig,
+  UploadStrategy,
 } from "./types";
 import {
   generatePublicDownloadUrl,
@@ -152,27 +152,30 @@ export function createSiloCore(config: UploadCoreConfig) {
     if (effectiveUploadStrategy === "server") {
       const preparedFiles: PreparedUploadFile[] = [];
       for (const file of input.files) {
+        const requestBody: Record<string, unknown> = {
+          environmentId: config.environmentId,
+          fileKeyId: file.fileKeyId,
+          accessKey: file.accessKey ?? createDefaultAccessKey(),
+          fileName: file.fileName,
+          size: file.size,
+          hash: file.hash,
+          mimeType: file.mimeType,
+          acceptedMimeTypes: file.acceptedMimeTypes,
+          isPublic: file.isPublic,
+          metadata: file.metadata,
+          callbackUrl,
+          callbackMetadata: input.callbackMetadata ?? {},
+          dev: input.dev === true,
+        };
+        applyFileExpiryToRegisterBody(requestBody, input.fileExpiry);
+
         const response = await fetchImpl(`${baseUrl}/api/v1/upload`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${config.apiKey}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            environmentId: config.environmentId,
-            fileKeyId: file.fileKeyId,
-            accessKey: file.accessKey ?? createDefaultAccessKey(),
-            fileName: file.fileName,
-            size: file.size,
-            hash: file.hash,
-            mimeType: file.mimeType,
-            acceptedMimeTypes: file.acceptedMimeTypes,
-            isPublic: file.isPublic,
-            metadata: file.metadata,
-            callbackUrl,
-            callbackMetadata: input.callbackMetadata ?? {},
-            dev: input.dev === true,
-          }),
+          body: JSON.stringify(requestBody),
         });
 
         if (!response.ok) {
@@ -223,7 +226,7 @@ export function createSiloCore(config: UploadCoreConfig) {
 
     if (!config.signingSecret || !config.keyId) {
       throw new Error(
-        "Self upload strategy requires keyId and signingSecret. Provide these in createSiloCore config or switch to uploadStrategy: \"server\".",
+        'Self upload strategy requires keyId and signingSecret. Provide these in createSiloCore config or switch to uploadStrategy: "server".',
       );
     }
     const selfSigningSecret = config.signingSecret;
