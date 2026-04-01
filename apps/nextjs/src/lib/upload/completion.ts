@@ -4,6 +4,9 @@ import { z } from "zod";
 const COMPLETION_KEY_PREFIX = "completion:fileKey:";
 const COMPLETION_CHANNEL_PREFIX = "completion:fileKey:";
 const DEFAULT_COMPLETION_TTL_SECONDS = 25 * 60;
+const COMPLETION_DEBUG_ENABLED =
+  (globalThis as { process?: { env?: Record<string, string | undefined> } })
+    .process?.env?.SILO_COMPLETION_DEBUG === "1";
 
 const completionRecordSchema = z
   .object({
@@ -24,6 +27,14 @@ function completionKey(fileKeyId: string): string {
 
 function completionChannel(fileKeyId: string): string {
   return `${COMPLETION_CHANNEL_PREFIX}${fileKeyId}`;
+}
+
+function logCompletionDebug(event: string, details: Record<string, unknown>) {
+  if (!COMPLETION_DEBUG_ENABLED) return;
+  console.info("[silo-completion-store]", {
+    event,
+    ...details,
+  });
 }
 
 export async function setCompletionRecord(input: {
@@ -50,10 +61,19 @@ export async function setCompletionRecord(input: {
   await redis.set(completionKey(input.fileKeyId), JSON.stringify(record), {
     ex: ttlSeconds,
   });
+  const persisted = await redis.get<string | null>(completionKey(input.fileKeyId));
+  logCompletionDebug("set.persisted", {
+    fileKeyId: input.fileKeyId,
+    ttlSeconds,
+    persisted: Boolean(persisted),
+  });
   await publishMessage(completionChannel(input.fileKeyId), {
     type: "completion.ready",
     fileKeyId: input.fileKeyId,
     completedAt: record.completedAt,
+  });
+  logCompletionDebug("set.published", {
+    fileKeyId: input.fileKeyId,
   });
 
   return record;
@@ -63,11 +83,20 @@ export async function getCompletionRecord(
   fileKeyId: string,
 ): Promise<CompletionRecord | null> {
   const raw = await redis.get<string | null>(completionKey(fileKeyId));
-  if (!raw || typeof raw !== "string") return null;
+  if (!raw || typeof raw !== "string") {
+    logCompletionDebug("get.miss", { fileKeyId });
+    return null;
+  }
 
   try {
-    return completionRecordSchema.parse(JSON.parse(raw));
+    const parsed = completionRecordSchema.parse(JSON.parse(raw));
+    logCompletionDebug("get.hit", {
+      fileKeyId,
+      completedAt: parsed.completedAt,
+    });
+    return parsed;
   } catch {
+    logCompletionDebug("get.parse_error", { fileKeyId });
     return null;
   }
 }
@@ -76,10 +105,17 @@ export async function waitForCompletionRecord(
   fileKeyId: string,
   timeoutMs: number,
 ): Promise<CompletionRecord | null> {
-  const first = await getCompletionRecord(fileKeyId);
-  if (first) return first;
-
   const startedAt = Date.now();
+  logCompletionDebug("wait.start", { fileKeyId, timeoutMs });
+  const first = await getCompletionRecord(fileKeyId);
+  if (first) {
+    logCompletionDebug("wait.fast_hit", {
+      fileKeyId,
+      elapsedMs: Date.now() - startedAt,
+    });
+    return first;
+  }
+
   while (Date.now() - startedAt <= timeoutMs) {
     const remainingMs = timeoutMs - (Date.now() - startedAt);
     if (remainingMs <= 0) break;
@@ -98,8 +134,18 @@ export async function waitForCompletionRecord(
     }
 
     const current = await getCompletionRecord(fileKeyId);
-    if (current) return current;
+    if (current) {
+      logCompletionDebug("wait.hit_after_subscribe", {
+        fileKeyId,
+        elapsedMs: Date.now() - startedAt,
+      });
+      return current;
+    }
   }
 
+  logCompletionDebug("wait.timeout", {
+    fileKeyId,
+    elapsedMs: Date.now() - startedAt,
+  });
   return null;
 }
