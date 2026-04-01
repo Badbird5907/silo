@@ -34,6 +34,8 @@ Bulk and single uploads:
 ```ts
 const upload = useUpload({ endpoint: "imageUploader" });
 await upload.uploadFiles(files, { input: { albumId: "abc" } });
+// Optional: tune how many files upload in parallel (default: max parallel)
+await upload.uploadFiles(files, { input: { albumId: "abc" }, concurrency: 4 });
 // or
 await upload.uploadFile(file, { input: { albumId: "abc" } });
 // or open a file picker and auto-upload selected files

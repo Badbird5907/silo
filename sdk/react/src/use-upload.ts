@@ -14,8 +14,8 @@ import type {
 } from "./types";
 import {
   buildAcceptAttribute,
-  getRouteMaxFileCount,
   getRouteFileTypeKeys,
+  getRouteMaxFileCount,
   isFileAllowedByRouteFileTypes,
   routeAllowsMultipleFiles,
 } from "./file-types";
@@ -31,6 +31,19 @@ interface UseUploadFactoryContext {
   endpointUrl: string;
   fetchImpl: typeof fetch;
   initialRouterConfig?: RouterConfigLike;
+}
+
+function resolveUploadConcurrency(
+  fileCount: number,
+  requestConcurrency?: number,
+  defaultConcurrency?: number,
+): number {
+  const candidate = requestConcurrency ?? defaultConcurrency ?? fileCount;
+  if (!Number.isFinite(candidate)) {
+    return fileCount;
+  }
+  const normalized = Math.max(1, Math.floor(candidate));
+  return Math.min(fileCount, normalized);
 }
 
 function openFilePickerDialog(
@@ -222,69 +235,125 @@ export function useUploadInternal<
           },
         );
 
-        const completions: UploadCompletion<TRouter, TEndpoint>[] = [];
-        for (const [index, file] of files.entries()) {
-          setCurrentUploadingFile(file);
-          const registration = registrations[index];
-          if (!registration) {
-            throw new SiloUploadError({
-              code: "REGISTER_RESPONSE_INVALID",
-              message: `Missing registration for file "${file.name}"`,
-            });
-          }
+        const completionsByIndex: (UploadCompletion<
+          TRouter,
+          TEndpoint
+        > | null)[] = Array.from({ length: files.length }, () => null);
+        const workerCount = resolveUploadConcurrency(
+          files.length,
+          uploadOptions?.concurrency,
+          options.concurrency,
+        );
+        let nextFileIndex = 0;
+        const runWorker = async () => {
+          while (!abortController.signal.aborted) {
+            const index = nextFileIndex;
+            nextFileIndex += 1;
+            if (index >= files.length) {
+              return;
+            }
 
-          await uploadFileWithProgress(
-            registration.uploadUrl,
-            file,
-            (loaded, total) => {
-              const previousLoaded = loadedByIndex.get(index) ?? 0;
-              loadedByIndex.set(index, loaded);
-              aggregateLoaded += loaded - previousLoaded;
-
-              const percent = Math.round(
-                total > 0 ? (loaded / total) * 100 : 0,
-              );
-              const aggregatePercent = Math.round(
-                totalBytes > 0 ? (aggregateLoaded / totalBytes) * 100 : 0,
-              );
-
-              setProgressByFile((prev) => ({
-                ...prev,
-                [registration.fileKeyId]: percent,
-              }));
-
-              options.onUploadProgress?.({
-                file,
-                fileIndex: index,
-                loaded,
-                total,
-                percent,
-                aggregateLoaded,
-                aggregateTotal: totalBytes,
-                aggregatePercent,
+            const file = files[index];
+            const registration = registrations[index];
+            if (!file || !registration) {
+              const error = new SiloUploadError({
+                code: "REGISTER_RESPONSE_INVALID",
+                message: `Missing registration for file at index ${index}`,
               });
-            },
-            abortController.signal,
-          );
+              abortController.abort();
+              throw error;
+            }
 
-          const completion = await awaitCompletion(
-            factoryContext.endpointUrl,
-            factoryContext.fetchImpl,
-            registration.fileKeyId,
-            uploadOptions?.awaitTimeoutMs,
-          );
+            setCurrentUploadingFile(file);
 
-          completions.push({
-            fileKeyId: completion.fileKeyId,
-            routeSlug: completion.routeSlug as TEndpoint,
-            accessKey: String(registration.accessKey),
-            uploadUrl: String(registration.uploadUrl),
-            result: completion.onUploadCompleteResult as UploadCompletion<
-              TRouter,
-              TEndpoint
-            >["result"],
+            try {
+              await uploadFileWithProgress(
+                registration.uploadUrl,
+                file,
+                (loaded, total) => {
+                  const previousLoaded = loadedByIndex.get(index) ?? 0;
+                  loadedByIndex.set(index, loaded);
+                  aggregateLoaded += loaded - previousLoaded;
+
+                  const percent = Math.round(
+                    total > 0 ? (loaded / total) * 100 : 0,
+                  );
+                  const aggregatePercent = Math.round(
+                    totalBytes > 0 ? (aggregateLoaded / totalBytes) * 100 : 0,
+                  );
+
+                  setProgressByFile((prev) => ({
+                    ...prev,
+                    [registration.fileKeyId]: percent,
+                  }));
+
+                  options.onUploadProgress?.({
+                    file,
+                    fileIndex: index,
+                    loaded,
+                    total,
+                    percent,
+                    aggregateLoaded,
+                    aggregateTotal: totalBytes,
+                    aggregatePercent,
+                  });
+                },
+                abortController.signal,
+              );
+
+              const completion = await awaitCompletion(
+                factoryContext.endpointUrl,
+                factoryContext.fetchImpl,
+                registration.fileKeyId,
+                uploadOptions?.awaitTimeoutMs,
+              );
+
+              completionsByIndex[index] = {
+                fileKeyId: completion.fileKeyId,
+                routeSlug: completion.routeSlug as TEndpoint,
+                accessKey: String(registration.accessKey),
+                uploadUrl: String(registration.uploadUrl),
+                result: completion.onUploadCompleteResult as UploadCompletion<
+                  TRouter,
+                  TEndpoint
+                >["result"],
+              };
+            } catch (error) {
+              const normalizedError =
+                error instanceof SiloUploadError
+                  ? error
+                  : new SiloUploadError({
+                      code: "UPLOAD_FAILED",
+                      message:
+                        error instanceof Error
+                          ? error.message
+                          : "Upload failed",
+                      cause: error,
+                    });
+              abortController.abort();
+              throw normalizedError;
+            }
+          }
+        };
+
+        await Promise.all(
+          Array.from({ length: workerCount }, () => runWorker()),
+        );
+
+        const missingCompletionIndex = completionsByIndex.findIndex(
+          (completion) => completion === null,
+        );
+        if (missingCompletionIndex >= 0) {
+          throw new SiloUploadError({
+            code: "UPLOAD_FAILED",
+            message: `Missing upload completion for file index ${missingCompletionIndex}`,
           });
         }
+
+        const completions = completionsByIndex.filter(
+          (completion): completion is UploadCompletion<TRouter, TEndpoint> =>
+            completion !== null,
+        );
 
         setResult(completions);
         options.onComplete?.(completions);
@@ -358,6 +427,7 @@ export function useUploadInternal<
           expiresIn: beginOptions?.expiresIn,
           protocol: beginOptions?.protocol,
           awaitTimeoutMs: beginOptions?.awaitTimeoutMs,
+          concurrency: beginOptions?.concurrency,
         });
       } catch (cause) {
         const normalized =
@@ -376,7 +446,13 @@ export function useUploadInternal<
         throw normalized;
       }
     },
-    [accept, maxFileCountByRoute, options, supportsMultipleByRoute, uploadFiles],
+    [
+      accept,
+      maxFileCountByRoute,
+      options,
+      supportsMultipleByRoute,
+      uploadFiles,
+    ],
   );
 
   const aggregateLoaded = Object.values(progressByFile).reduce(
@@ -529,6 +605,7 @@ export function useStagedUploadInternal<
         protocol: requestOptions?.protocol ?? options.protocol,
         awaitTimeoutMs:
           requestOptions?.awaitTimeoutMs ?? options.awaitTimeoutMs,
+        concurrency: requestOptions?.concurrency ?? options.concurrency,
       };
 
       const completions = await upload.uploadFiles(files, mergedOptions);

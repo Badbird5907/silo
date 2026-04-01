@@ -15,6 +15,7 @@ export interface UploadButtonProps<
   disabled?: boolean;
   input?: unknown;
   awaitTimeoutMs?: number;
+  concurrency?: number;
   children?: React.ReactNode;
   useUpload: (
     options: UseUploadOptions<TRouter, TEndpoint>,
@@ -38,6 +39,7 @@ export function UploadButton<
     multiple,
     input,
     awaitTimeoutMs,
+    concurrency,
     children,
   } = props;
   const upload = useUpload({
@@ -67,6 +69,7 @@ export function UploadButton<
           void upload.uploadFiles(selected, {
             input,
             awaitTimeoutMs,
+            concurrency,
           });
           event.currentTarget.value = "";
         }}

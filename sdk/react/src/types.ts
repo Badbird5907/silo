@@ -90,6 +90,7 @@ export interface UseUploadOptions<
   TEndpoint extends RouteSlug<TRouter>,
 > {
   endpoint: TEndpoint;
+  concurrency?: number;
   onUploadBegin?: (file: File, fileIndex: number) => void;
   onUploadProgress?: (event: SiloProgressEvent) => void;
   onComplete?: (result: UploadCompletion<TRouter, TEndpoint>[]) => void;
@@ -108,6 +109,7 @@ export interface UploadRequestOptions {
   expiresIn?: number;
   protocol?: "http" | "https";
   awaitTimeoutMs?: number;
+  concurrency?: number;
 }
 
 export interface UseStagedUploadOptions<

@@ -14,6 +14,7 @@ export interface UploadDropzoneProps<
   disabled?: boolean;
   input?: unknown;
   awaitTimeoutMs?: number;
+  concurrency?: number;
   className?: string;
   children?: React.ReactNode;
   useUpload: (
@@ -37,6 +38,7 @@ export function UploadDropzone<
     disabled,
     input,
     awaitTimeoutMs,
+    concurrency,
     className,
     children,
   } = props;
@@ -74,6 +76,7 @@ export function UploadDropzone<
         void upload.uploadFiles(dropped, {
           input,
           awaitTimeoutMs,
+          concurrency,
         });
       }}
       data-dragging={isDragging ? "true" : "false"}

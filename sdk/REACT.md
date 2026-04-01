@@ -104,6 +104,12 @@ await staged.upload();
 - actions: `uploadFiles`, `uploadFile`, `beginUpload`, `abort`, `reset`
 - state: `isUploading`, `isIdle`, `progress`, `error`, `result`
 
+Concurrency behavior:
+
+- multi-file uploads are concurrent by default (up to selected file count)
+- set `concurrency` on `useUpload(...)` for hook-level default
+- set `concurrency` on `uploadFiles(...)`/`beginUpload(...)` to override per request
+
 `useStagedUpload` returns:
 
 - actions: `openFilePicker`, `removeFile`, `clearFiles`, `upload`, `abort`, `reset`
