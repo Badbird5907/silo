@@ -82,10 +82,24 @@ export async function setCompletionRecord(input: {
 export async function getCompletionRecord(
   fileKeyId: string,
 ): Promise<CompletionRecord | null> {
-  const raw = await redis.get<string | null>(completionKey(fileKeyId));
-  if (!raw || typeof raw !== "string") {
+  const raw = await redis.get<unknown>(completionKey(fileKeyId));
+  if (raw == null) {
     logCompletionDebug("get.miss", { fileKeyId });
     return null;
+  }
+
+  if (typeof raw !== "string") {
+    try {
+      const parsed = completionRecordSchema.parse(raw);
+      logCompletionDebug("get.hit", {
+        fileKeyId,
+        completedAt: parsed.completedAt,
+      });
+      return parsed;
+    } catch {
+      logCompletionDebug("get.parse_error", { fileKeyId });
+      return null;
+    }
   }
 
   try {
