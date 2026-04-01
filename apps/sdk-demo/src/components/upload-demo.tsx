@@ -162,7 +162,7 @@ export function UploadDemo() {
                 disabled={upload.isUploading || !userId}
                 onClick={() => {
                   if (!userId) return;
-                  void upload.beginUpload();
+                  void upload.beginUpload({ awaitTimeoutMs: 60_000 });
                 }}
               >
                 {upload.isUploading ? (

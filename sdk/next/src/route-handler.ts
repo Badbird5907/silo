@@ -174,6 +174,20 @@ export function createRouteHandler<
   TContext = undefined,
   TRouter extends FileRouter<Request, TContext> = FileRouter<Request, TContext>,
 >(options: CreateRouteHandlerOptions<TContext, TRouter>) {
+  const completionDebugEnabled =
+    (globalThis as { process?: { env?: Record<string, string | undefined> } })
+      .process?.env?.SILO_COMPLETION_DEBUG === "1";
+  const logCompletionDebug = (
+    event: string,
+    details: Record<string, unknown>,
+  ) => {
+    if (!completionDebugEnabled) return;
+    console.info("[silo-completion]", {
+      event,
+      ...details,
+    });
+  };
+
   const completionTtlMs = options.completionTtlMs ?? 10 * 60 * 1000;
   const completionStoreUrl =
     options.completionStoreUrl ?? options.core.config.apiBaseUrl;
@@ -226,12 +240,35 @@ export function createRouteHandler<
       });
 
       if (callbackResult.status === "handled") {
-        await completionStore.set(callbackResult.event.data.fileKeyId, {
+        const fileKeyId = callbackResult.event.data.fileKeyId;
+        const setStartedAt = Date.now();
+        logCompletionDebug("callback.received", {
+          fileKeyId,
           routeSlug: callbackResult.routeSlug,
-          fileKeyId: callbackResult.event.data.fileKeyId,
-          completedAt: Date.now(),
-          onUploadCompleteResult: callbackResult.onUploadCompleteResult,
-        }, completionTtlMs);
+        });
+        try {
+          await completionStore.set(
+            fileKeyId,
+            {
+              routeSlug: callbackResult.routeSlug,
+              fileKeyId,
+              completedAt: Date.now(),
+              onUploadCompleteResult: callbackResult.onUploadCompleteResult,
+            },
+            completionTtlMs,
+          );
+          logCompletionDebug("completion.set.ok", {
+            fileKeyId,
+            elapsedMs: Date.now() - setStartedAt,
+          });
+        } catch (error) {
+          logCompletionDebug("completion.set.error", {
+            fileKeyId,
+            elapsedMs: Date.now() - setStartedAt,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          throw error;
+        }
       }
 
       return json({
@@ -244,7 +281,29 @@ export function createRouteHandler<
 
     if (action.action === "await-completion") {
       const timeoutMs = action.timeoutMs ?? 20_000;
-      const completion = await completionStore.wait(action.fileKeyId, timeoutMs);
+      const waitStartedAt = Date.now();
+      logCompletionDebug("completion.wait.start", {
+        fileKeyId: action.fileKeyId,
+        timeoutMs,
+      });
+      let completion: CompletionEntry | null = null;
+      try {
+        completion = await completionStore.wait(action.fileKeyId, timeoutMs);
+      } catch (error) {
+        logCompletionDebug("completion.wait.error", {
+          fileKeyId: action.fileKeyId,
+          timeoutMs,
+          elapsedMs: Date.now() - waitStartedAt,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      }
+      logCompletionDebug("completion.wait.done", {
+        fileKeyId: action.fileKeyId,
+        timeoutMs,
+        elapsedMs: Date.now() - waitStartedAt,
+        found: Boolean(completion),
+      });
       if (!completion) {
         return json(
           {
