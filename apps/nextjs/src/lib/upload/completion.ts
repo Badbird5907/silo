@@ -3,7 +3,7 @@ import { z } from "zod";
 
 const COMPLETION_KEY_PREFIX = "completion:fileKey:";
 const COMPLETION_CHANNEL_PREFIX = "completion:fileKey:";
-const DEFAULT_COMPLETION_TTL_SECONDS = 10 * 60;
+const DEFAULT_COMPLETION_TTL_SECONDS = 25 * 60;
 
 const completionRecordSchema = z
   .object({

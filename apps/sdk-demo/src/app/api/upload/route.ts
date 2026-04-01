@@ -8,9 +8,11 @@ function getRouteHandler() {
   return routeHandler;
 }
 
+const core = getSiloCore();
+
 const routeHandler = createRouteHandler({
   router: fileRouter,
-  core: getSiloCore(),
+  core,
   resolveContext: async () => {
     const { userId } = await auth();
     return { userId };

@@ -175,15 +175,21 @@ export function createRouteHandler<
   TRouter extends FileRouter<Request, TContext> = FileRouter<Request, TContext>,
 >(options: CreateRouteHandlerOptions<TContext, TRouter>) {
   const completionTtlMs = options.completionTtlMs ?? 10 * 60 * 1000;
+  const completionStoreUrl =
+    options.completionStoreUrl ?? options.core.config.apiBaseUrl;
+  const completionStoreAuthToken =
+    options.completionStoreAuthToken ?? options.core.config.apiKey;
+  const completionStorePathPrefix =
+    options.completionStorePathPrefix ?? "/api/v1/completion";
   const completionStore =
     options.completionStore ??
-    (options.completionStoreUrl
+    (completionStoreUrl
       ? createHttpCompletionStore({
-          baseUrl: options.completionStoreUrl,
-          pathPrefix: options.completionStorePathPrefix,
-          headers: options.completionStoreAuthToken
+          baseUrl: completionStoreUrl,
+          pathPrefix: completionStorePathPrefix,
+          headers: completionStoreAuthToken
             ? {
-                Authorization: `Bearer ${options.completionStoreAuthToken}`,
+                Authorization: `Bearer ${completionStoreAuthToken}`,
               }
             : undefined,
         })
