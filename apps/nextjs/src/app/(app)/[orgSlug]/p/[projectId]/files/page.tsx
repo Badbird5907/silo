@@ -7,10 +7,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Ban,
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   Clock,
   Copy,
   ExternalLink,
@@ -55,6 +51,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@silo-storage/ui/components/dropdown-menu";
+import { DataTable } from "@silo-storage/ui/components/data-table";
+import type { ColumnDef } from "@silo-storage/ui/components/data-table";
 import { Input } from "@silo-storage/ui/components/input";
 import {
   Select,
@@ -64,14 +62,10 @@ import {
   SelectValue,
 } from "@silo-storage/ui/components/select";
 import { Skeleton } from "@silo-storage/ui/components/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@silo-storage/ui/components/table";
+import { useIsMobile } from "@silo-storage/ui/hooks/use-mobile";
+import { cn } from "@silo-storage/ui/lib/utils";
+
+import type { RouterOutputs } from "@silo-storage/api";
 
 import { getDownloadUrl } from "@/actions/file";
 import { UploadDialog } from "@/components/upload-dialog";
@@ -143,18 +137,20 @@ function copyToClipboard(text: string, label = "Copied") {
   });
 }
 
-const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
+type FileKeyRow = RouterOutputs["fileKey"]["list"]["fileKeys"][number];
 
 interface SearchInputProps {
   value: string;
   onDebouncedChange: (value: string) => void;
   placeholder?: string;
+  className?: string;
 }
 
 const SearchInput = React.memo(function SearchInput({
   value,
   onDebouncedChange,
   placeholder = "Search...",
+  className,
 }: SearchInputProps) {
   const [localValue, setLocalValue] = React.useState(value);
 
@@ -172,7 +168,12 @@ const SearchInput = React.memo(function SearchInput({
   }, [localValue, value, onDebouncedChange]);
 
   return (
-    <div className="relative max-w-sm min-w-[200px] flex-1">
+    <div
+      className={cn(
+        "relative w-full min-w-0 max-w-full sm:max-w-sm sm:flex-1",
+        className,
+      )}
+    >
       <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
       <Input
         placeholder={placeholder}
@@ -186,6 +187,7 @@ const SearchInput = React.memo(function SearchInput({
 
 export default function FilesPage({ params }: FilesPageProps) {
   const trpc = useTRPC();
+  const isMobile = useIsMobile();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { projectId, orgSlug, environment: environmentSlug } = use(params);
@@ -201,7 +203,7 @@ export default function FilesPage({ params }: FilesPageProps) {
   >();
   const [statusFilter, setStatusFilter] = React.useState<
     "all" | "pending" | "completed" | "failed"
-  >("all");
+  >("completed"); // no need to show pending/failed files by default
   const [sortBy, setSortBy] = React.useState<
     "createdAt" | "size" | "mimeType" | "fileName"
   >("createdAt");
@@ -327,25 +329,28 @@ export default function FilesPage({ params }: FilesPageProps) {
     }),
   );
 
-  const handleOpenFile = async (fileKeyId: string) => {
-    setLoadingUrlId(fileKeyId);
-    try {
-      const result = await getDownloadUrl({
-        fileKeyId,
-        projectId,
-        organizationId,
-      });
-      if (result) {
-        window.open(result.url, "_blank");
-      } else {
+  const handleOpenFile = React.useCallback(
+    async (fileKeyId: string) => {
+      setLoadingUrlId(fileKeyId);
+      try {
+        const result = await getDownloadUrl({
+          fileKeyId,
+          projectId,
+          organizationId,
+        });
+        if (result) {
+          window.open(result.url, "_blank");
+        } else {
+          toast.error("Failed to get download URL");
+        }
+      } catch {
         toast.error("Failed to get download URL");
+      } finally {
+        setLoadingUrlId(null);
       }
-    } catch {
-      toast.error("Failed to get download URL");
-    } finally {
-      setLoadingUrlId(null);
-    }
-  };
+    },
+    [projectId, organizationId],
+  );
 
   const handleDelete = () => {
     if (deleteFileId) {
@@ -367,10 +372,172 @@ export default function FilesPage({ params }: FilesPageProps) {
     }
   };
 
+  const columns = React.useMemo<ColumnDef<FileKeyRow>[]>(
+    () => [
+      {
+        id: "file",
+        header: "File",
+        meta: {
+          headerClassName: isMobile ? undefined : "w-[35%]",
+        },
+        cell: ({ row }) => {
+          const fk = row.original;
+          const FileIcon = getFileIcon(fk.mimeType);
+          return (
+            <div className="flex items-center gap-3">
+              <div className="bg-muted flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
+                <FileIcon className="text-muted-foreground h-5 w-5" />
+              </div>
+              <div className="flex min-w-0 flex-col">
+                <span className="truncate font-medium">{fk.fileName}</span>
+                {fk.hash ? (
+                  <span className="text-muted-foreground truncate font-mono text-xs">
+                    {fk.hash.slice(0, 16)}...
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        id: "status",
+        header: "Status",
+        meta: { headerClassName: "w-[100px]" },
+        cell: ({ row }) => <FileStatusBadge status={row.original.status} />,
+      },
+      ...(isMobile
+        ? []
+        : [
+            {
+              id: "type",
+              header: "Type",
+              cell: ({ row }) => {
+                const fk = row.original;
+                return fk.mimeType ? (
+                  <Badge variant="outline">{fk.mimeType}</Badge>
+                ) : (
+                  <span className="text-muted-foreground">-</span>
+                );
+              },
+            } satisfies ColumnDef<FileKeyRow>,
+          ]),
+      {
+        id: "size",
+        header: "Size",
+        cell: ({ row }) => formatFileSize(row.original.size),
+      },
+      ...(isMobile
+        ? []
+        : [
+            {
+              id: "environment",
+              header: "Environment",
+              cell: ({ row }) => {
+                const env = row.original.environment;
+                return env ? (
+                  <Badge
+                    variant={
+                      env.type === "production"
+                        ? "default"
+                        : env.type === "staging"
+                          ? "secondary"
+                          : "outline"
+                    }
+                  >
+                    {env.name}
+                  </Badge>
+                ) : (
+                  <span className="text-muted-foreground">-</span>
+                );
+              },
+            } satisfies ColumnDef<FileKeyRow>,
+            {
+              id: "created",
+              header: "Created",
+              cell: ({ row }) => (
+                <span className="text-muted-foreground text-sm">
+                  {formatDate(row.original.createdAt)}
+                </span>
+              ),
+            } satisfies ColumnDef<FileKeyRow>,
+          ]),
+      {
+        id: "actions",
+        header: () => <span className="sr-only">Actions</span>,
+        meta: { headerClassName: "w-[50px]", cellClassName: "w-[50px]" },
+        cell: ({ row }) => {
+          const fk = row.original;
+          const isCompleted = fk.status === "completed";
+          return (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {loadingUrlId === fk.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <MoreHorizontal className="h-4 w-4" />
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => void handleOpenFile(fk.id)}
+                  disabled={!isCompleted}
+                >
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Open File
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() =>
+                    copyToClipboard(fk.accessKey, "Access key copied")
+                  }
+                >
+                  <Copy className="mr-2 h-4 w-4" />
+                  Copy Access Key
+                </DropdownMenuItem>
+                {fk.status === "pending" ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => setFailFileId(fk.id)}
+                      className="text-orange-600"
+                    >
+                      <Ban className="mr-2 h-4 w-4" />
+                      Mark as Failed
+                    </DropdownMenuItem>
+                  </>
+                ) : null}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setDeleteFileId(fk.id)}
+                  className="text-red-600"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          );
+        },
+      },
+    ],
+    [handleOpenFile, loadingUrlId, isMobile],
+  );
+
   if (projectQuery.isLoading || !organizationId) {
     return (
       <>
-        <div className="flex flex-1 flex-col gap-4 p-4">
+        <div className="flex min-w-0 flex-1 flex-col gap-4 p-4">
           <Skeleton className="h-32 w-full" />
           <Skeleton className="h-96 w-full" />
         </div>
@@ -391,19 +558,19 @@ export default function FilesPage({ params }: FilesPageProps) {
   const stats = statsQuery.data;
 
   const hasActiveFilters =
-    (mimeTypeFilter ?? environmentFilter ?? statusFilter !== "all") || search;
+    (mimeTypeFilter ?? environmentFilter ?? statusFilter !== "completed") || search;
 
   const clearFilters = () => {
     setSearch("");
     setMimeTypeFilter(undefined);
     setEnvironmentFilter(undefined);
-    setStatusFilter("all");
+    setStatusFilter("completed");
   };
 
   return (
     <>
-      <div className="flex flex-1 flex-col gap-4 p-4">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+      <div className="flex min-w-0 flex-1 flex-col gap-4 p-4">
+        <div className="grid min-w-0 grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-5">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total</CardTitle>
@@ -481,20 +648,20 @@ export default function FilesPage({ params }: FilesPageProps) {
           </Card>
         </div>
 
-        <Card>
+        <Card className="min-w-0">
           <CardHeader className="pb-4">
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <SearchInput
-                  value={search}
-                  onDebouncedChange={handleSearchChange}
-                  placeholder="Search by filename..."
-                />
+            <div className="flex min-w-0 flex-col gap-4">
+              <SearchInput
+                value={search}
+                onDebouncedChange={handleSearchChange}
+                placeholder="Search by filename..."
+              />
+              <div className="grid min-w-0 grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
                 <Select
                   value={statusFilter}
                   onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}
                 >
-                  <SelectTrigger className="w-[130px]">
+                  <SelectTrigger className="min-w-0 w-full sm:w-[130px]">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -510,7 +677,7 @@ export default function FilesPage({ params }: FilesPageProps) {
                     setEnvironmentFilter(v === "all" ? undefined : v)
                   }
                 >
-                  <SelectTrigger className="w-[160px]">
+                  <SelectTrigger className="min-w-0 w-full sm:w-[160px]">
                     <SelectValue placeholder="Environment" />
                   </SelectTrigger>
                   <SelectContent>
@@ -528,7 +695,7 @@ export default function FilesPage({ params }: FilesPageProps) {
                     setMimeTypeFilter(v === "all" ? undefined : v)
                   }
                 >
-                  <SelectTrigger className="w-[130px]">
+                  <SelectTrigger className="min-w-0 w-full sm:w-[130px]">
                     <SelectValue placeholder="Type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -551,7 +718,7 @@ export default function FilesPage({ params }: FilesPageProps) {
                     setSortOrder(order);
                   }}
                 >
-                  <SelectTrigger className="w-[160px]">
+                  <SelectTrigger className="min-w-0 w-full sm:w-[160px]">
                     <SelectValue placeholder="Sort" />
                   </SelectTrigger>
                   <SelectContent>
@@ -563,12 +730,19 @@ export default function FilesPage({ params }: FilesPageProps) {
                     <SelectItem value="size-asc">Smallest First</SelectItem>
                   </SelectContent>
                 </Select>
-                {hasActiveFilters && (
-                  <Button variant="ghost" size="sm" onClick={clearFilters}>
+              </div>
+              <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+                {hasActiveFilters ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearFilters}
+                    className="self-start sm:self-auto"
+                  >
                     Clear filters
                   </Button>
-                )}
-                <div className="ml-auto">
+                ) : null}
+                <div className="w-full sm:ml-auto sm:w-auto [&_button]:w-full sm:[&_button]:w-auto">
                   <UploadDialog
                     projectId={projectId}
                     defaultEnvironmentId={selectedEnvironmentId}
@@ -589,221 +763,30 @@ export default function FilesPage({ params }: FilesPageProps) {
             </div>
           </CardHeader>
 
-          <CardContent>
-            {fileKeysQuery.isLoading ? (
-              <div className="space-y-2">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Skeleton key={i} className="h-14 w-full" />
-                ))}
-              </div>
-            ) : fileKeys.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <File className="text-muted-foreground mb-4 h-12 w-12" />
-                <h3 className="text-lg font-semibold">No files found</h3>
-                <p className="text-muted-foreground text-sm">
-                  {hasActiveFilters
-                    ? "Try adjusting your filters"
-                    : "Upload some files to get started"}
-                </p>
-              </div>
-            ) : (
-              <>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[35%]">File</TableHead>
-                      <TableHead className="w-[100px]">Status</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Size</TableHead>
-                      <TableHead>Environment</TableHead>
-                      <TableHead>Created</TableHead>
-                      <TableHead className="w-[50px]"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {fileKeys.map((fk) => {
-                      const FileIcon = getFileIcon(fk.mimeType);
-                      const isCompleted = fk.status === "completed";
-                      return (
-                        <TableRow
-                          key={fk.id}
-                          className="cursor-pointer"
-                          onClick={() =>
-                            router.push(`${projectBasePath}/files/${fk.id}`)
-                          }
-                        >
-                          <TableCell>
-                            <div className="flex items-center gap-3">
-                              <div className="bg-muted flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
-                                <FileIcon className="text-muted-foreground h-5 w-5" />
-                              </div>
-                              <div className="flex min-w-0 flex-col">
-                                <span className="truncate font-medium">{fk.fileName}</span>
-                                {fk.hash && (
-                                  <span className="text-muted-foreground truncate font-mono text-xs">
-                                    {fk.hash.slice(0, 16)}...
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <FileStatusBadge status={fk.status} />
-                          </TableCell>
-                          <TableCell>
-                            {fk.mimeType ? (
-                              <Badge variant="outline">{fk.mimeType}</Badge>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell>{formatFileSize(fk.size)}</TableCell>
-                          <TableCell>
-                            {fk.environment ? (
-                              <Badge
-                                variant={
-                                  fk.environment.type === "production"
-                                    ? "default"
-                                    : fk.environment.type === "staging"
-                                      ? "secondary"
-                                      : "outline"
-                                }
-                              >
-                                {fk.environment.name}
-                              </Badge>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground text-sm">
-                            {formatDate(fk.createdAt)}
-                          </TableCell>
-                          <TableCell>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon-sm"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  {loadingUrlId === fk.id ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  )}
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent
-                                align="end"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onClick={() => handleOpenFile(fk.id)}
-                                  disabled={!isCompleted}
-                                >
-                                  <ExternalLink className="mr-2 h-4 w-4" />
-                                  Open File
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() =>
-                                    copyToClipboard(fk.accessKey, "Access key copied")
-                                  }
-                                >
-                                  <Copy className="mr-2 h-4 w-4" />
-                                  Copy Access Key
-                                </DropdownMenuItem>
-                                {fk.status === "pending" && (
-                                  <>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem
-                                      onClick={() => setFailFileId(fk.id)}
-                                      className="text-orange-600"
-                                    >
-                                      <Ban className="mr-2 h-4 w-4" />
-                                      Mark as Failed
-                                    </DropdownMenuItem>
-                                  </>
-                                )}
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onClick={() => setDeleteFileId(fk.id)}
-                                  className="text-red-600"
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-
-                {pagination && (
-                  <div className="flex items-center justify-between border-t pt-4">
-                    <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                      <span>Rows:</span>
-                      <Select
-                        value={pageSize.toString()}
-                        onValueChange={(value) => setPageSize(Number(value))}
-                      >
-                        <SelectTrigger className="h-8 w-[70px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {PAGE_SIZE_OPTIONS.map((size) => (
-                            <SelectItem key={size} value={size.toString()}>
-                              {size}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="text-muted-foreground text-sm">
-                      {pagination.page} / {pagination.totalPages} ({pagination.totalCount})
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="outline"
-                        size="icon-sm"
-                        onClick={() => setPage(1)}
-                        disabled={!pagination.hasPreviousPage}
-                      >
-                        <ChevronsLeft className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="icon-sm"
-                        onClick={() => setPage((p) => Math.max(1, p - 1))}
-                        disabled={!pagination.hasPreviousPage}
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="icon-sm"
-                        onClick={() => setPage((p) => p + 1)}
-                        disabled={!pagination.hasNextPage}
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="icon-sm"
-                        onClick={() => setPage(pagination.totalPages)}
-                        disabled={!pagination.hasNextPage}
-                      >
-                        <ChevronsRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
+          <CardContent className="min-w-0">
+            <DataTable
+              columns={columns}
+              data={fileKeys}
+              loading={fileKeysQuery.isLoading}
+              emptyMessage={
+                hasActiveFilters
+                  ? "No files found. Try adjusting your filters."
+                  : "No files found. Upload some files to get started."
+              }
+              emptyIcon={File}
+              onRowClick={(row) =>
+                router.push(`${projectBasePath}/files/${row.id}`)
+              }
+              pagination={
+                pagination
+                  ? {
+                      ...pagination,
+                      onPageChange: setPage,
+                      onPageSizeChange: setPageSize,
+                    }
+                  : undefined
+              }
+            />
           </CardContent>
         </Card>
       </div>
