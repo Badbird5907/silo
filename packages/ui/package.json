@@ -83,6 +83,7 @@
     "./components/spinner": "./src/components/spinner.tsx",
     "./components/switch": "./src/components/switch.tsx",
     "./components/table": "./src/components/table.tsx",
+    "./components/tabs": "./src/components/tabs.tsx",
     "./components/tooltip": "./src/components/tooltip.tsx",
     "./hooks/use-mobile": "./src/hooks/use-mobile.ts",
     "./lib/utils": "./src/lib/utils.ts"

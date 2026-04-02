@@ -50,6 +50,7 @@ import { fileRouter } from "@/upload";
 const core = createSiloCoreFromToken({
   url: process.env.SILO_URL!,
   token: process.env.SILO_TOKEN!,
+  cdnHost: process.env.NEXT_PUBLIC_SILO_CDN!,
 });
 
 export const { GET, POST } = createRouteHandler({

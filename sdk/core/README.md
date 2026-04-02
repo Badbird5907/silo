@@ -28,6 +28,7 @@ import { createSiloCoreFromToken } from "@silo-storage/sdk-core";
 const uploadCore = createSiloCoreFromToken({
   url: process.env.SILO_URL!,
   token: process.env.SILO_TOKEN!,
+  cdnHost: process.env.SILO_CDN ?? process.env.NEXT_PUBLIC_SILO_CDN!,
   uploadStrategy: "server", // optional default
   callbackUrl: "https://app.example.com/api/silo/callback",
 });
@@ -50,6 +51,7 @@ import { createSiloCoreFromToken } from "@silo-storage/sdk-core";
 const uploadCore = createSiloCoreFromToken({
   url: process.env.SILO_URL!,
   token: process.env.SILO_TOKEN!,
+  cdnHost: process.env.SILO_CDN ?? process.env.NEXT_PUBLIC_SILO_CDN!,
   callbackUrl: "https://app.example.com/api/silo/callback",
 });
 
@@ -73,10 +75,12 @@ const downloadUrl = await uploadCore.generateDownloadUrl({
 - `v` version
 - `ak` apiKey
 - `eid` environmentId
-- `is` ingestServer
 - `ss` signingSecret
 - `rm` routeMode (`s` = subdomain, `p` = path)
 - `ps` projectSlug
+
+The ingest/CDN host is no longer embedded in `SILO_TOKEN`. Provide it via app env
+(`SILO_CDN`, or `NEXT_PUBLIC_SILO_CDN` in Next.js) and pass it as `cdnHost`.
 
 ## Callback URL
 

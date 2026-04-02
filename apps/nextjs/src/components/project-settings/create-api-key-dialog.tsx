@@ -2,10 +2,11 @@
 
 import * as React from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Check, Copy, Key, Loader2 } from "lucide-react";
+import { Key, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useDebouncedCallback } from "use-debounce";
 
+import { Badge } from "@silo-storage/ui/components/badge";
 import { Button } from "@silo-storage/ui/components/button";
 import {
   Dialog,
@@ -26,6 +27,9 @@ import {
   SelectValue,
 } from "@silo-storage/ui/components/select";
 
+import {
+  ApiKeySecretsSection,
+} from "@/components/project-settings/api-key-secrets-section";
 import { useTRPC } from "@/trpc/react";
 
 interface CreateApiKeyDialogProps {
@@ -54,8 +58,6 @@ export function CreateApiKeyDialog({
   );
   const [copied, setCopied] = React.useState(false);
   const [copiedSecret, setCopiedSecret] = React.useState(false);
-  const [copiedBothVars, setCopiedBothVars] = React.useState(false);
-
   const environmentsQuery = useQuery({
     ...trpc.apiKey.getEnvironments.queryOptions({ projectId, organizationId }),
     enabled: open && !!organizationId,
@@ -127,15 +129,6 @@ export function CreateApiKeyDialog({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleCopyBothVars = async () => {
-    if (!createdSiloToken) return;
-    const snippet = `SILO_URL=${window.location.origin}\nSILO_TOKEN=${createdSiloToken}`;
-    await navigator.clipboard.writeText(snippet);
-    setCopiedBothVars(true);
-    toast.success("SILO_URL and SILO_TOKEN copied to clipboard");
-    setTimeout(() => setCopiedBothVars(false), 2000);
-  };
-
   const handleCopySigningSecret = async () => {
     if (!createdSigningSecret) return;
     await navigator.clipboard.writeText(createdSigningSecret);
@@ -157,7 +150,6 @@ export function CreateApiKeyDialog({
       setCreatedSiloToken(null);
       setCopied(false);
       setCopiedSecret(false);
-      setCopiedBothVars(false);
       createMutation.reset();
     }, 200);
   };
@@ -195,108 +187,48 @@ export function CreateApiKeyDialog({
           Create API Key
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent
+        className={createdKey ? "gap-0 sm:max-w-xl" : undefined}
+      >
         {createdKey ? (
           <>
-            <DialogHeader>
-              <DialogTitle>API Key Created</DialogTitle>
+            <DialogHeader className="space-y-2">
+              <DialogTitle>API key created</DialogTitle>
               <DialogDescription>
-                Your new API key has been created. Make sure to copy it now -
-                you won&apos;t be able to see it again!
+                Copy what you need before closing. These values are only shown
+                once.
               </DialogDescription>
             </DialogHeader>
-            <div className="py-4">
-              <div className="space-y-4">
-                {selectedEnvironment ? (
-                  <p className="text-muted-foreground text-xs">
-                    This key is scoped to{" "}
-                    <strong>{selectedEnvironment.name}</strong>.
-                  </p>
-                ) : null}
-                <div className="space-y-2">
-                  <Label>Your API Key</Label>
-                  <div className="flex items-center gap-2">
-                    <code className="bg-muted flex-1 rounded-md border px-3 py-2 font-mono text-sm break-all">
-                      {createdKey}
-                    </code>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={handleCopyKey}
-                      className="shrink-0"
-                    >
-                      {copied ? (
-                        <Check className="h-4 w-4 text-green-500" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
+
+            <div className="min-w-0 space-y-5 py-2">
+              {selectedEnvironment ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-muted-foreground text-sm">
+                    Environment
+                  </span>
+                  <Badge variant="secondary" className="font-normal">
+                    {selectedEnvironment.name}
+                  </Badge>
                 </div>
-                {createdSigningSecret && (
-                  <div className="space-y-2">
-                    <Label>Signing Secret</Label>
-                    <div className="flex items-center gap-2">
-                      <code className="bg-muted flex-1 rounded-md border px-3 py-2 font-mono text-sm break-all">
-                        {createdSigningSecret}
-                      </code>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={handleCopySigningSecret}
-                        className="shrink-0"
-                      >
-                        {copiedSecret ? (
-                          <Check className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <Copy className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                    <p className="text-muted-foreground text-xs">
-                      Use this to self-sign upload URLs from your server without
-                      calling the /upload endpoint.
-                    </p>
-                  </div>
-                )}
-                <div className="space-y-2">
-                  <Label>Environment Snippet</Label>
-                  {createdSiloToken ? (
-                    <>
-                      <pre className="bg-muted rounded-md border px-3 py-2 font-mono text-xs break-all whitespace-pre-wrap">
-                        {`SILO_URL=${typeof window === "undefined" ? "" : window.location.origin}\nSILO_TOKEN=${createdSiloToken}`}
-                      </pre>
-                      <Button
-                        variant="outline"
-                        onClick={handleCopyBothVars}
-                        className="w-full"
-                      >
-                        {copiedBothVars ? (
-                          <>
-                            <Check className="mr-2 h-4 w-4 text-green-500" />
-                            Copied both vars
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="mr-2 h-4 w-4" />
-                            Copy both vars
-                          </>
-                        )}
-                      </Button>
-                    </>
-                  ) : (
-                    <p className="text-muted-foreground text-xs">
-                      SILO_TOKEN could not be generated. Delete this key and
-                      create a new key scoped to an environment.
-                    </p>
-                  )}
-                </div>
-                <p className="text-muted-foreground text-xs">
-                  Store these securely. They will not be shown again.
-                </p>
-              </div>
+              ) : null}
+
+              <ApiKeySecretsSection
+                siloToken={createdSiloToken}
+                apiKey={createdKey}
+                signingSecret={createdSigningSecret}
+                apiKeyCopied={copied}
+                signingSecretCopied={copiedSecret}
+                onCopyApiKey={() => void handleCopyKey()}
+                onCopySigningSecret={() => void handleCopySigningSecret()}
+              />
+
+              <p className="text-muted-foreground border-t pt-4 text-xs leading-relaxed">
+                Treat these like passwords. Store them in a secrets manager or
+                env files that are never committed.
+              </p>
             </div>
-            <DialogFooter>
+
+            <DialogFooter className="mt-2 sm:justify-end">
               <Button onClick={handleClose}>Done</Button>
             </DialogFooter>
           </>

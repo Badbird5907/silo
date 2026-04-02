@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Key, MoreHorizontal, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@silo-storage/ui/components/avatar";
@@ -14,6 +15,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@silo-storage/ui/components/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@silo-storage/ui/components/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -61,6 +71,10 @@ function isExpired(expiresAt: Date | null): boolean {
 
 export function ApiKeysList({ projectId, organizationId }: ApiKeysListProps) {
   const trpc = useTRPC();
+  const [keyPendingDelete, setKeyPendingDelete] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   const apiKeysQuery = useQuery(
     trpc.apiKey.list.queryOptions({ projectId, organizationId }),
@@ -71,6 +85,7 @@ export function ApiKeysList({ projectId, organizationId }: ApiKeysListProps) {
       onSuccess: () => {
         toast.success("API key deleted successfully");
         void apiKeysQuery.refetch();
+        setKeyPendingDelete(null);
       },
       onError: (error: { message?: string }) => {
         toast.error(error.message ?? "Failed to delete API key");
@@ -78,8 +93,12 @@ export function ApiKeysList({ projectId, organizationId }: ApiKeysListProps) {
     }),
   );
 
-  const handleDelete = (id: string) => {
-    deleteMutation.mutate({ id, organizationId });
+  const handleConfirmDelete = () => {
+    if (!keyPendingDelete) return;
+    deleteMutation.mutate({
+      id: keyPendingDelete.id,
+      organizationId,
+    });
   };
 
   if (apiKeysQuery.isLoading) {
@@ -235,7 +254,12 @@ export function ApiKeysList({ projectId, organizationId }: ApiKeysListProps) {
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
-                            onClick={() => handleDelete(apiKey.id)}
+                            onClick={() =>
+                              setKeyPendingDelete({
+                                id: apiKey.id,
+                                name: apiKey.name,
+                              })
+                            }
                             className="text-red-600"
                           >
                             <Trash2 className="mr-2 h-4 w-4" />
@@ -251,6 +275,42 @@ export function ApiKeysList({ projectId, organizationId }: ApiKeysListProps) {
           </Table>
         )}
       </CardContent>
+
+      <Dialog
+        open={keyPendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setKeyPendingDelete(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete API key</DialogTitle>
+            <DialogDescription>
+              This will revoke{" "}
+              <span className="text-foreground font-medium">
+                {keyPendingDelete?.name}
+              </span>
+              . Apps using this key will stop working immediately. This cannot be
+              undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline" disabled={deleteMutation.isPending}>
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={deleteMutation.isPending}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              {deleteMutation.isPending ? "Deleting…" : "Delete key"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

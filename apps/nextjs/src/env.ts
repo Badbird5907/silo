@@ -11,6 +11,7 @@ export const env = createEnv({
       .enum(["development", "production", "test"])
       .default("development"),
     DISABLE_ORG_CREATION: z.boolean().default(false),
+    SILO_CDN: z.url().min(1),
   },
   /**
    * Specify your server-side environment variables schema here.
@@ -41,7 +42,7 @@ export const env = createEnv({
   experimental__runtimeEnv: {
     ...process.env,
     DISABLE_ORG_CREATION: process.env.NEXT_PUBLIC_DISABLE_ORG_CREATION === "true",
-    // NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR,
+    SILO_CDN: process.env.NEXT_PUBLIC_SILO_CDN,
   },
   skipValidation:
     !!process.env.CI || process.env.npm_lifecycle_event === "lint",

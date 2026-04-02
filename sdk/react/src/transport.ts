@@ -105,9 +105,7 @@ export async function registerUpload(
   return data.files;
 }
 
-// End-to-end callback delivery can exceed 20s in serverless environments.
-// Use a larger default budget so browser completion polling is resilient.
-const DEFAULT_COMPLETION_TOTAL_MS = 60_000;
+const DEFAULT_COMPLETION_TOTAL_MS = 60_000; // retry for 60 seconds
 /** Max time each await-completion HTTP request holds the server polling in-memory state. */
 const MAX_COMPLETION_POLL_PER_REQUEST_MS = 4_000;
 

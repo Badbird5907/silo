@@ -4,6 +4,7 @@ import { createSiloCore, createSiloCoreFromToken } from "./upload/core";
 
 export interface SiloClientConfig {
   apiBaseUrl: string;
+  cdnHost?: string;
   token?: string;
   apiKey?: string;
 }
@@ -52,9 +53,15 @@ export function createSiloClient(config: SiloClientConfig): SiloClient {
           "Missing token. Provide one in createSiloClient(...) or createSiloCoreFromToken(...).",
         );
       }
+      if (!config.cdnHost) {
+        throw new Error(
+          "Missing cdnHost. Provide one in createSiloClient(...) for createSiloCoreFromToken(...).",
+        );
+      }
       return createSiloCoreFromToken({
         url: apiBaseUrl,
         token: tokenToUse,
+        cdnHost: config.cdnHost,
       });
     },
   };

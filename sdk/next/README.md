@@ -24,6 +24,7 @@ const parsed = parseSiloToken(token);
 const core = createSiloCoreFromToken({
   url: process.env.SILO_URL!,
   token,
+  cdnHost: process.env.NEXT_PUBLIC_SILO_CDN!,
 });
 
 export const { GET, POST } = createRouteHandler({

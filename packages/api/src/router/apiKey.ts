@@ -21,7 +21,6 @@ function encodeSiloToken(payload: {
   ak: string;
   kid: string;
   eid: string;
-  is: string;
   ss: string;
   rm: "s" | "p";
   ps: string;
@@ -214,7 +213,6 @@ export const apiKeyRouter = {
         ak: fullKey,
         kid: newKey.id,
         eid: input.environmentId,
-        is: ingestServer,
         ss: signingSecret,
         rm: toCompactRouteMode(env.PROJECT_ROUTE_MODE),
         ps: project.slug,

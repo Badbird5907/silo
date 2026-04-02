@@ -7,7 +7,6 @@ const siloTokenSchema = z
     ak: z.string().min(1),
     kid: z.string().min(1),
     eid: z.string().min(1),
-    is: z.string().min(1),
     ss: z.string().min(1),
     rm: z.enum(["s", "p"]),
     ps: z.string().min(1),
@@ -19,7 +18,6 @@ export interface ParsedSiloToken {
   apiKey: string;
   apiKeyId: string;
   environmentId: string;
-  ingestServer: string;
   signingSecret: string;
   routeMode: "subdomain" | "path";
   projectSlug: string;
@@ -28,6 +26,7 @@ export interface ParsedSiloToken {
 export interface CreateSiloCoreFromTokenInput {
   url: string;
   token: string;
+  cdnHost: string;
   uploadStrategy?: UploadStrategy;
   callbackUrl?: string;
   fetch?: typeof fetch;
@@ -63,7 +62,6 @@ export function encodeSiloToken(payload: {
   ak: string;
   kid: string;
   eid: string;
-  is: string;
   ss: string;
   rm: "s" | "p";
   ps: string;
@@ -116,7 +114,6 @@ export function parseSiloToken(token: string): ParsedSiloToken {
     apiKey: parsed.data.ak,
     apiKeyId: parsed.data.kid,
     environmentId: parsed.data.eid,
-    ingestServer: parsed.data.is,
     signingSecret: parsed.data.ss,
     routeMode: parsed.data.rm === "p" ? "path" : "subdomain",
     projectSlug: parsed.data.ps,

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Check, Copy, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@silo-storage/ui/components/button";
@@ -27,6 +27,10 @@ import {
 import { authClient } from "@/auth/client";
 import { useTRPC } from "@/trpc/react";
 
+import {
+  ApiKeySecretsSection,
+} from "@/components/project-settings/api-key-secrets-section";
+
 interface CreatePersonalEnvironmentWizardProps {
   projectId: string;
   organizationId: string;
@@ -35,14 +39,8 @@ interface CreatePersonalEnvironmentWizardProps {
   onOpenChange?: (open: boolean) => void;
 }
 
-interface EnvironmentVariableRowProps {
-  label: string;
-  value: string | null;
-  copied: boolean;
-  onCopy: () => void;
-}
-
 interface CreatedValues {
+  apiKey: string | null;
   siloToken: string | null;
   signingSecret: string | null;
 }
@@ -50,39 +48,16 @@ interface CreatedValues {
 type CopyField = keyof CreatedValues;
 
 const EMPTY_CREATED_VALUES: CreatedValues = {
+  apiKey: null,
   siloToken: null,
   signingSecret: null,
 };
 
 const EMPTY_COPIED_VALUES: Record<CopyField, boolean> = {
+  apiKey: false,
   siloToken: false,
   signingSecret: false,
 };
-
-function EnvironmentVariableRow({
-  label,
-  value,
-  copied,
-  onCopy,
-}: EnvironmentVariableRowProps) {
-  return (
-    <div className="space-y-2">
-      <Label>{label}</Label>
-      <div className="flex items-center gap-2">
-        <code className="bg-muted flex-1 rounded-md border px-3 py-2 font-mono text-xs break-all">
-          {value}
-        </code>
-        <Button variant="outline" size="icon" onClick={onCopy} className="shrink-0">
-          {copied ? (
-            <Check className="h-4 w-4 text-green-500" />
-          ) : (
-            <Copy className="h-4 w-4" />
-          )}
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 export function CreatePersonalEnvironmentWizard({
   projectId,
@@ -145,10 +120,12 @@ export function CreatePersonalEnvironmentWizard({
               apiKeyResult && typeof apiKeyResult === "object"
                 ? (apiKeyResult as Record<string, unknown>)
                 : null;
+            const apiKey = typeof record?.key === "string" ? record.key : null;
             const siloToken = typeof record?.siloToken === "string" ? record.siloToken : null;
             const signingSecret =
               typeof record?.signingSecret === "string" ? record.signingSecret : null;
             setCreatedValues({
+              apiKey,
               siloToken,
               signingSecret,
             });
@@ -203,31 +180,25 @@ export function CreatePersonalEnvironmentWizard({
 
   const isCreating = createMutation.isPending || createApiKeyMutation.isPending;
 
-  const copyCreatedValue = React.useCallback(
-    async (field: CopyField, successMessage: string) => {
-      const value = createdValues[field];
-      if (!value) return;
-
-      await navigator.clipboard.writeText(value);
-      setCopiedValues((prev) => ({ ...prev, [field]: true }));
-      toast.success(successMessage);
-      setTimeout(() => {
-        setCopiedValues((prev) => ({ ...prev, [field]: false }));
-      }, 1500);
-    },
-    [createdValues],
-  );
-
-  const copySiloVars = React.useCallback(async () => {
-    if (!createdValues.siloToken) return;
-    const snippet = `SILO_URL=${window.location.origin}\nSILO_TOKEN=${createdValues.siloToken}`;
-    await navigator.clipboard.writeText(snippet);
-    setCopiedValues((prev) => ({ ...prev, siloToken: true }));
-    toast.success("SILO_URL and SILO_TOKEN copied");
+  const copyApiKey = React.useCallback(async () => {
+    if (!createdValues.apiKey) return;
+    await navigator.clipboard.writeText(createdValues.apiKey);
+    setCopiedValues((prev) => ({ ...prev, apiKey: true }));
+    toast.success("API key copied to clipboard");
     setTimeout(() => {
-      setCopiedValues((prev) => ({ ...prev, siloToken: false }));
-    }, 1500);
-  }, [createdValues.siloToken]);
+      setCopiedValues((prev) => ({ ...prev, apiKey: false }));
+    }, 2000);
+  }, [createdValues.apiKey]);
+
+  const copySigningSecret = React.useCallback(async () => {
+    if (!createdValues.signingSecret) return;
+    await navigator.clipboard.writeText(createdValues.signingSecret);
+    setCopiedValues((prev) => ({ ...prev, signingSecret: true }));
+    toast.success("Signing secret copied to clipboard");
+    setTimeout(() => {
+      setCopiedValues((prev) => ({ ...prev, signingSecret: false }));
+    }, 2000);
+  }, [createdValues.signingSecret]);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -308,37 +279,17 @@ export function CreatePersonalEnvironmentWizard({
             )}
           </div>
         ) : (
-          <div className="space-y-4 text-sm">
+          <div className="min-w-0 space-y-4 text-sm">
             <p>Environment and API key created.</p>
-            {createdValues.siloToken ? (
-              <div className="space-y-2">
-                <Label>SILO setup</Label>
-                <pre className="bg-muted rounded-md border px-3 py-2 font-mono text-xs whitespace-pre-wrap break-all">
-                  {`SILO_URL=${typeof window === "undefined" ? "" : window.location.origin}\nSILO_TOKEN=${createdValues.siloToken}`}
-                </pre>
-                <Button
-                  variant="outline"
-                  onClick={() => void copySiloVars()}
-                >
-                  {copiedValues.siloToken ? (
-                    <Check className="mr-2 h-4 w-4 text-green-500" />
-                  ) : (
-                    <Copy className="mr-2 h-4 w-4" />
-                  )}
-                  Copy both vars
-                </Button>
-              </div>
-            ) : null}
-            {createdValues.signingSecret && (
-              <EnvironmentVariableRow
-                label="SILO_SIGNING_SECRET"
-                value={createdValues.signingSecret}
-                copied={copiedValues.signingSecret}
-                onCopy={() =>
-                  void copyCreatedValue("signingSecret", "Signing secret copied")
-                }
-              />
-            )}
+            <ApiKeySecretsSection
+              siloToken={createdValues.siloToken}
+              apiKey={createdValues.apiKey}
+              signingSecret={createdValues.signingSecret}
+              apiKeyCopied={copiedValues.apiKey}
+              signingSecretCopied={copiedValues.signingSecret}
+              onCopyApiKey={() => void copyApiKey()}
+              onCopySigningSecret={() => void copySigningSecret()}
+            />
           </div>
         )}
 

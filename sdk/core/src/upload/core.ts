@@ -523,7 +523,7 @@ export function createSiloCoreFromToken(
     apiKey: parsed.apiKey,
     keyId: parsed.apiKeyId,
     environmentId: parsed.environmentId,
-    ingestServer: parsed.ingestServer,
+    ingestServer: input.cdnHost,
     signingSecret: parsed.signingSecret,
     uploadStrategy: input.uploadStrategy,
     routeMode: parsed.routeMode,

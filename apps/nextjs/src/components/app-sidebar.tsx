@@ -168,6 +168,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     router.push(`/${orgSlug}/p/${currentProjectId}/settings?createDevEnv=1`);
   };
 
+  const hasOwnDevEnv = React.useMemo(() => {
+    return !environmentsQuery.isLoading && session && environmentsQuery.data?.some((environment) => environment.ownerUserId === session.user.id);
+  }, [environmentsQuery.data, environmentsQuery.isLoading, session]);
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -190,15 +194,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 ))}
               </SelectContent>
             </Select>
-            <Button
-              variant="outline"
-              className="w-full"
-              size="sm"
-              onClick={handleCreateMyDevEnvironment}
-              aria-label="Create my dev environment"
-            >
-              Create my dev environment
-            </Button>
+            {!hasOwnDevEnv && (
+              <Button
+                variant="outline"
+                className="w-full"
+                size="sm"
+                onClick={handleCreateMyDevEnvironment}
+                aria-label="Create my dev environment"
+              >
+                Create my dev environment
+              </Button>
+            )}
           </div>
         )}
       </SidebarHeader>
