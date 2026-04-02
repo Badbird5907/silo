@@ -19,7 +19,7 @@ export function siloEnvSnippet(
 ): string {
   const origin =
     typeof window !== "undefined" ? window.location.origin : "";
-  const cdn = env.SILO_CDN;
+  const cdn = env.SILO_CDN.endsWith("/") ? env.SILO_CDN.substring(0, env.SILO_CDN.length - 1) : env.SILO_CDN;
   // return `${keys.url}=${origin}\n${keys.cdn}=${cdn}\n${keys.token}=${siloToken}`;
   let cdnPrefix = "";
   if (framework === "next") {
