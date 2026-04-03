@@ -17,6 +17,7 @@ import {
   FileImage,
   FileText,
   FileVideo,
+  Filter,
   HardDrive,
   Loader2,
   MoreHorizontal,
@@ -46,21 +47,21 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuPortal,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@silo-storage/ui/components/dropdown-menu";
 import { DataTable } from "@silo-storage/ui/components/data-table";
 import type { ColumnDef } from "@silo-storage/ui/components/data-table";
 import { Input } from "@silo-storage/ui/components/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@silo-storage/ui/components/select";
 import { Skeleton } from "@silo-storage/ui/components/skeleton";
 import { useIsMobile } from "@silo-storage/ui/hooks/use-mobile";
 import { cn } from "@silo-storage/ui/lib/utils";
@@ -199,8 +200,8 @@ export default function FilesPage({ params }: FilesPageProps) {
   const [search, setSearch] = React.useState("");
   const [mimeTypeFilter, setMimeTypeFilter] = React.useState<string | undefined>();
   const [environmentFilter, setEnvironmentFilter] = React.useState<
-    string | undefined
-  >();
+    string
+  >("all");
   const [statusFilter, setStatusFilter] = React.useState<
     "all" | "pending" | "completed" | "failed"
   >("completed"); // no need to show pending/failed files by default
@@ -258,8 +259,9 @@ export default function FilesPage({ params }: FilesPageProps) {
     if (!environmentSlug) {
       return;
     }
-    setEnvironmentFilter(undefined);
+    setEnvironmentFilter("all");
   }, [selectedEnvironmentId, environmentSlug]);
+  const environmentId = environmentFilter === "all" ? undefined : environmentFilter;
 
   const fileKeysQuery = useQuery(
     trpc.fileKey.list.queryOptions(
@@ -270,7 +272,7 @@ export default function FilesPage({ params }: FilesPageProps) {
         pageSize,
         search: search || undefined,
         mimeType: mimeTypeFilter,
-        environmentId: environmentFilter,
+        environmentId,
         status: statusFilter,
         sortBy,
         sortOrder,
@@ -281,14 +283,14 @@ export default function FilesPage({ params }: FilesPageProps) {
 
   const filterOptionsQuery = useQuery(
     trpc.fileKey.getFilterOptions.queryOptions(
-      { organizationId, projectId, environmentId: environmentFilter },
+      { organizationId, projectId, environmentId },
       { enabled: !!organizationId },
     ),
   );
 
   const statsQuery = useQuery(
     trpc.fileKey.getStats.queryOptions(
-      { organizationId, projectId, environmentId: environmentFilter },
+      { organizationId, projectId, environmentId },
       { enabled: !!organizationId },
     ),
   );
@@ -409,19 +411,19 @@ export default function FilesPage({ params }: FilesPageProps) {
       ...(isMobile
         ? []
         : [
-            {
-              id: "type",
-              header: "Type",
-              cell: ({ row }) => {
-                const fk = row.original;
-                return fk.mimeType ? (
-                  <Badge variant="outline">{fk.mimeType}</Badge>
-                ) : (
-                  <span className="text-muted-foreground">-</span>
-                );
-              },
-            } satisfies ColumnDef<FileKeyRow>,
-          ]),
+          {
+            id: "type",
+            header: "Type",
+            cell: ({ row }) => {
+              const fk = row.original;
+              return fk.mimeType ? (
+                <Badge variant="outline">{fk.mimeType}</Badge>
+              ) : (
+                <span className="text-muted-foreground">-</span>
+              );
+            },
+          } satisfies ColumnDef<FileKeyRow>,
+        ]),
       {
         id: "size",
         header: "Size",
@@ -430,38 +432,38 @@ export default function FilesPage({ params }: FilesPageProps) {
       ...(isMobile
         ? []
         : [
-            {
-              id: "environment",
-              header: "Environment",
-              cell: ({ row }) => {
-                const env = row.original.environment;
-                return env ? (
-                  <Badge
-                    variant={
-                      env.type === "production"
-                        ? "default"
-                        : env.type === "staging"
-                          ? "secondary"
-                          : "outline"
-                    }
-                  >
-                    {env.name}
-                  </Badge>
-                ) : (
-                  <span className="text-muted-foreground">-</span>
-                );
-              },
-            } satisfies ColumnDef<FileKeyRow>,
-            {
-              id: "created",
-              header: "Created",
-              cell: ({ row }) => (
-                <span className="text-muted-foreground text-sm">
-                  {formatDate(row.original.createdAt)}
-                </span>
-              ),
-            } satisfies ColumnDef<FileKeyRow>,
-          ]),
+          {
+            id: "environment",
+            header: "Environment",
+            cell: ({ row }) => {
+              const env = row.original.environment;
+              return env ? (
+                <Badge
+                  variant={
+                    env.type === "production"
+                      ? "default"
+                      : env.type === "staging"
+                        ? "secondary"
+                        : "outline"
+                  }
+                >
+                  {env.name}
+                </Badge>
+              ) : (
+                <span className="text-muted-foreground">-</span>
+              );
+            },
+          } satisfies ColumnDef<FileKeyRow>,
+          {
+            id: "created",
+            header: "Created",
+            cell: ({ row }) => (
+              <span className="text-muted-foreground text-sm">
+                {formatDate(row.original.createdAt)}
+              </span>
+            ),
+          } satisfies ColumnDef<FileKeyRow>,
+        ]),
       {
         id: "actions",
         header: () => <span className="sr-only">Actions</span>,
@@ -475,6 +477,7 @@ export default function FilesPage({ params }: FilesPageProps) {
                 <Button
                   variant="ghost"
                   size="icon-sm"
+                  className="h-10 w-10 md:h-8 md:w-8"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {loadingUrlId === fk.id ? (
@@ -558,12 +561,12 @@ export default function FilesPage({ params }: FilesPageProps) {
   const stats = statsQuery.data;
 
   const hasActiveFilters =
-    (mimeTypeFilter ?? environmentFilter ?? statusFilter !== "completed") || search;
+    (mimeTypeFilter ?? (environmentFilter !== "all" ? environmentFilter : undefined) ?? statusFilter !== "completed") || search;
 
   const clearFilters = () => {
     setSearch("");
     setMimeTypeFilter(undefined);
-    setEnvironmentFilter(undefined);
+    setEnvironmentFilter("all");
     setStatusFilter("completed");
   };
 
@@ -649,144 +652,205 @@ export default function FilesPage({ params }: FilesPageProps) {
         </div>
 
         <Card className="min-w-0">
-          <CardHeader className="pb-4">
-            <div className="flex min-w-0 flex-col gap-4">
+          <CardHeader>
+            <div className="flex flex-col gap-3 md:flex-row md:items-center">
               <SearchInput
                 value={search}
                 onDebouncedChange={handleSearchChange}
                 placeholder="Search by filename..."
+                className="w-full md:max-w-sm"
               />
-              <div className="grid min-w-0 grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
-                <Select
-                  value={statusFilter}
-                  onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}
-                >
-                  <SelectTrigger className="min-w-0 w-full sm:w-[130px]">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="failed">Failed</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={environmentFilter ?? "all"}
-                  onValueChange={(v) =>
-                    setEnvironmentFilter(v === "all" ? undefined : v)
-                  }
-                >
-                  <SelectTrigger className="min-w-0 w-full sm:w-[160px]">
-                    <SelectValue placeholder="Environment" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Environments</SelectItem>
-                    {filterOptions?.environments.map((env) => (
-                      <SelectItem key={env.id} value={env.id}>
-                        {env.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={mimeTypeFilter ?? "all"}
-                  onValueChange={(v) =>
-                    setMimeTypeFilter(v === "all" ? undefined : v)
-                  }
-                >
-                  <SelectTrigger className="min-w-0 w-full sm:w-[130px]">
-                    <SelectValue placeholder="Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    {filterOptions?.mimeTypeCategories.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type.charAt(0).toUpperCase() + type.slice(1)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={`${sortBy}-${sortOrder}`}
-                  onValueChange={(v) => {
-                    const [field, order] = v.split("-") as [
-                      typeof sortBy,
-                      typeof sortOrder,
-                    ];
-                    setSortBy(field);
-                    setSortOrder(order);
-                  }}
-                >
-                  <SelectTrigger className="min-w-0 w-full sm:w-[160px]">
-                    <SelectValue placeholder="Sort" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="createdAt-desc">Newest First</SelectItem>
-                    <SelectItem value="createdAt-asc">Oldest First</SelectItem>
-                    <SelectItem value="fileName-asc">Name A-Z</SelectItem>
-                    <SelectItem value="fileName-desc">Name Z-A</SelectItem>
-                    <SelectItem value="size-desc">Largest First</SelectItem>
-                    <SelectItem value="size-asc">Smallest First</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-                {hasActiveFilters ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={clearFilters}
-                    className="self-start sm:self-auto"
+              <div className="grid w-full min-w-0 grid-cols-[auto,minmax(0,1fr)] items-center gap-2 md:ml-auto md:flex md:w-auto md:grid-cols-none md:justify-end">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className="shrink-0 border md:border-none"
+                    >
+                      <Filter className="h-4 w-4" />
+                      <span className="block md:hidden">Filter</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    sideOffset={8}
+                    className="min-w-[220px] max-w-[calc(100vw-2rem)]"
                   >
-                    Clear filters
-                  </Button>
-                ) : null}
-                <div className="w-full sm:ml-auto sm:w-auto [&_button]:w-full sm:[&_button]:w-auto">
-                  <UploadDialog
-                    projectId={projectId}
-                    defaultEnvironmentId={selectedEnvironmentId}
-                    environments={
-                      filterOptions?.environments.map((env) => ({
-                        id: env.id,
-                        name: env.name,
-                        type: env.type,
-                      })) ?? []
-                    }
-                    onUploadComplete={() => {
-                      void fileKeysQuery.refetch();
-                      void statsQuery.refetch();
-                    }}
-                  />
-                </div>
+                    <DropdownMenuGroup>
+                      <DropdownMenuLabel className="text-xs text-muted-foreground">Filter by</DropdownMenuLabel>
+                      {isMobile ? (
+                        <>
+                          <DropdownMenuLabel className="text-xs text-muted-foreground">Status</DropdownMenuLabel>
+                          <DropdownMenuRadioGroup value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
+                            <DropdownMenuRadioItem value="all">
+                              All Status
+                            </DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value="completed">
+                              Completed
+                            </DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value="pending">
+                              Pending
+                            </DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value="failed">
+                              Failed
+                            </DropdownMenuRadioItem>
+                          </DropdownMenuRadioGroup>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuLabel className="text-xs text-muted-foreground">Environment</DropdownMenuLabel>
+                          <DropdownMenuRadioGroup value={environmentFilter} onValueChange={(v) => setEnvironmentFilter(v)}>
+                            <DropdownMenuRadioItem value="all">
+                              All Environments
+                            </DropdownMenuRadioItem>
+                            {filterOptions?.environments.map((env) => (
+                              <DropdownMenuRadioItem key={env.id} value={env.id}>
+                                {env.name}
+                              </DropdownMenuRadioItem>
+                            ))}
+                          </DropdownMenuRadioGroup>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuLabel className="text-xs text-muted-foreground">Type</DropdownMenuLabel>
+                          <DropdownMenuRadioGroup value={mimeTypeFilter} onValueChange={(v) => setMimeTypeFilter(v as typeof mimeTypeFilter)}>
+                            <DropdownMenuRadioItem value="all">
+                              All Types
+                            </DropdownMenuRadioItem>
+                            {filterOptions?.mimeTypeCategories.map((type) => (
+                              <DropdownMenuRadioItem key={type} value={type}>
+                                {type.charAt(0).toUpperCase() + type.slice(1)}
+                              </DropdownMenuRadioItem>
+                            ))}
+                          </DropdownMenuRadioGroup>
+                        </>
+                      ) : (
+                        <>
+                          <DropdownMenuSub>
+                            <DropdownMenuSubTrigger>Status</DropdownMenuSubTrigger>
+                            <DropdownMenuPortal>
+                              <DropdownMenuSubContent>
+                                <DropdownMenuRadioGroup value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
+                                  <DropdownMenuRadioItem value="all">
+                                    All Status
+                                  </DropdownMenuRadioItem>
+                                  <DropdownMenuRadioItem value="completed">
+                                    Completed
+                                  </DropdownMenuRadioItem>
+                                  <DropdownMenuRadioItem value="pending">
+                                    Pending
+                                  </DropdownMenuRadioItem>
+                                  <DropdownMenuRadioItem value="failed">
+                                    Failed
+                                  </DropdownMenuRadioItem>
+                                </DropdownMenuRadioGroup>
+                              </DropdownMenuSubContent>
+                            </DropdownMenuPortal>
+                          </DropdownMenuSub>
+                          <DropdownMenuSub>
+                            <DropdownMenuSubTrigger>Environment</DropdownMenuSubTrigger>
+                            <DropdownMenuPortal>
+                              <DropdownMenuSubContent>
+                                <DropdownMenuRadioGroup value={environmentFilter} onValueChange={(v) => setEnvironmentFilter(v)}>
+                                  <DropdownMenuRadioItem value="all">
+                                    All Environments
+                                  </DropdownMenuRadioItem>
+                                  {filterOptions?.environments.map((env) => (
+                                    <DropdownMenuRadioItem key={env.id} value={env.id}>
+                                      {env.name}
+                                    </DropdownMenuRadioItem>
+                                  ))}
+                                </DropdownMenuRadioGroup>
+                              </DropdownMenuSubContent>
+                            </DropdownMenuPortal>
+                          </DropdownMenuSub>
+                          <DropdownMenuSub>
+                            <DropdownMenuSubTrigger>Type</DropdownMenuSubTrigger>
+                            <DropdownMenuPortal>
+                              <DropdownMenuSubContent>
+                                <DropdownMenuRadioGroup value={mimeTypeFilter} onValueChange={(v) => setMimeTypeFilter(v as typeof mimeTypeFilter)}>
+                                  <DropdownMenuRadioItem value="all">
+                                    All Types
+                                  </DropdownMenuRadioItem>
+                                  {filterOptions?.mimeTypeCategories.map((type) => (
+                                    <DropdownMenuRadioItem key={type} value={type}>
+                                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                                    </DropdownMenuRadioItem>
+                                  ))}
+                                </DropdownMenuRadioGroup>
+                              </DropdownMenuSubContent>
+                            </DropdownMenuPortal>
+                          </DropdownMenuSub>
+                        </>
+                      )}
+                    </DropdownMenuGroup>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={clearFilters}>
+                      Clear Filters
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel className="text-xs text-muted-foreground">Sort by</DropdownMenuLabel>
+                    <DropdownMenuRadioGroup value={`${sortBy}-${sortOrder}`}
+                      onValueChange={(v) => {
+                        const [field, order] = v.split("-") as [
+                          typeof sortBy,
+                          typeof sortOrder,
+                        ];
+                        setSortBy(field);
+                        setSortOrder(order);
+                      }}>
+                      <DropdownMenuRadioItem value="createdAt-desc">Newest First</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="createdAt-asc">Oldest First</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="fileName-asc">Name A-Z</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="fileName-desc">Name Z-A</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="size-desc">Largest First</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="size-asc">Smallest First</DropdownMenuRadioItem>
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <UploadDialog
+                  projectId={projectId}
+                  defaultEnvironmentId={selectedEnvironmentId}
+                  environments={
+                    filterOptions?.environments.map((env) => ({
+                      id: env.id,
+                      name: env.name,
+                      type: env.type,
+                    })) ?? []
+                  }
+                  onUploadComplete={() => {
+                    void fileKeysQuery.refetch();
+                    void statsQuery.refetch();
+                  }}
+                />
               </div>
             </div>
           </CardHeader>
 
           <CardContent className="min-w-0">
-            <DataTable
-              columns={columns}
-              data={fileKeys}
-              loading={fileKeysQuery.isLoading}
-              emptyMessage={
-                hasActiveFilters
-                  ? "No files found. Try adjusting your filters."
-                  : "No files found. Upload some files to get started."
-              }
-              emptyIcon={File}
-              onRowClick={(row) =>
-                router.push(`${projectBasePath}/files/${row.id}`)
-              }
-              pagination={
-                pagination
-                  ? {
-                      ...pagination,
-                      onPageChange: setPage,
-                      onPageSizeChange: setPageSize,
-                    }
-                  : undefined
-              }
-            />
+            <div className="max-w-full overflow-x-auto">
+              <div className="min-w-[860px] lg:min-w-0">
+                <DataTable
+                  columns={columns}
+                  data={fileKeys}
+                  loading={fileKeysQuery.isLoading}
+                  emptyMessage={
+                    hasActiveFilters
+                      ? "No files found. Try adjusting your filters."
+                      : "No files found. Upload some files to get started."
+                  }
+                  emptyIcon={File}
+                  onRowClick={(row) =>
+                    router.push(`${projectBasePath}/files/${row.id}`)
+                  }
+                  pagination={
+                    pagination
+                      ? {
+                        ...pagination,
+                        onPageChange: setPage,
+                        onPageSizeChange: setPageSize,
+                      }
+                      : undefined
+                  }
+                />
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

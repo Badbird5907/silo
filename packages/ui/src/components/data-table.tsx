@@ -69,28 +69,30 @@ function DataTablePagination({
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="text-muted-foreground flex items-center gap-2 text-sm">
-        <span>Rows:</span>
-        <Select
-          value={pageSize.toString()}
-          onValueChange={(value) => onPageSizeChange(Number(value))}
-        >
-          <SelectTrigger className="h-8 w-[70px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {pageSizeOptions.map((size) => (
-              <SelectItem key={size} value={size.toString()}>
-                {size}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-2 sm:contents">
+        <div className="text-muted-foreground flex items-center gap-2 text-sm">
+          <span>Rows:</span>
+          <Select
+            value={pageSize.toString()}
+            onValueChange={(value) => onPageSizeChange(Number(value))}
+          >
+            <SelectTrigger className="h-8 w-[70px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {pageSizeOptions.map((size) => (
+                <SelectItem key={size} value={size.toString()}>
+                  {size}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="text-muted-foreground text-sm tabular-nums">
+          {page} / {totalPages} ({totalCount.toLocaleString()})
+        </div>
       </div>
-      <div className="text-muted-foreground text-sm">
-        {page} / {totalPages} ({totalCount.toLocaleString()})
-      </div>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center justify-center gap-2 sm:justify-end sm:gap-1">
         <Button
           variant="outline"
           size="icon-sm"

@@ -54,6 +54,7 @@ export const fileKeyRouter = {
     .query(async ({ ctx, input }) => {
       const project = await ctx.db.query.projects.findFirst({
         where: eq(projects.id, input.projectId),
+        columns: { parentOrganizationId: true },
       });
 
       if (!project) {
@@ -203,6 +204,7 @@ export const fileKeyRouter = {
     .query(async ({ ctx, input }) => {
       const project = await ctx.db.query.projects.findFirst({
         where: eq(projects.id, input.projectId),
+        columns: { parentOrganizationId: true },
       });
 
       if (project?.parentOrganizationId !== ctx.organizationId) {
@@ -310,46 +312,48 @@ export const fileKeyRouter = {
         }
       }
 
-      const environments = await ctx.db.query.projectEnvironments.findMany({
-        where: eq(projectEnvironments.projectId, input.projectId),
-        columns: { id: true, name: true, type: true },
-      });
-
-      const completedFileKeys = await ctx.db
-        .select({ mimeType: files.mimeType })
-        .from(fileKeys)
-        .innerJoin(files, eq(fileKeys.fileId, files.id))
-        .where(
-          and(
-            eq(fileKeys.projectId, input.projectId),
-            ...(input.environmentId
-              ? [eq(fileKeys.environmentId, input.environmentId)]
-              : []),
-          ),
-        );
-
-      const pendingFileKeys = await ctx.db
-        .select({ mimeType: fileKeys.claimedMimeType })
-        .from(fileKeys)
-        .where(
-          and(
-            eq(fileKeys.projectId, input.projectId),
-            ...(input.environmentId
-              ? [eq(fileKeys.environmentId, input.environmentId)]
-              : []),
-            eq(fileKeys.status, "pending"),
-            isNotNull(fileKeys.claimedMimeType),
-          ),
-        );
-
-      const allMimeTypes = [
-        ...completedFileKeys.map((r) => r.mimeType),
-        ...pendingFileKeys.map((r) => r.mimeType).filter(Boolean),
+      const baseFileKeyFilters = [
+        eq(fileKeys.projectId, input.projectId),
+        ...(input.environmentId
+          ? [eq(fileKeys.environmentId, input.environmentId)]
+          : []),
       ];
 
-      const mimeTypeCategories = [
-        ...new Set(allMimeTypes.map((mt) => mt?.split("/")[0]).filter(Boolean)),
-      ].sort() as string[];
+      const [environments, completedMimeTypes, pendingMimeTypes] = await Promise.all([
+        ctx.db.query.projectEnvironments.findMany({
+          where: eq(projectEnvironments.projectId, input.projectId),
+          columns: { id: true, name: true, type: true },
+        }),
+        ctx.db
+          .select({ mimeType: files.mimeType })
+          .from(fileKeys)
+          .innerJoin(files, eq(fileKeys.fileId, files.id))
+          .where(and(...baseFileKeyFilters)),
+        ctx.db
+          .select({ mimeType: fileKeys.claimedMimeType })
+          .from(fileKeys)
+          .where(
+            and(
+              ...baseFileKeyFilters,
+              eq(fileKeys.status, "pending"),
+              isNotNull(fileKeys.claimedMimeType),
+            ),
+          ),
+      ]);
+
+      const mimeTypeCategorySet = new Set<string>();
+
+      for (const { mimeType } of completedMimeTypes) {
+        const category = mimeType.split("/")[0];
+        if (category) mimeTypeCategorySet.add(category);
+      }
+
+      for (const { mimeType } of pendingMimeTypes) {
+        const category = mimeType?.split("/")[0];
+        if (category) mimeTypeCategorySet.add(category);
+      }
+
+      const mimeTypeCategories = [...mimeTypeCategorySet].sort();
 
       return { environments, mimeTypeCategories };
     }),

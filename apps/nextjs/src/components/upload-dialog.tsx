@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@silo-storage/ui/components/select";
+import { cn } from "@silo-storage/ui/lib/utils";
 import { nanoid } from "nanoid";
 
 interface Environment {
@@ -36,6 +37,7 @@ interface UploadDialogProps {
   environments: Environment[];
   defaultEnvironmentId?: string;
   onUploadComplete?: () => void;
+  triggerClassName?: string;
 }
 
 type UploadStatus = "idle" | "preparing" | "uploading" | "success" | "error";
@@ -52,6 +54,7 @@ export function UploadDialog({
   environments,
   defaultEnvironmentId,
   onUploadComplete,
+  triggerClassName,
 }: UploadDialogProps) {
   const [open, setOpen] = React.useState(false);
   const [selectedEnvId, setSelectedEnvId] = React.useState<string>("");
@@ -178,7 +181,7 @@ export function UploadDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
+        <Button className={cn("w-full sm:w-auto", triggerClassName)}>
           <Upload className="mr-2 h-4 w-4" />
           Upload File
         </Button>
