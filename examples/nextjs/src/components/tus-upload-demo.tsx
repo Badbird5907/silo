@@ -183,10 +183,6 @@ export function TusUploadDemo() {
         // Finite chunks improve checkpoint frequency for pause/resume UX.
         chunkSize: chunkSizeBytes,
         retryDelays: [0, 1000, 3000, 5000],
-        metadata: {
-          filename: file.name,
-          filetype: file.type || "application/octet-stream",
-        },
         removeFingerprintOnSuccess: true,
         onError: (error) => {
           if (activeUploadIdRef.current !== registration.fileKeyId) return;

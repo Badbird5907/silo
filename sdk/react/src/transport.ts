@@ -192,10 +192,6 @@ export async function uploadFileWithProgress(
     const upload = new Upload(file, {
       endpoint: uploadUrl,
       uploadSize: file.size,
-      metadata: {
-        filename: file.name,
-        filetype: file.type || "application/octet-stream",
-      },
       storeFingerprintForResuming: false,
       removeFingerprintOnSuccess: true,
       retryDelays: [0, 1000, 3000],

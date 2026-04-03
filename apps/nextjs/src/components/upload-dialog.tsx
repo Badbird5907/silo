@@ -127,10 +127,6 @@ export function UploadDialog({
       const upload = new tus.Upload(selectedFile, {
         endpoint: uploadUrl,
         retryDelays: [0, 1000, 3000, 5000],
-        metadata: {
-          filename: selectedFile.name,
-          filetype: selectedFile.type,
-        },
         onError: (error: { message?: string }) => {
           console.error("Upload failed:", error);
           setUploadState({
