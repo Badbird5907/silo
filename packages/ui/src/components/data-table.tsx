@@ -1,6 +1,13 @@
 "use client";
 
-import type { ColumnDef, Row } from "@tanstack/react-table";
+import * as React from "react";
+import type {
+  CellContext,
+  ColumnDef,
+  OnChangeFn,
+  Row,
+  RowSelectionState,
+} from "@tanstack/react-table";
 import type { LucideIcon } from "lucide-react";
 import {
   flexRender,
@@ -18,6 +25,7 @@ import {
 import { cn } from "@silo-storage/ui/lib/utils";
 
 import { Button } from "./button";
+import { Checkbox } from "./checkbox";
 import {
   Select,
   SelectContent,
@@ -36,6 +44,105 @@ import {
 } from "./table";
 
 const DEFAULT_PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
+
+// https://github.com/TanStack/table/discussions/3068#discussioncomment-12041689
+function getRowRange<TData>(
+  rows: Row<TData>[],
+  clickedRowID: string,
+  previousClickedRowID: string,
+) {
+  const range: Row<TData>[] = [];
+  const processedRowsMap: Record<string, boolean> = {
+    [clickedRowID]: false,
+    [previousClickedRowID]: false,
+  };
+  for (const row of rows) {
+    if (row.id === clickedRowID || row.id === previousClickedRowID) {
+      if (previousClickedRowID === "") {
+        range.push(row);
+        break;
+      }
+
+      processedRowsMap[row.id] = true;
+    }
+    if (
+      (processedRowsMap[clickedRowID] || processedRowsMap[previousClickedRowID]) &&
+      !row.getIsGrouped()
+    ) {
+      range.push(row);
+    }
+    if (processedRowsMap[clickedRowID] && processedRowsMap[previousClickedRowID]) {
+      break;
+    }
+  }
+
+  return range;
+}
+
+function shiftCheckboxClickHandler<TData>(
+  event: React.MouseEvent<HTMLElement>,
+  context: CellContext<TData, unknown>,
+  previousClickedRowID: string,
+) {
+  if (event.shiftKey) {
+    const { rows, rowsById: rowsMap } = context.table.getRowModel();
+    const rowsToToggle = getRowRange(
+      rows,
+      context.row.id,
+      rows.map((r) => r.id).includes(previousClickedRowID)
+        ? previousClickedRowID
+        : "",
+    );
+    const isLastSelected = !rowsMap[context.row.id]?.getIsSelected();
+    rowsToToggle.forEach((row) => row.toggleSelected(isLastSelected));
+  }
+}
+
+function getRowSelectionSelectedIds(rowSelection: RowSelectionState): string[] {
+  return Object.entries(rowSelection)
+    .filter(([, selected]) => selected)
+    .map(([id]) => id);
+}
+
+function getRowsForRowSelection<TData>(
+  data: TData[],
+  rowSelection: RowSelectionState,
+  getRowId: (row: TData) => string,
+): TData[] {
+  const selected = new Set(getRowSelectionSelectedIds(rowSelection));
+  return data.filter((row) => selected.has(getRowId(row)));
+}
+
+function useDataTableMultiselect<TData>(getRowId: (row: TData) => string): {
+  rowSelection: RowSelectionState;
+  onRowSelectionChange: OnChangeFn<RowSelectionState>;
+  getRowId: (originalRow: TData, index: number, parent?: Row<TData>) => string;
+  getSelectedRows: (data: TData[]) => TData[];
+  selectedIds: string[];
+} {
+  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
+  const getRowIdForTable = React.useCallback(
+    (originalRow: TData, _index: number, _parent?: Row<TData>) =>
+      getRowId(originalRow),
+    [getRowId],
+  );
+  const getSelectedRows = React.useCallback(
+    (data: TData[]) => getRowsForRowSelection(data, rowSelection, getRowId),
+    [rowSelection, getRowId],
+  );
+  const selectedIds = React.useMemo(
+    () => getRowSelectionSelectedIds(rowSelection),
+    [rowSelection],
+  );
+
+  return {
+    rowSelection,
+    onRowSelectionChange: setRowSelection,
+    getRowId: getRowIdForTable,
+    getSelectedRows,
+    selectedIds,
+  };
+}
 
 interface DataTablePaginationState {
   page: number;
@@ -130,7 +237,7 @@ function DataTablePagination({
   );
 }
 
-interface DataTableProps<TData, TValue> {
+type DataTableProps<TData, TValue> = {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
   loading?: boolean;
@@ -138,7 +245,15 @@ interface DataTableProps<TData, TValue> {
   emptyIcon?: LucideIcon;
   onRowClick?: (row: TData) => void;
   pagination?: DataTablePaginationProps | null;
-}
+  /** When true, prepends a selection column and enables row selection. Requires `getRowId` (e.g. from `useDataTableMultiselect`). */
+  multiselect?: boolean;
+  rowSelection?: RowSelectionState;
+  onRowSelectionChange?: OnChangeFn<RowSelectionState>;
+  getRowId?: (originalRow: TData, index: number, parent?: Row<TData>) => string;
+} & (
+  | { multiselect?: false | undefined }
+  | { multiselect: true; getRowId: (originalRow: TData, index: number, parent?: Row<TData>) => string }
+);
 
 function getColumnLayoutMeta(meta: unknown): {
   headerClassName?: string;
@@ -164,12 +279,127 @@ function DataTable<TData, TValue>({
   emptyIcon: EmptyIcon = FileX,
   onRowClick,
   pagination,
+  multiselect = false,
+  rowSelection,
+  onRowSelectionChange,
+  getRowId,
 }: DataTableProps<TData, TValue>) {
+  const previousSelectedRowIdRef = React.useRef("");
+  const skipNextCheckboxChangeRef = React.useRef(false);
+
+  const [uncontrolledSelection, setUncontrolledSelection] =
+    React.useState<RowSelectionState>({});
+  const usingUncontrolledMultiselect =
+    multiselect && onRowSelectionChange === undefined;
+  const effectiveRowSelection = usingUncontrolledMultiselect
+    ? uncontrolledSelection
+    : (rowSelection ?? {});
+  const effectiveOnRowSelectionChange = usingUncontrolledMultiselect
+    ? setUncontrolledSelection
+    : onRowSelectionChange;
+
+  const selectionEnabled =
+    multiselect || effectiveOnRowSelectionChange != null;
+
+  const selectionColumn = React.useMemo(
+    (): ColumnDef<TData, unknown> => ({
+      id: "select",
+      header: ({ table }) => (
+        <Checkbox
+          checked={
+            table.getIsAllPageRowsSelected() ||
+            (table.getIsSomePageRowsSelected() && "indeterminate")
+          }
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+        />
+      ),
+      cell: (context) => {
+        const { row } = context;
+        const handleSelectionCellClick = (
+          event: React.MouseEvent<HTMLDivElement>,
+        ) => {
+          event.stopPropagation();
+          if (event.shiftKey) {
+            event.preventDefault();
+            skipNextCheckboxChangeRef.current = true;
+            shiftCheckboxClickHandler(
+              event,
+              context,
+              previousSelectedRowIdRef.current,
+            );
+            previousSelectedRowIdRef.current = context.row.id;
+            return;
+          }
+          row.toggleSelected(!row.getIsSelected());
+          previousSelectedRowIdRef.current = context.row.id;
+        };
+
+        return (
+          // -m-2 p-2: extend hit target over TableCell padding so row onClick does not fire on near-misses.
+          <div
+            className="-m-2 flex min-h-10 cursor-pointer items-center justify-center p-2"
+            onMouseDown={(e) => {
+              if (e.shiftKey) e.preventDefault();
+            }}
+            onClick={handleSelectionCellClick}
+          >
+            <Checkbox
+              checked={row.getIsSelected()}
+              onClick={(event) => {
+                event.stopPropagation();
+                if (event.shiftKey) {
+                  event.preventDefault();
+                  skipNextCheckboxChangeRef.current = true;
+                  shiftCheckboxClickHandler(
+                    event,
+                    context,
+                    previousSelectedRowIdRef.current,
+                  );
+                }
+                previousSelectedRowIdRef.current = context.row.id;
+              }}
+              onCheckedChange={(value) => {
+                if (skipNextCheckboxChangeRef.current) {
+                  skipNextCheckboxChangeRef.current = false;
+                  return;
+                }
+                row.toggleSelected(!!value);
+                previousSelectedRowIdRef.current = context.row.id;
+              }}
+              aria-label="Select row"
+            />
+          </div>
+        );
+      },
+      enableSorting: false,
+      enableHiding: false,
+    }),
+    [],
+  );
+
+  const displayColumns = React.useMemo(() => {
+    if (!multiselect) {
+      return columns;
+    }
+    return [selectionColumn, ...columns] as ColumnDef<TData, TValue>[];
+  }, [multiselect, selectionColumn, columns]);
+
+  const columnCount = displayColumns.length;
+
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table requires this hook to create table instance for rendering.
   const table = useReactTable({
     data,
-    columns,
+    columns: displayColumns,
     getCoreRowModel: getCoreRowModel(),
+    ...(selectionEnabled
+      ? {
+          enableRowSelection: true,
+          ...(getRowId ? { getRowId } : {}),
+          onRowSelectionChange: effectiveOnRowSelectionChange,
+          state: { rowSelection: effectiveRowSelection },
+        }
+      : {}),
   });
 
   const handleRowClick = (row: Row<TData>) => {
@@ -179,7 +409,7 @@ function DataTable<TData, TValue>({
   };
 
   return (
-    <div className="overflow-hidden rounded-md border">
+    <div className="min-w-0 overflow-hidden rounded-md border">
       <Table>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
@@ -205,7 +435,7 @@ function DataTable<TData, TValue>({
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={columns.length} className="h-48">
+              <TableCell colSpan={columnCount} className="h-48">
                 <div className="flex flex-col items-center justify-center gap-2">
                   <Spinner className="size-8" />
                   <span className="text-muted-foreground text-sm">
@@ -220,6 +450,13 @@ function DataTable<TData, TValue>({
                 key={row.id}
                 data-state={row.getIsSelected() && "selected"}
                 onClick={() => handleRowClick(row)}
+                onMouseDownCapture={
+                  multiselect
+                    ? (e) => {
+                        if (e.shiftKey) e.preventDefault();
+                      }
+                    : undefined
+                }
                 className={cn(onRowClick && "cursor-pointer")}
               >
                 {row.getVisibleCells().map((cell) => {
@@ -239,7 +476,7 @@ function DataTable<TData, TValue>({
             ))
           ) : (
             <TableRow>
-              <TableCell colSpan={columns.length} className="h-48">
+              <TableCell colSpan={columnCount} className="h-48">
                 <div className="flex flex-col items-center justify-center gap-3">
                   <div className="bg-muted flex size-12 items-center justify-center rounded-full">
                     <EmptyIcon className="text-muted-foreground size-6" />
@@ -262,5 +499,18 @@ function DataTable<TData, TValue>({
   );
 }
 
-export { DataTable, DataTablePagination };
-export type { ColumnDef, DataTablePaginationProps, DataTablePaginationState };
+export {
+  DataTable,
+  DataTablePagination,
+  getRowSelectionSelectedIds,
+  getRowsForRowSelection,
+  useDataTableMultiselect,
+};
+export type {
+  CellContext,
+  ColumnDef,
+  Row,
+  RowSelectionState,
+} from "@tanstack/react-table";
+export type { DataTablePaginationProps, DataTablePaginationState };
+export type { DataTableProps };

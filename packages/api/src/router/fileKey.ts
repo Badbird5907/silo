@@ -8,6 +8,7 @@ import {
   desc,
   eq,
   ilike,
+  inArray,
   isNotNull,
   or,
   sql,
@@ -133,6 +134,7 @@ export const fileKeyRouter = {
           claimedMimeType: fileKeys.claimedMimeType,
           claimedSize: fileKeys.claimedSize,
           status: fileKeys.status,
+          isPublic: fileKeys.isPublic,
           uploadCompletedAt: fileKeys.uploadCompletedAt,
           uploadFailedAt: fileKeys.uploadFailedAt,
           createdAt: fileKeys.createdAt,
@@ -170,6 +172,7 @@ export const fileKeyRouter = {
         claimedHash: r.claimedHash,
         claimedMimeType: r.claimedMimeType,
         claimedSize: r.claimedSize,
+        isPublic: r.isPublic,
         uploadCompletedAt: r.uploadCompletedAt,
         uploadFailedAt: r.uploadFailedAt,
         createdAt: r.createdAt,
@@ -623,5 +626,176 @@ export const fileKeyRouter = {
         }
         throw error;
       }
+    }),
+
+  bulkDelete: organizationProcedure
+    .input(
+      z.object({
+        ids: z.array(z.string()).min(1).max(100),
+        projectId: z.string(),
+      }),
+    )
+    .use(requirePermission({ fileKey: ["delete"] }))
+    .mutation(async ({ ctx, input }) => {
+      const project = await ctx.db.query.projects.findFirst({
+        where: eq(projects.id, input.projectId),
+        columns: { parentOrganizationId: true },
+      });
+
+      if (project?.parentOrganizationId !== ctx.organizationId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You don't have access to this project",
+        });
+      }
+
+      const matchedFileKeys = await ctx.db.query.fileKeys.findMany({
+        where: and(
+          inArray(fileKeys.id, input.ids),
+          eq(fileKeys.projectId, input.projectId),
+        ),
+        with: { file: true },
+      });
+
+      let succeeded = 0;
+      let failed = 0;
+
+      await ctx.db.transaction(async (tx) => {
+        for (const fk of matchedFileKeys) {
+          if (!fk.file && fk.status === "failed") {
+            succeeded++;
+            continue;
+          }
+
+          if (!fk.file) {
+            failed++;
+            continue;
+          }
+
+          await tx
+            .update(fileKeys)
+            .set({
+              status: "failed",
+              uploadFailedAt: new Date(),
+              adapterData: clearUploadSessionAdapterData(fk.adapterData),
+            })
+            .where(eq(fileKeys.id, fk.id));
+
+          await enqueueDeleteObjectJob(tx, {
+            projectId: input.projectId,
+            environmentId: fk.environmentId,
+            fileKeyId: fk.id,
+            fileId: fk.file.id,
+            storageKey: fk.file.storageKey,
+            priority: 120,
+          });
+
+          await enqueueFinalizeFailedFileKeyJob(tx, {
+            projectId: input.projectId,
+            environmentId: fk.environmentId,
+            fileKeyId: fk.id,
+            fileId: fk.file.id,
+            priority: 100,
+          });
+
+          succeeded++;
+        }
+      });
+
+      failed += input.ids.length - matchedFileKeys.length;
+
+      await runLifecycleJobBatch(ctx.db, {
+        limit: 50,
+        leaseSeconds: 45,
+        leaseOwner: "trpc:fileKey.bulkDelete",
+      });
+
+      return { succeeded, failed };
+    }),
+
+  bulkMarkFailed: organizationProcedure
+    .input(
+      z.object({
+        ids: z.array(z.string()).min(1).max(100),
+        projectId: z.string(),
+      }),
+    )
+    .use(requirePermission({ fileKey: ["update"] }))
+    .mutation(async ({ ctx, input }) => {
+      const project = await ctx.db.query.projects.findFirst({
+        where: eq(projects.id, input.projectId),
+        columns: { parentOrganizationId: true },
+      });
+
+      if (project?.parentOrganizationId !== ctx.organizationId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You don't have access to this project",
+        });
+      }
+
+      const matchedFileKeys = await ctx.db.query.fileKeys.findMany({
+        where: and(
+          inArray(fileKeys.id, input.ids),
+          eq(fileKeys.projectId, input.projectId),
+        ),
+      });
+
+      let succeeded = 0;
+      let failed = 0;
+
+      for (const fk of matchedFileKeys) {
+        try {
+          await markUploadAsFailed(ctx.db, {
+            projectId: input.projectId,
+            environmentId: fk.environmentId,
+            fileKeyId: fk.id,
+            error: "Manually marked as failed",
+          });
+          succeeded++;
+        } catch {
+          failed++;
+        }
+      }
+
+      failed += input.ids.length - matchedFileKeys.length;
+
+      return { succeeded, failed };
+    }),
+
+  bulkUpdateAccess: organizationProcedure
+    .input(
+      z.object({
+        ids: z.array(z.string()).min(1).max(100),
+        projectId: z.string(),
+        isPublic: z.boolean(),
+      }),
+    )
+    .use(requirePermission({ fileKey: ["update"] }))
+    .mutation(async ({ ctx, input }) => {
+      const project = await ctx.db.query.projects.findFirst({
+        where: eq(projects.id, input.projectId),
+        columns: { parentOrganizationId: true },
+      });
+
+      if (project?.parentOrganizationId !== ctx.organizationId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You don't have access to this project",
+        });
+      }
+
+      const result = await ctx.db
+        .update(fileKeys)
+        .set({ isPublic: input.isPublic })
+        .where(
+          and(
+            inArray(fileKeys.id, input.ids),
+            eq(fileKeys.projectId, input.projectId),
+          ),
+        )
+        .returning({ id: fileKeys.id });
+
+      return { updated: result.length };
     }),
 } satisfies TRPCRouterRecord;

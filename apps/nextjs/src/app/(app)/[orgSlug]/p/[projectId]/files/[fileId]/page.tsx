@@ -312,14 +312,12 @@ export default function FileDetailPage({ params }: FileDetailPageProps) {
   return (
     <>
       <div className="flex flex-1 flex-col gap-4 p-4">
+        <Link href={`${projectBasePath}/files`} className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-2">
+          <ArrowLeft className="h-4 w-4" /> Back to files
+        </Link>
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
-            <Link href={`${projectBasePath}/files`}>
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
           <div className="flex items-center gap-3">
-            <div className="bg-muted flex h-12 w-12 items-center justify-center rounded-lg">
+            <div className="bg-muted hidden h-12 w-12 items-center justify-center rounded-lg md:flex">
               <FileIcon className="text-muted-foreground h-6 w-6" />
             </div>
             <div>

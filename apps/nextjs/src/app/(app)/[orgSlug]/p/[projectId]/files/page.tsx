@@ -10,6 +10,8 @@ import {
   Clock,
   Copy,
   ExternalLink,
+  Eye,
+  EyeOff,
   File,
   FileArchive,
   FileAudio,
@@ -23,6 +25,7 @@ import {
   MoreHorizontal,
   Search,
   Trash2,
+  X,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -59,7 +62,10 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@silo-storage/ui/components/dropdown-menu";
-import { DataTable } from "@silo-storage/ui/components/data-table";
+import {
+  DataTable,
+  useDataTableMultiselect,
+} from "@silo-storage/ui/components/data-table";
 import type { ColumnDef } from "@silo-storage/ui/components/data-table";
 import { Input } from "@silo-storage/ui/components/input";
 import { Skeleton } from "@silo-storage/ui/components/skeleton";
@@ -72,7 +78,6 @@ import { getDownloadUrl } from "@/actions/file";
 import { UploadDialog } from "@/components/upload-dialog";
 import { useOrganization } from "@/hooks/use-organization";
 import { useTRPC } from "@/trpc/react";
-
 interface FilesPageProps {
   params: Promise<{
     orgSlug: string;
@@ -138,7 +143,7 @@ function copyToClipboard(text: string, label = "Copied") {
   });
 }
 
-type FileKeyRow = RouterOutputs["fileKey"]["list"]["fileKeys"][number];
+type FileKeyRow = RouterOutputs["fileKey"]["list"]["fileKeys"][number]
 
 interface SearchInputProps {
   value: string;
@@ -212,6 +217,11 @@ export default function FilesPage({ params }: FilesPageProps) {
   const [deleteFileId, setDeleteFileId] = React.useState<string | null>(null);
   const [failFileId, setFailFileId] = React.useState<string | null>(null);
   const [loadingUrlId, setLoadingUrlId] = React.useState<string | null>(null);
+  const multiselect = useDataTableMultiselect<FileKeyRow>((row) => row.id);
+
+  const [bulkAction, setBulkAction] = React.useState<
+    "delete" | "markFailed" | "makePublic" | "makePrivate" | null
+  >(null);
 
   const handleSearchChange = React.useCallback((value: string) => {
     setSearch(value);
@@ -331,6 +341,121 @@ export default function FilesPage({ params }: FilesPageProps) {
     }),
   );
 
+  // Clear selection on page/filter changes
+  React.useEffect(() => {
+    multiselect.onRowSelectionChange({});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, mimeTypeFilter, environmentFilter, statusFilter, sortBy, sortOrder, pageSize]);
+
+  const clearSelection = React.useCallback(() => {
+    multiselect.onRowSelectionChange({});
+  }, [multiselect]);
+
+  const bulkDeleteMutation = useMutation(
+    trpc.fileKey.bulkDelete.mutationOptions({
+      onSuccess: (data) => {
+        if (data.failed > 0) {
+          toast.warning(
+            `Deleted ${data.succeeded} of ${data.succeeded + data.failed} files. ${data.failed} failed.`,
+          );
+        } else {
+          toast.success(`Deleted ${data.succeeded} file${data.succeeded !== 1 ? "s" : ""}`);
+        }
+        setBulkAction(null);
+        clearSelection();
+        void queryClient.invalidateQueries({
+          queryKey: trpc.fileKey.list.queryKey(),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.fileKey.getStats.queryKey(),
+        });
+      },
+      onError: (error: { message?: string }) => {
+        toast.error(error.message ?? "Failed to delete files");
+      },
+    }),
+  );
+
+  const bulkMarkFailedMutation = useMutation(
+    trpc.fileKey.bulkMarkFailed.mutationOptions({
+      onSuccess: (data) => {
+        if (data.failed > 0) {
+          toast.warning(
+            `Marked ${data.succeeded} of ${data.succeeded + data.failed} uploads as failed. ${data.failed} failed.`,
+          );
+        } else {
+          toast.success(
+            `Marked ${data.succeeded} upload${data.succeeded !== 1 ? "s" : ""} as failed`,
+          );
+        }
+        setBulkAction(null);
+        clearSelection();
+        void queryClient.invalidateQueries({
+          queryKey: trpc.fileKey.list.queryKey(),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.fileKey.getStats.queryKey(),
+        });
+      },
+      onError: (error: { message?: string }) => {
+        toast.error(error.message ?? "Failed to mark uploads as failed");
+      },
+    }),
+  );
+
+  const bulkUpdateAccessMutation = useMutation(
+    trpc.fileKey.bulkUpdateAccess.mutationOptions({
+      onSuccess: (data) => {
+        toast.success(
+          `Updated access for ${data.updated} file${data.updated !== 1 ? "s" : ""}`,
+        );
+        setBulkAction(null);
+        clearSelection();
+        void queryClient.invalidateQueries({
+          queryKey: trpc.fileKey.list.queryKey(),
+        });
+      },
+      onError: (error: { message?: string }) => {
+        toast.error(error.message ?? "Failed to update file access");
+      },
+    }),
+  );
+
+  const handleBulkAction = () => {
+    const ids = multiselect.selectedIds;
+    if (ids.length === 0) return;
+
+    switch (bulkAction) {
+      case "delete":
+        bulkDeleteMutation.mutate({ ids, projectId, organizationId });
+        break;
+      case "markFailed":
+        bulkMarkFailedMutation.mutate({ ids, projectId, organizationId });
+        break;
+      case "makePublic":
+        bulkUpdateAccessMutation.mutate({
+          ids,
+          projectId,
+          organizationId,
+          isPublic: true,
+        });
+        break;
+      case "makePrivate":
+        bulkUpdateAccessMutation.mutate({
+          ids,
+          projectId,
+          organizationId,
+          isPublic: false,
+        });
+        break;
+    }
+  };
+
+  const isBulkPending =
+    bulkDeleteMutation.isPending ||
+    bulkMarkFailedMutation.isPending ||
+    bulkUpdateAccessMutation.isPending;
+
   const handleOpenFile = React.useCallback(
     async (fileKeyId: string) => {
       setLoadingUrlId(fileKeyId);
@@ -408,62 +533,66 @@ export default function FilesPage({ params }: FilesPageProps) {
         meta: { headerClassName: "w-[100px]" },
         cell: ({ row }) => <FileStatusBadge status={row.original.status} />,
       },
-      ...(isMobile
-        ? []
-        : [
-          {
-            id: "type",
-            header: "Type",
-            cell: ({ row }) => {
-              const fk = row.original;
-              return fk.mimeType ? (
-                <Badge variant="outline">{fk.mimeType}</Badge>
-              ) : (
-                <span className="text-muted-foreground">-</span>
-              );
-            },
-          } satisfies ColumnDef<FileKeyRow>,
-        ]),
+      {
+        id: "type",
+        header: "Type",
+        cell: ({ row }) => {
+          const fk = row.original;
+          return fk.mimeType ? (
+            <Badge variant="outline">{fk.mimeType}</Badge>
+          ) : (
+            <span className="text-muted-foreground">-</span>
+          );
+        },
+      },
+      {
+        id: "access",
+        header: "Access",
+        cell: ({ row }) => {
+          const fk = row.original;
+          return fk.isPublic ? (
+            <Badge variant="outline">Public</Badge>
+          ) : (
+            <Badge variant="outline">Private</Badge>
+          );
+        },
+      },
       {
         id: "size",
         header: "Size",
         cell: ({ row }) => formatFileSize(row.original.size),
       },
-      ...(isMobile
-        ? []
-        : [
-          {
-            id: "environment",
-            header: "Environment",
-            cell: ({ row }) => {
-              const env = row.original.environment;
-              return env ? (
-                <Badge
-                  variant={
-                    env.type === "production"
-                      ? "default"
-                      : env.type === "staging"
-                        ? "secondary"
-                        : "outline"
-                  }
-                >
-                  {env.name}
-                </Badge>
-              ) : (
-                <span className="text-muted-foreground">-</span>
-              );
-            },
-          } satisfies ColumnDef<FileKeyRow>,
-          {
-            id: "created",
-            header: "Created",
-            cell: ({ row }) => (
-              <span className="text-muted-foreground text-sm">
-                {formatDate(row.original.createdAt)}
-              </span>
-            ),
-          } satisfies ColumnDef<FileKeyRow>,
-        ]),
+      {
+        id: "environment",
+        header: "Environment",
+        cell: ({ row }) => {
+          const env = row.original.environment;
+          return env ? (
+            <Badge
+              variant={
+                env.type === "production"
+                  ? "default"
+                  : env.type === "staging"
+                    ? "secondary"
+                    : "outline"
+              }
+            >
+              {env.name}
+            </Badge>
+          ) : (
+            <span className="text-muted-foreground">-</span>
+          );
+        },
+      },
+      {
+        id: "created",
+        header: "Created",
+        cell: ({ row }) => (
+          <span className="text-muted-foreground text-sm">
+            {formatDate(row.original.createdAt)}
+          </span>
+        ),
+      },
       {
         id: "actions",
         header: () => <span className="sr-only">Actions</span>,
@@ -824,33 +953,31 @@ export default function FilesPage({ params }: FilesPageProps) {
           </CardHeader>
 
           <CardContent className="min-w-0">
-            <div className="max-w-full overflow-x-auto">
-              <div className="min-w-[860px] lg:min-w-0">
-                <DataTable
-                  columns={columns}
-                  data={fileKeys}
-                  loading={fileKeysQuery.isLoading}
-                  emptyMessage={
-                    hasActiveFilters
-                      ? "No files found. Try adjusting your filters."
-                      : "No files found. Upload some files to get started."
+            <DataTable
+              columns={columns}
+              data={fileKeys}
+              multiselect
+              {...multiselect}
+              loading={fileKeysQuery.isLoading}
+              emptyMessage={
+                hasActiveFilters
+                  ? "No files found. Try adjusting your filters."
+                  : "No files found. Upload some files to get started."
+              }
+              emptyIcon={File}
+              onRowClick={(row) =>
+                router.push(`${projectBasePath}/files/${row.id}`)
+              }
+              pagination={
+                pagination
+                  ? {
+                    ...pagination,
+                    onPageChange: setPage,
+                    onPageSizeChange: setPageSize,
                   }
-                  emptyIcon={File}
-                  onRowClick={(row) =>
-                    router.push(`${projectBasePath}/files/${row.id}`)
-                  }
-                  pagination={
-                    pagination
-                      ? {
-                        ...pagination,
-                        onPageChange: setPage,
-                        onPageSizeChange: setPageSize,
-                      }
-                      : undefined
-                  }
-                />
-              </div>
-            </div>
+                  : undefined
+              }
+            />
           </CardContent>
         </Card>
       </div>
@@ -922,6 +1049,119 @@ export default function FilesPage({ params }: FilesPageProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog
+        open={bulkAction !== null}
+        onOpenChange={(open) => !open && setBulkAction(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {bulkAction === "delete" && "Delete Files"}
+              {bulkAction === "markFailed" && "Mark Uploads as Failed"}
+              {bulkAction === "makePublic" && "Make Files Public"}
+              {bulkAction === "makePrivate" && "Make Files Private"}
+            </DialogTitle>
+            <DialogDescription>
+              {bulkAction === "delete" &&
+                `Are you sure you want to delete ${multiselect.selectedIds.length} file${multiselect.selectedIds.length !== 1 ? "s" : ""}? This action cannot be undone.`}
+              {bulkAction === "markFailed" &&
+                `Are you sure you want to mark ${multiselect.selectedIds.length} upload${multiselect.selectedIds.length !== 1 ? "s" : ""} as failed? This will abort the uploads and any partial data will be cleaned up.`}
+              {bulkAction === "makePublic" &&
+                `Are you sure you want to make ${multiselect.selectedIds.length} file${multiselect.selectedIds.length !== 1 ? "s" : ""} publicly accessible?`}
+              {bulkAction === "makePrivate" &&
+                `Are you sure you want to make ${multiselect.selectedIds.length} file${multiselect.selectedIds.length !== 1 ? "s" : ""} private?`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBulkAction(null)}
+              disabled={isBulkPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant={
+                bulkAction === "delete" || bulkAction === "markFailed"
+                  ? "destructive"
+                  : "default"
+              }
+              onClick={handleBulkAction}
+              disabled={isBulkPending}
+            >
+              {isBulkPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              {bulkAction === "delete" && "Delete"}
+              {bulkAction === "markFailed" && "Mark as Failed"}
+              {bulkAction === "makePublic" && "Make Public"}
+              {bulkAction === "makePrivate" && "Make Private"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Floating bulk action bar */}
+      {multiselect.selectedIds.length > 0 && (
+        <div className="bg-background fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-lg border px-4 py-2 shadow-lg">
+          <span className="text-sm font-medium">
+            {multiselect.selectedIds.length} selected
+          </span>
+          <div className="bg-border mx-1 h-4 w-px" />
+          {(() => {
+            const selectedRows = multiselect.getSelectedRows(fileKeys);
+            const hasPending = selectedRows.some((r) => r.status === "pending");
+            return (
+              <>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setBulkAction("delete")}
+                >
+                  <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                  Delete
+                </Button>
+                {hasPending && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-orange-600 hover:text-orange-600"
+                    onClick={() => setBulkAction("markFailed")}
+                  >
+                    <Ban className="mr-1.5 h-3.5 w-3.5" />
+                    Mark Failed
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setBulkAction("makePublic")}
+                >
+                  <Eye className="mr-1.5 h-3.5 w-3.5" />
+                  Make Public
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setBulkAction("makePrivate")}
+                >
+                  <EyeOff className="mr-1.5 h-3.5 w-3.5" />
+                  Make Private
+                </Button>
+              </>
+            );
+          })()}
+          <div className="bg-border mx-1 h-4 w-px" />
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={clearSelection}
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      )}
     </>
   );
 }
