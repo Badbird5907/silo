@@ -1,9 +1,6 @@
-import { eq } from "drizzle-orm";
 
 import { db } from "./src/client";
 import {
-  projectEnvironments,
-  projects,
   usageDaily,
   usageEvents,
 } from "./src/schema";
@@ -45,6 +42,9 @@ async function seed() {
 
     for (const env of environments) {
       console.log(`  Environment: ${env.name}`);
+      let storageBytes = Math.floor(
+        Math.random() * 5_000_000_000 + 100_000_000,
+      );
 
       for (let daysAgo = days; daysAgo >= 0; daysAgo--) {
         const date = new Date(now);
@@ -77,6 +77,10 @@ async function seed() {
 
         const bytesUploaded = uploadsCompleted * avgUploadSize;
         const bytesDownloaded = downloads * avgDownloadSize;
+        const bytesDeleted = Math.floor(
+          Math.random() * Math.min(storageBytes, bytesUploaded * 0.35 + 50_000_000),
+        );
+        storageBytes = Math.max(0, storageBytes + bytesUploaded - bytesDeleted);
 
         // Insert daily aggregate
         await db
@@ -92,7 +96,7 @@ async function seed() {
             downloads,
             bytesUploaded,
             bytesDownloaded,
-            storageBytes: 0,
+            storageBytes,
           })
           .onConflictDoNothing();
 

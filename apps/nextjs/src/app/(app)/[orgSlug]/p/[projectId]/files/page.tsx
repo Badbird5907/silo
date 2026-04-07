@@ -1,13 +1,14 @@
 "use client";
 
+import type { RouterOutputs } from "@silo-storage/api";
+import type { ColumnDef } from "@silo-storage/ui/components/data-table";
 import * as React from "react";
 import { use } from "react";
 import { notFound, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Activity,
   Ban,
-  CheckCircle2,
-  Clock,
   Copy,
   ExternalLink,
   Eye,
@@ -25,20 +26,22 @@ import {
   MoreHorizontal,
   Search,
   Trash2,
+  TrendingUp,
   X,
-  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@silo-storage/ui/components/badge";
 import { Button } from "@silo-storage/ui/components/button";
-import { FileStatusBadge } from "@/components/file-status-badge";
 import {
   Card,
   CardContent,
   CardHeader,
-  CardTitle,
 } from "@silo-storage/ui/components/card";
+import {
+  DataTable,
+  useDataTableMultiselect,
+} from "@silo-storage/ui/components/data-table";
 import {
   Dialog,
   DialogContent,
@@ -62,22 +65,19 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@silo-storage/ui/components/dropdown-menu";
-import {
-  DataTable,
-  useDataTableMultiselect,
-} from "@silo-storage/ui/components/data-table";
-import type { ColumnDef } from "@silo-storage/ui/components/data-table";
 import { Input } from "@silo-storage/ui/components/input";
 import { Skeleton } from "@silo-storage/ui/components/skeleton";
 import { useIsMobile } from "@silo-storage/ui/hooks/use-mobile";
 import { cn } from "@silo-storage/ui/lib/utils";
 
-import type { RouterOutputs } from "@silo-storage/api";
-
 import { getDownloadUrl } from "@/actions/file";
+import { FileStatusBadge } from "@/components/file-status-badge";
 import { UploadDialog } from "@/components/upload-dialog";
 import { useOrganization } from "@/hooks/use-organization";
 import { useTRPC } from "@/trpc/react";
+import { StorageChart } from "@/app/(app)/[orgSlug]/p/[projectId]/files/chart";
+import { UploadActivityChart } from "@/app/(app)/[orgSlug]/p/[projectId]/files/upload-chart";
+
 interface FilesPageProps {
   params: Promise<{
     orgSlug: string;
@@ -143,7 +143,7 @@ function copyToClipboard(text: string, label = "Copied") {
   });
 }
 
-type FileKeyRow = RouterOutputs["fileKey"]["list"]["fileKeys"][number]
+type FileKeyRow = RouterOutputs["fileKey"]["list"]["fileKeys"][number];
 
 interface SearchInputProps {
   value: string;
@@ -176,7 +176,7 @@ const SearchInput = React.memo(function SearchInput({
   return (
     <div
       className={cn(
-        "relative w-full min-w-0 max-w-full sm:max-w-sm sm:flex-1",
+        "relative w-full max-w-full min-w-0 sm:max-w-sm sm:flex-1",
         className,
       )}
     >
@@ -203,10 +203,11 @@ export default function FilesPage({ params }: FilesPageProps) {
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(20);
   const [search, setSearch] = React.useState("");
-  const [mimeTypeFilter, setMimeTypeFilter] = React.useState<string | undefined>();
-  const [environmentFilter, setEnvironmentFilter] = React.useState<
-    string
-  >("all");
+  const [mimeTypeFilter, setMimeTypeFilter] = React.useState<
+    string | undefined
+  >();
+  const [environmentFilter, setEnvironmentFilter] =
+    React.useState<string>("all");
   const [statusFilter, setStatusFilter] = React.useState<
     "all" | "pending" | "completed" | "failed" | "deleted"
   >("completed"); // no need to show pending/failed/deleted files by default
@@ -271,7 +272,8 @@ export default function FilesPage({ params }: FilesPageProps) {
     }
     setEnvironmentFilter("all");
   }, [selectedEnvironmentId, environmentSlug]);
-  const environmentId = environmentFilter === "all" ? undefined : environmentFilter;
+  const environmentId =
+    environmentFilter === "all" ? undefined : environmentFilter;
 
   const fileKeysQuery = useQuery(
     trpc.fileKey.list.queryOptions(
@@ -345,7 +347,15 @@ export default function FilesPage({ params }: FilesPageProps) {
   React.useEffect(() => {
     multiselect.onRowSelectionChange({});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, mimeTypeFilter, environmentFilter, statusFilter, sortBy, sortOrder, pageSize]);
+  }, [
+    page,
+    mimeTypeFilter,
+    environmentFilter,
+    statusFilter,
+    sortBy,
+    sortOrder,
+    pageSize,
+  ]);
 
   const clearSelection = React.useCallback(() => {
     multiselect.onRowSelectionChange({});
@@ -359,7 +369,9 @@ export default function FilesPage({ params }: FilesPageProps) {
             `Deleted ${data.succeeded} of ${data.succeeded + data.failed} files. ${data.failed} failed.`,
           );
         } else {
-          toast.success(`Deleted ${data.succeeded} file${data.succeeded !== 1 ? "s" : ""}`);
+          toast.success(
+            `Deleted ${data.succeeded} file${data.succeeded !== 1 ? "s" : ""}`,
+          );
         }
         setBulkAction(null);
         clearSelection();
@@ -693,15 +705,21 @@ export default function FilesPage({ params }: FilesPageProps) {
   const pagination = fileKeysQuery.data?.pagination;
   const filterOptions = filterOptionsQuery.data;
   const stats = statsQuery.data;
+  const fileCountTotal = stats?.total ?? 0;
+  const fileCountCompleted = stats?.completed ?? 0;
+  const fileCountPending = stats?.pending ?? 0;
+  const fileCountFailed = stats?.failed ?? 0;
+  const fileCountShare = (n: number) =>
+    fileCountTotal > 0 ? (n / fileCountTotal) * 100 : 0;
   const deleteCandidate = deleteFileId
-    ? fileKeys.find((fileKey) => fileKey.id === deleteFileId) ?? null
+    ? (fileKeys.find((fileKey) => fileKey.id === deleteFileId) ?? null)
     : null;
 
   const hasActiveFilters = Boolean(
     search.length > 0 ||
-      mimeTypeFilter !== undefined ||
-      environmentFilter !== "all" ||
-      statusFilter !== "completed",
+    mimeTypeFilter !== undefined ||
+    environmentFilter !== "all" ||
+    statusFilter !== "completed",
   );
 
   const clearFilters = () => {
@@ -714,95 +732,141 @@ export default function FilesPage({ params }: FilesPageProps) {
   return (
     <>
       <div className="flex min-w-0 flex-1 flex-col gap-4 p-4">
-        <div className="grid min-w-0 grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total</CardTitle>
-              <File className="text-muted-foreground h-4 w-4" />
-            </CardHeader>
+        <div className="grid min-w-0 grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          <Card className="col-span-2 min-w-0 lg:col-span-2">
             <CardContent>
-              <div className="text-2xl font-bold">
-                {statsQuery.isLoading ? (
-                  <Skeleton className="h-8 w-16" />
-                ) : (
-                  (stats?.total.toLocaleString() ?? 0)
-                )}
-              </div>
+              {statsQuery.isLoading ? (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                    <div className="space-y-2">
+                      <Skeleton className="h-3 w-20" />
+                      <Skeleton className="h-9 w-16" />
+                    </div>
+                    <div className="space-y-2">
+                      <Skeleton className="h-3 w-24" />
+                      <Skeleton className="h-9 w-28" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-2 w-full rounded-full" />
+                  <div className="grid grid-cols-3 gap-2">
+                    <Skeleton className="h-10 w-full rounded-md" />
+                    <Skeleton className="h-10 w-full rounded-md" />
+                    <Skeleton className="h-10 w-full rounded-md" />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                    <div className="min-w-0">
+                      <p className="text-muted-foreground mb-1 text-xs font-medium">
+                        Total files
+                      </p>
+                      <p className="text-3xl font-bold tracking-tight tabular-nums">
+                        {fileCountCompleted.toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-muted-foreground mb-1 text-xs font-medium">
+                        Storage used
+                      </p>
+                      <p className="text-3xl font-bold tracking-tight tabular-nums">
+                        {formatFileSize(stats?.totalSize ?? 0)}
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    className="bg-muted flex h-2 w-full overflow-hidden rounded-full"
+                    role="img"
+                    aria-label={`File status mix: ${fileCountCompleted} completed, ${fileCountPending} pending, ${fileCountFailed} failed`}
+                  >
+                    {fileCountTotal > 0 ? (
+                      <>
+                        <div
+                          className="h-full bg-emerald-500"
+                          style={{
+                            width: `${fileCountShare(fileCountCompleted)}%`,
+                          }}
+                        />
+                        <div
+                          className="h-full bg-amber-500"
+                          style={{
+                            width: `${fileCountShare(fileCountPending)}%`,
+                          }}
+                        />
+                        <div
+                          className="h-full bg-red-500"
+                          style={{ width: `${fileCountShare(fileCountFailed)}%` }}
+                        />
+                      </>
+                    ) : null}
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+                    <div className="flex min-w-0 flex-col gap-1 rounded-md px-2 py-1.5">
+                      <span className="text-muted-foreground flex items-center gap-1.5 text-[10px] font-medium sm:text-xs">
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                        Completed
+                      </span>
+                      <span className="text-foreground font-semibold tabular-nums">
+                        {fileCountCompleted.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex min-w-0 flex-col gap-1 rounded-md px-2 py-1.5">
+                      <span className="text-muted-foreground flex items-center gap-1.5 text-[10px] font-medium sm:text-xs">
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+                        Pending
+                      </span>
+                      <span className="text-foreground font-semibold tabular-nums">
+                        {fileCountPending.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex min-w-0 flex-col gap-1 rounded-md px-2 py-1.5">
+                      <span className="text-muted-foreground flex items-center gap-1.5 text-[10px] font-medium sm:text-xs">
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
+                        Failed
+                      </span>
+                      <span className="text-foreground font-semibold tabular-nums">
+                        {fileCountFailed.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
+
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Completed</CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
-            </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {statsQuery.isLoading ? (
-                  <Skeleton className="h-8 w-16" />
-                ) : (
-                  (stats?.completed.toLocaleString() ?? 0)
-                )}
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-muted-foreground text-sm font-medium">
+                  Upload Activity
+                </p>
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10">
+                  <TrendingUp className="h-4 w-4 text-emerald-500" />
+                </div>
               </div>
+              <UploadActivityChart
+                projectId={projectId}
+                organizationId={organizationId}
+                environmentId={selectedEnvironmentId}
+              />
             </CardContent>
           </Card>
+
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending</CardTitle>
-              <Clock className="h-4 w-4 text-yellow-500" />
-            </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {statsQuery.isLoading ? (
-                  <Skeleton className="h-8 w-16" />
-                ) : (
-                  (stats?.pending.toLocaleString() ?? 0)
-                )}
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-muted-foreground text-sm font-medium">
+                  Storage Trend
+                </p>
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-500/10">
+                  <Activity className="h-4 w-4 text-purple-500" />
+                </div>
               </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Failed</CardTitle>
-              <XCircle className="h-4 w-4 text-red-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {statsQuery.isLoading ? (
-                  <Skeleton className="h-8 w-16" />
-                ) : (
-                  (stats?.failed.toLocaleString() ?? 0)
-                )}
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Deleted</CardTitle>
-              <Trash2 className="text-muted-foreground h-4 w-4" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {statsQuery.isLoading ? (
-                  <Skeleton className="h-8 w-16" />
-                ) : (
-                  (stats?.deleted.toLocaleString() ?? 0)
-                )}
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Storage</CardTitle>
-              <HardDrive className="text-muted-foreground h-4 w-4" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {statsQuery.isLoading ? (
-                  <Skeleton className="h-8 w-20" />
-                ) : (
-                  formatFileSize(stats?.totalSize ?? 0)
-                )}
-              </div>
+              <StorageChart
+                projectId={projectId}
+                organizationId={organizationId}
+                environmentId={selectedEnvironmentId}
+              />
             </CardContent>
           </Card>
         </div>
@@ -830,14 +894,23 @@ export default function FilesPage({ params }: FilesPageProps) {
                   <DropdownMenuContent
                     align="end"
                     sideOffset={8}
-                    className="min-w-[220px] max-w-[calc(100vw-2rem)]"
+                    className="max-w-[calc(100vw-2rem)] min-w-[220px]"
                   >
                     <DropdownMenuGroup>
-                      <DropdownMenuLabel className="text-xs text-muted-foreground">Filter by</DropdownMenuLabel>
+                      <DropdownMenuLabel className="text-muted-foreground text-xs">
+                        Filter by
+                      </DropdownMenuLabel>
                       {isMobile ? (
                         <>
-                          <DropdownMenuLabel className="text-xs text-muted-foreground">Status</DropdownMenuLabel>
-                          <DropdownMenuRadioGroup value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
+                          <DropdownMenuLabel className="text-muted-foreground text-xs">
+                            Status
+                          </DropdownMenuLabel>
+                          <DropdownMenuRadioGroup
+                            value={statusFilter}
+                            onValueChange={(v) =>
+                              setStatusFilter(v as typeof statusFilter)
+                            }
+                          >
                             <DropdownMenuRadioItem value="all">
                               All Status
                             </DropdownMenuRadioItem>
@@ -855,20 +928,35 @@ export default function FilesPage({ params }: FilesPageProps) {
                             </DropdownMenuRadioItem>
                           </DropdownMenuRadioGroup>
                           <DropdownMenuSeparator />
-                          <DropdownMenuLabel className="text-xs text-muted-foreground">Environment</DropdownMenuLabel>
-                          <DropdownMenuRadioGroup value={environmentFilter} onValueChange={(v) => setEnvironmentFilter(v)}>
+                          <DropdownMenuLabel className="text-muted-foreground text-xs">
+                            Environment
+                          </DropdownMenuLabel>
+                          <DropdownMenuRadioGroup
+                            value={environmentFilter}
+                            onValueChange={(v) => setEnvironmentFilter(v)}
+                          >
                             <DropdownMenuRadioItem value="all">
                               All Environments
                             </DropdownMenuRadioItem>
                             {filterOptions?.environments.map((env) => (
-                              <DropdownMenuRadioItem key={env.id} value={env.id}>
+                              <DropdownMenuRadioItem
+                                key={env.id}
+                                value={env.id}
+                              >
                                 {env.name}
                               </DropdownMenuRadioItem>
                             ))}
                           </DropdownMenuRadioGroup>
                           <DropdownMenuSeparator />
-                          <DropdownMenuLabel className="text-xs text-muted-foreground">Type</DropdownMenuLabel>
-                          <DropdownMenuRadioGroup value={mimeTypeFilter} onValueChange={(v) => setMimeTypeFilter(v as typeof mimeTypeFilter)}>
+                          <DropdownMenuLabel className="text-muted-foreground text-xs">
+                            Type
+                          </DropdownMenuLabel>
+                          <DropdownMenuRadioGroup
+                            value={mimeTypeFilter}
+                            onValueChange={(v) =>
+                              setMimeTypeFilter(v as typeof mimeTypeFilter)
+                            }
+                          >
                             <DropdownMenuRadioItem value="all">
                               All Types
                             </DropdownMenuRadioItem>
@@ -882,10 +970,17 @@ export default function FilesPage({ params }: FilesPageProps) {
                       ) : (
                         <>
                           <DropdownMenuSub>
-                            <DropdownMenuSubTrigger>Status</DropdownMenuSubTrigger>
+                            <DropdownMenuSubTrigger>
+                              Status
+                            </DropdownMenuSubTrigger>
                             <DropdownMenuPortal>
                               <DropdownMenuSubContent>
-                                <DropdownMenuRadioGroup value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
+                                <DropdownMenuRadioGroup
+                                  value={statusFilter}
+                                  onValueChange={(v) =>
+                                    setStatusFilter(v as typeof statusFilter)
+                                  }
+                                >
                                   <DropdownMenuRadioItem value="all">
                                     All Status
                                   </DropdownMenuRadioItem>
@@ -906,15 +1001,23 @@ export default function FilesPage({ params }: FilesPageProps) {
                             </DropdownMenuPortal>
                           </DropdownMenuSub>
                           <DropdownMenuSub>
-                            <DropdownMenuSubTrigger>Environment</DropdownMenuSubTrigger>
+                            <DropdownMenuSubTrigger>
+                              Environment
+                            </DropdownMenuSubTrigger>
                             <DropdownMenuPortal>
                               <DropdownMenuSubContent>
-                                <DropdownMenuRadioGroup value={environmentFilter} onValueChange={(v) => setEnvironmentFilter(v)}>
+                                <DropdownMenuRadioGroup
+                                  value={environmentFilter}
+                                  onValueChange={(v) => setEnvironmentFilter(v)}
+                                >
                                   <DropdownMenuRadioItem value="all">
                                     All Environments
                                   </DropdownMenuRadioItem>
                                   {filterOptions?.environments.map((env) => (
-                                    <DropdownMenuRadioItem key={env.id} value={env.id}>
+                                    <DropdownMenuRadioItem
+                                      key={env.id}
+                                      value={env.id}
+                                    >
                                       {env.name}
                                     </DropdownMenuRadioItem>
                                   ))}
@@ -923,18 +1026,33 @@ export default function FilesPage({ params }: FilesPageProps) {
                             </DropdownMenuPortal>
                           </DropdownMenuSub>
                           <DropdownMenuSub>
-                            <DropdownMenuSubTrigger>Type</DropdownMenuSubTrigger>
+                            <DropdownMenuSubTrigger>
+                              Type
+                            </DropdownMenuSubTrigger>
                             <DropdownMenuPortal>
                               <DropdownMenuSubContent>
-                                <DropdownMenuRadioGroup value={mimeTypeFilter} onValueChange={(v) => setMimeTypeFilter(v as typeof mimeTypeFilter)}>
+                                <DropdownMenuRadioGroup
+                                  value={mimeTypeFilter}
+                                  onValueChange={(v) =>
+                                    setMimeTypeFilter(
+                                      v as typeof mimeTypeFilter,
+                                    )
+                                  }
+                                >
                                   <DropdownMenuRadioItem value="all">
                                     All Types
                                   </DropdownMenuRadioItem>
-                                  {filterOptions?.mimeTypeCategories.map((type) => (
-                                    <DropdownMenuRadioItem key={type} value={type}>
-                                      {type.charAt(0).toUpperCase() + type.slice(1)}
-                                    </DropdownMenuRadioItem>
-                                  ))}
+                                  {filterOptions?.mimeTypeCategories.map(
+                                    (type) => (
+                                      <DropdownMenuRadioItem
+                                        key={type}
+                                        value={type}
+                                      >
+                                        {type.charAt(0).toUpperCase() +
+                                          type.slice(1)}
+                                      </DropdownMenuRadioItem>
+                                    ),
+                                  )}
                                 </DropdownMenuRadioGroup>
                               </DropdownMenuSubContent>
                             </DropdownMenuPortal>
@@ -947,8 +1065,11 @@ export default function FilesPage({ params }: FilesPageProps) {
                       Clear Filters
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuLabel className="text-xs text-muted-foreground">Sort by</DropdownMenuLabel>
-                    <DropdownMenuRadioGroup value={`${sortBy}-${sortOrder}`}
+                    <DropdownMenuLabel className="text-muted-foreground text-xs">
+                      Sort by
+                    </DropdownMenuLabel>
+                    <DropdownMenuRadioGroup
+                      value={`${sortBy}-${sortOrder}`}
                       onValueChange={(v) => {
                         const [field, order] = v.split("-") as [
                           typeof sortBy,
@@ -956,13 +1077,26 @@ export default function FilesPage({ params }: FilesPageProps) {
                         ];
                         setSortBy(field);
                         setSortOrder(order);
-                      }}>
-                      <DropdownMenuRadioItem value="createdAt-desc">Newest First</DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="createdAt-asc">Oldest First</DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="fileName-asc">Name A-Z</DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="fileName-desc">Name Z-A</DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="size-desc">Largest First</DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="size-asc">Smallest First</DropdownMenuRadioItem>
+                      }}
+                    >
+                      <DropdownMenuRadioItem value="createdAt-desc">
+                        Newest First
+                      </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="createdAt-asc">
+                        Oldest First
+                      </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="fileName-asc">
+                        Name A-Z
+                      </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="fileName-desc">
+                        Name Z-A
+                      </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="size-desc">
+                        Largest First
+                      </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="size-asc">
+                        Smallest First
+                      </DropdownMenuRadioItem>
                     </DropdownMenuRadioGroup>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -1007,10 +1141,10 @@ export default function FilesPage({ params }: FilesPageProps) {
               pagination={
                 pagination
                   ? {
-                    ...pagination,
-                    onPageChange: setPage,
-                    onPageSizeChange: setPageSize,
-                  }
+                      ...pagination,
+                      onPageChange: setPage,
+                      onPageSizeChange: setPageSize,
+                    }
                   : undefined
               }
             />
@@ -1199,11 +1333,7 @@ export default function FilesPage({ params }: FilesPageProps) {
             );
           })()}
           <div className="bg-border mx-1 h-4 w-px" />
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={clearSelection}
-          >
+          <Button variant="ghost" size="icon-sm" onClick={clearSelection}>
             <X className="h-3.5 w-3.5" />
           </Button>
         </div>

@@ -37,6 +37,7 @@ import { Skeleton } from "@silo-storage/ui/components/skeleton";
 import { useOrganization } from "@/hooks/use-organization";
 import { useTRPC } from "@/trpc/react";
 import { StatCard } from "./stat-card";
+import { formatDateParam } from "@/lib/format";
 
 interface AnalyticsPageProps {
   params: Promise<{
@@ -58,6 +59,16 @@ interface PickerDateRange {
   to?: Date;
 }
 
+interface DailyChartDatum {
+  date: string;
+  uploadsCompleted: number;
+  uploadsFailed: number;
+  downloads: number;
+  bytesUploaded: number;
+  bytesDownloaded: number;
+  storageBytes: number | null;
+}
+
 function getDefaultAnalyticsRange() {
   const end = new Date();
   end.setHours(0, 0, 0, 0);
@@ -68,19 +79,20 @@ function getDefaultAnalyticsRange() {
   return { from: start, to: end };
 }
 
-function formatDateParam(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
   const k = 1024;
   const sizes = ["B", "KB", "MB", "GB", "TB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+}
+
+function formatChartDate(value: string): string {
+  const date = new Date(value);
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 export default function AnalyticsPage({ params }: AnalyticsPageProps) {
@@ -159,9 +171,10 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
     downloads: { label: "Downloads", color: "var(--chart-3)" },
     bytesUploaded: { label: "Uploaded", color: "var(--chart-1)" },
     bytesDownloaded: { label: "Downloaded", color: "var(--chart-3)" },
+    storageBytes: { label: "Stored", color: "var(--chart-4)" },
   };
 
-  const dailyData =
+  const dailyData: DailyChartDatum[] =
     stats?.daily.map((d) => ({
       date: d.date,
       uploadsCompleted: d.uploadsCompleted,
@@ -169,7 +182,9 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
       downloads: d.downloads,
       bytesUploaded: d.bytesUploaded,
       bytesDownloaded: d.bytesDownloaded,
+      storageBytes: d.storageBytes as number | null,
     })) ?? [];
+  const hasStorageHistory = dailyData.some((d) => d.storageBytes !== null);
 
   return (
     <>
@@ -249,13 +264,7 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
                       axisLine={false}
                       tickMargin={8}
                       className="fill-muted-foreground text-xs"
-                      tickFormatter={(value) => {
-                        const date = new Date(value as string);
-                        return date.toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                        });
-                      }}
+                      tickFormatter={(value) => formatChartDate(value as string)}
                     />
                     <YAxis
                       tickLine={false}
@@ -313,13 +322,7 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
                       axisLine={false}
                       tickMargin={8}
                       className="fill-muted-foreground text-xs"
-                      tickFormatter={(value) => {
-                        const date = new Date(value as string);
-                        return date.toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                        });
-                      }}
+                      tickFormatter={(value) => formatChartDate(value as string)}
                     />
                     <YAxis
                       tickLine={false}
@@ -352,6 +355,84 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
 
         <Card>
           <CardHeader>
+            <CardTitle>Storage</CardTitle>
+            <CardDescription>
+              Total storage over time
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {analyticsQuery.isLoading ? (
+              <Skeleton className="h-[240px] w-full" />
+            ) : hasStorageHistory ? (
+              <ChartContainer config={chartConfig} className="h-[240px] aspect-auto">
+                <AreaChart data={dailyData}>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    vertical={false}
+                    className="stroke-border"
+                  />
+                  <XAxis
+                    dataKey="date"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    className="fill-muted-foreground text-xs"
+                    tickFormatter={(value) => formatChartDate(value as string)}
+                  />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    className="fill-muted-foreground text-xs"
+                    tickFormatter={(value) =>
+                      typeof value === "number" ? formatBytes(value) : ""
+                    }
+                  />
+                  <ChartTooltip
+                    content={
+                      <ChartTooltipContent
+                        labelFormatter={(label) =>
+                          typeof label === "string"
+                            ? formatChartDate(label)
+                            : String(label)
+                        }
+                        formatter={(value, name) => (
+                          <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                            <span className="text-muted-foreground">
+                              {name}
+                            </span>
+                            <span className="text-foreground font-mono font-medium tabular-nums">
+                              {typeof value === "number"
+                                ? formatBytes(value)
+                                : "Unknown"}
+                            </span>
+                          </div>
+                        )}
+                      />
+                    }
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="storageBytes"
+                    stroke="var(--color-storageBytes)"
+                    fill="var(--color-storageBytes)"
+                    fillOpacity={0.2}
+                  />
+                </AreaChart>
+              </ChartContainer>
+            ) : (
+              <div className="flex h-[240px] items-center justify-center">
+                <p className="text-muted-foreground">
+                  Storage history starts on the day snapshot tracking was
+                  enabled.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle>Bandwidth Usage</CardTitle>
             <CardDescription>
               Data uploaded and downloaded in the selected range
@@ -369,18 +450,12 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
                     className="stroke-border"
                   />
                   <XAxis
-                    dataKey="date"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    className="fill-muted-foreground text-xs"
-                    tickFormatter={(value) => {
-                      const date = new Date(value as string);
-                      return date.toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                      });
-                    }}
+                  dataKey="date"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  className="fill-muted-foreground text-xs"
+                  tickFormatter={(value) => formatChartDate(value as string)}
                   />
                   <YAxis
                     tickLine={false}

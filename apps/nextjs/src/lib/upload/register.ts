@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { and, eq, sql } from "@silo-storage/db";
+import { syncEnvironmentStorageSnapshot } from "@silo-storage/api/services";
 import { db } from "@silo-storage/db/client";
 import {
   fileKeys,
@@ -424,6 +425,11 @@ export async function completeFileKeyFromCallback(input: {
     if (!updatedFileKey) {
       throw new Error("Failed to update callback file key");
     }
+
+    await syncEnvironmentStorageSnapshot(tx, {
+      projectId: input.projectId,
+      environmentId: input.environmentId,
+    });
 
     return {
       fileKey: updatedFileKey,

@@ -518,9 +518,7 @@ export const usageDaily = pgTable(
     bytesDownloaded: bigint("bytes_downloaded", { mode: "number" })
       .notNull()
       .default(0),
-    storageBytes: bigint("storage_bytes", { mode: "number" })
-      .notNull()
-      .default(0),
+    storageBytes: bigint("storage_bytes", { mode: "number" }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()

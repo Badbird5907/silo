@@ -214,7 +214,7 @@ export function OrganizationsSettingsCard() {
                         </Button>
                       ) : (
                         <Tooltip>
-                          <TooltipTrigger>
+                          <TooltipTrigger asChild>
                             <Button variant="destructive" size="sm" disabled>
                               <UserMinus className="mr-2 h-4 w-4" />
                               Leave

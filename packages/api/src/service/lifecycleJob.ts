@@ -15,6 +15,7 @@ import { fileKeys, fileLifecycleJobs, files } from "@silo-storage/db/schema";
 import { clearUploadSessionAdapterData } from "@silo-storage/shared";
 
 import { env } from "../env";
+import { syncEnvironmentStorageSnapshot } from "./analytics";
 
 const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
 const ALWAYS_RETRY_CLEANUP_KINDS = new Set<LifecycleJobKind>([
@@ -564,6 +565,13 @@ async function performFinalizeFailedFileKey(
 
   if (job.fileId) {
     await db.delete(files).where(eq(files.id, job.fileId));
+
+    if (job.projectId && job.environmentId) {
+      await syncEnvironmentStorageSnapshot(db, {
+        projectId: job.projectId,
+        environmentId: job.environmentId,
+      });
+    }
   }
 
   return { ok: true as const };
@@ -595,6 +603,13 @@ async function performRepairMissingObject(
 
     if (job.fileId) {
       await tx.delete(files).where(eq(files.id, job.fileId));
+
+      if (job.projectId && job.environmentId) {
+        await syncEnvironmentStorageSnapshot(tx, {
+          projectId: job.projectId,
+          environmentId: job.environmentId,
+        });
+      }
     }
   });
 

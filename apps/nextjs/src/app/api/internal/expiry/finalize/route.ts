@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { and, eq, inArray, isNotNull, lte } from "@silo-storage/db";
+import { syncEnvironmentStorageSnapshots } from "@silo-storage/api/services";
 import { db } from "@silo-storage/db/client";
 import { fileKeys, files } from "@silo-storage/db/schema";
 
@@ -71,10 +72,27 @@ export async function POST(request: Request) {
       );
     }
 
+    const deletedFiles = await db
+      .select({
+        id: files.id,
+        projectId: files.projectId,
+        environmentId: files.environmentId,
+      })
+      .from(files)
+      .where(inArray(files.id, deletableFileIds));
+
     const deleted = await db
       .delete(files)
       .where(inArray(files.id, deletableFileIds))
       .returning({ id: files.id });
+
+    await syncEnvironmentStorageSnapshots(
+      db,
+      deletedFiles.map((file) => ({
+        projectId: file.projectId,
+        environmentId: file.environmentId,
+      })),
+    );
 
     return new Response(
       JSON.stringify({
