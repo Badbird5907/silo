@@ -50,6 +50,10 @@ export async function getDownloadUrl({
     return null;
   }
 
+  if (fileKey.status !== "completed" || !fileKey.file) {
+    return null;
+  }
+
   // isPublic is now stored directly on fileKey (resolved at creation time)
   const isPublic = fileKey.isPublic;
 

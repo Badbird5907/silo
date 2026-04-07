@@ -9,6 +9,7 @@ import {
 } from "@/lib/api-key-middleware";
 import { createDevUploadEventStream } from "@/lib/upload/dev-sse";
 import {
+  DeletedFileKeyReuseError,
   registerFileKeyIntent,
   registerUploadBodySchema,
 } from "@/lib/upload/register";
@@ -154,6 +155,10 @@ export async function POST(request: Request) {
       },
     );
   } catch (error) {
+    if (error instanceof DeletedFileKeyReuseError) {
+      return jsonError("Conflict", error.message, 409);
+    }
+
     console.error("Error registering upload:", error);
     return jsonError(
       "Internal Server Error",

@@ -308,6 +308,8 @@ export default function FileDetailPage({ params }: FileDetailPageProps) {
     !!expiresAt &&
     !Number.isNaN(expiresAt.getTime()) &&
     expiresAt.getTime() <= Date.now();
+  const deletedAt = fileKey.deletedAt ? new Date(fileKey.deletedAt) : null;
+  const canDelete = status === "completed" || status === "failed";
 
   return (
     <>
@@ -428,6 +430,15 @@ export default function FileDetailPage({ params }: FileDetailPageProps) {
                   <span className="text-muted-foreground text-sm">Never</span>
                 )}
               </div>
+              {deletedAt && (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Calendar className="text-muted-foreground h-4 w-4" />
+                    <span className="text-muted-foreground">Deleted</span>
+                  </div>
+                  <span className="text-sm">{formatDate(deletedAt)}</span>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -498,7 +509,7 @@ export default function FileDetailPage({ params }: FileDetailPageProps) {
               <Select
                 value={effectiveAccess}
                 onValueChange={(v) => handleAccessChange(v as AccessValue)}
-                disabled={updateAccessMutation.isPending}
+                disabled={updateAccessMutation.isPending || status === "deleted"}
               >
                 <SelectTrigger className="w-[180px]">
                   <SelectValue />
@@ -530,51 +541,61 @@ export default function FileDetailPage({ params }: FileDetailPageProps) {
           </Card>
         )}
 
-        <Card className="border-red-200 dark:border-red-900">
-          <CardHeader>
-            <CardTitle className="text-base text-red-600">
-              Danger Zone
-            </CardTitle>
-            <CardDescription>
-              Irreversible actions for this file
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {status === "pending" && (
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Mark upload as failed</p>
-                  <p className="text-muted-foreground text-sm">
-                    Abort this pending upload and clean up any partial data
-                  </p>
+        {status !== "deleted" && (
+          <Card className="border-red-200 dark:border-red-900">
+            <CardHeader>
+              <CardTitle className="text-base text-red-600">
+                Danger Zone
+              </CardTitle>
+              <CardDescription>
+                Irreversible actions for this file
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {status === "pending" && (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Mark upload as failed</p>
+                    <p className="text-muted-foreground text-sm">
+                      Abort this pending upload and clean up any partial data
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="border-orange-300 text-orange-600 hover:bg-orange-50 dark:border-orange-700 dark:hover:bg-orange-950"
+                    onClick={() => setShowMarkFailedDialog(true)}
+                  >
+                    <Ban className="mr-2 h-4 w-4" />
+                    Mark as Failed
+                  </Button>
                 </div>
-                <Button
-                  variant="outline"
-                  className="border-orange-300 text-orange-600 hover:bg-orange-50 dark:border-orange-700 dark:hover:bg-orange-950"
-                  onClick={() => setShowMarkFailedDialog(true)}
-                >
-                  <Ban className="mr-2 h-4 w-4" />
-                  Mark as Failed
-                </Button>
-              </div>
-            )}
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">Delete this file</p>
-                <p className="text-muted-foreground text-sm">
-                  Permanently delete this file and all associated data
-                </p>
-              </div>
-              <Button
-                variant="destructive"
-                onClick={() => setShowDeleteDialog(true)}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete File
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+              )}
+              {canDelete && (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">
+                      {status === "failed"
+                        ? "Delete this file record"
+                        : "Delete this file"}
+                    </p>
+                    <p className="text-muted-foreground text-sm">
+                      {status === "failed"
+                        ? "Permanently delete this failed file record"
+                        : "Permanently delete this file and all associated data"}
+                    </p>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    onClick={() => setShowDeleteDialog(true)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete File
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
@@ -582,8 +603,9 @@ export default function FileDetailPage({ params }: FileDetailPageProps) {
           <DialogHeader>
             <DialogTitle>Delete File</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{fileKey.fileName}"? This action
-              cannot be undone.
+              {status === "failed"
+                ? `Are you sure you want to delete the failed file record for "${fileKey.fileName}"? This action cannot be undone.`
+                : `Are you sure you want to delete "${fileKey.fileName}"? This action cannot be undone.`}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

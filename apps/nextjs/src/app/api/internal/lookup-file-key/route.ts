@@ -40,14 +40,19 @@ export async function POST(request: Request) {
       });
     }
 
+    if (fileKey.status === "deleted" || !fileKey.file) {
+      return new Response(JSON.stringify({ error: "File not found" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
     const responseBody = {
       ...fileKey,
-      file: fileKey.file
-        ? {
-            ...fileKey.file,
-            adapterKey: fileKey.file.storageKey,
-          }
-        : null,
+      file: {
+        ...fileKey.file,
+        adapterKey: fileKey.file.storageKey,
+      },
     };
 
     return new Response(JSON.stringify(responseBody), {

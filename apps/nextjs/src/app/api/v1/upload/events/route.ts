@@ -90,6 +90,11 @@ export async function GET(request: Request) {
           ),
         );
 
+        if (fileKey?.status === "deleted") {
+          close();
+          return;
+        }
+
         // upload already complete/failed
         if (fileKey?.status === "completed" || fileKey?.status === "failed") {
           controller.enqueue(

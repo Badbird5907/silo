@@ -100,9 +100,11 @@ async function trackUsageEvent(
     try {
       await insertUsageEvent(fileId);
     } catch (insertError) {
-      const errorCode =
-        (insertError as { cause?: { code?: string } })?.cause?.code ??
-        (insertError as { code?: string })?.code;
+      const errorWithCode = insertError as {
+        cause?: { code?: string };
+        code?: string;
+      };
+      const errorCode = errorWithCode.cause?.code ?? errorWithCode.code;
       const isFileFkViolation = errorCode === "23503";
 
       if (!isFileFkViolation || !fileId) {
@@ -385,6 +387,38 @@ export async function POST(request: Request) {
         metadata: data.metadata,
       });
 
+      if (completion.alreadyDeleted) {
+        try {
+          await scheduleAdapterKeyCleanup({
+            projectId: data.projectId,
+            environmentId: data.environmentId,
+            fileKeyId: data.fileKeyId,
+            storageKey: resolvedStorageKey,
+          });
+        } catch (cleanupError) {
+          console.error(
+            "Failed to enqueue cleanup for already-deleted upload:",
+            cleanupError,
+          );
+          return new Response(
+            JSON.stringify({
+              error:
+                "Temporary cleanup scheduling failure for already-deleted upload",
+            }),
+            { status: 503, headers: { "Content-Type": "application/json" } },
+          );
+        }
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            status: "deleted",
+            note: "File key already deleted; completion callback ignored.",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+
       if (completion.alreadyFailed) {
         try {
           await scheduleAdapterKeyCleanup({
@@ -552,7 +586,7 @@ export async function POST(request: Request) {
         return new Response(
           JSON.stringify({
             success: true,
-            status: "failed",
+            status: error.code === "ALREADY_DELETED" ? "deleted" : "failed",
             note: error.message,
           }),
           {

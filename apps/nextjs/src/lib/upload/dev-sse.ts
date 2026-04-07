@@ -63,6 +63,11 @@ export async function createDevUploadEventStream(request: Request, input: {
           ),
         );
 
+        if (fileKey?.status === "deleted") {
+          close();
+          return;
+        }
+
         if (fileKey?.status === "completed" || fileKey?.status === "failed") {
           const terminalEvent: UploadEventEnvelope = fileKey.status === "completed"
             ? {

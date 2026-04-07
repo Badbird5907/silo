@@ -175,9 +175,7 @@ export async function enqueueUploadWebhookEvent(
   const normalizedEnvironment: WebhookEnvironmentConfig = {
     ...env,
     type: parsedType,
-    webhookEvents: Array.isArray(env.webhookEvents)
-      ? (env.webhookEvents as string[])
-      : [],
+    webhookEvents: Array.isArray(env.webhookEvents) ? env.webhookEvents : [],
   };
 
   const webhookAllowed = environmentAllowsEvent(normalizedEnvironment, input.event.type);
@@ -246,7 +244,7 @@ export async function getWebhookTargetForEvent(
     id: input.environmentId,
     type: parsedType,
     webhookEvents: Array.isArray(environment.webhookEvents)
-      ? (environment.webhookEvents as string[])
+      ? environment.webhookEvents
       : [],
   };
 

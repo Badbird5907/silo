@@ -208,8 +208,8 @@ export default function FilesPage({ params }: FilesPageProps) {
     string
   >("all");
   const [statusFilter, setStatusFilter] = React.useState<
-    "all" | "pending" | "completed" | "failed"
-  >("completed"); // no need to show pending/failed files by default
+    "all" | "pending" | "completed" | "failed" | "deleted"
+  >("completed"); // no need to show pending/failed/deleted files by default
   const [sortBy, setSortBy] = React.useState<
     "createdAt" | "size" | "mimeType" | "fileName"
   >("createdAt");
@@ -600,6 +600,7 @@ export default function FilesPage({ params }: FilesPageProps) {
         cell: ({ row }) => {
           const fk = row.original;
           const isCompleted = fk.status === "completed";
+          const canDelete = fk.status === "completed" || fk.status === "failed";
           return (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -649,14 +650,18 @@ export default function FilesPage({ params }: FilesPageProps) {
                     </DropdownMenuItem>
                   </>
                 ) : null}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => setDeleteFileId(fk.id)}
-                  className="text-red-600"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
-                </DropdownMenuItem>
+                {canDelete ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => setDeleteFileId(fk.id)}
+                      className="text-red-600"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </DropdownMenuItem>
+                  </>
+                ) : null}
               </DropdownMenuContent>
             </DropdownMenu>
           );
@@ -688,9 +693,16 @@ export default function FilesPage({ params }: FilesPageProps) {
   const pagination = fileKeysQuery.data?.pagination;
   const filterOptions = filterOptionsQuery.data;
   const stats = statsQuery.data;
+  const deleteCandidate = deleteFileId
+    ? fileKeys.find((fileKey) => fileKey.id === deleteFileId) ?? null
+    : null;
 
-  const hasActiveFilters =
-    (mimeTypeFilter ?? (environmentFilter !== "all" ? environmentFilter : undefined) ?? statusFilter !== "completed") || search;
+  const hasActiveFilters = Boolean(
+    search.length > 0 ||
+      mimeTypeFilter !== undefined ||
+      environmentFilter !== "all" ||
+      statusFilter !== "completed",
+  );
 
   const clearFilters = () => {
     setSearch("");
@@ -702,7 +714,7 @@ export default function FilesPage({ params }: FilesPageProps) {
   return (
     <>
       <div className="flex min-w-0 flex-1 flex-col gap-4 p-4">
-        <div className="grid min-w-0 grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-5">
+        <div className="grid min-w-0 grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total</CardTitle>
@@ -759,6 +771,21 @@ export default function FilesPage({ params }: FilesPageProps) {
                   <Skeleton className="h-8 w-16" />
                 ) : (
                   (stats?.failed.toLocaleString() ?? 0)
+                )}
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Deleted</CardTitle>
+              <Trash2 className="text-muted-foreground h-4 w-4" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {statsQuery.isLoading ? (
+                  <Skeleton className="h-8 w-16" />
+                ) : (
+                  (stats?.deleted.toLocaleString() ?? 0)
                 )}
               </div>
             </CardContent>
@@ -823,6 +850,9 @@ export default function FilesPage({ params }: FilesPageProps) {
                             <DropdownMenuRadioItem value="failed">
                               Failed
                             </DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value="deleted">
+                              Deleted
+                            </DropdownMenuRadioItem>
                           </DropdownMenuRadioGroup>
                           <DropdownMenuSeparator />
                           <DropdownMenuLabel className="text-xs text-muted-foreground">Environment</DropdownMenuLabel>
@@ -867,6 +897,9 @@ export default function FilesPage({ params }: FilesPageProps) {
                                   </DropdownMenuRadioItem>
                                   <DropdownMenuRadioItem value="failed">
                                     Failed
+                                  </DropdownMenuRadioItem>
+                                  <DropdownMenuRadioItem value="deleted">
+                                    Deleted
                                   </DropdownMenuRadioItem>
                                 </DropdownMenuRadioGroup>
                               </DropdownMenuSubContent>
@@ -968,6 +1001,9 @@ export default function FilesPage({ params }: FilesPageProps) {
               onRowClick={(row) =>
                 router.push(`${projectBasePath}/files/${row.id}`)
               }
+              onRowMiddleClick={(row) => {
+                window.open(`${projectBasePath}/files/${row.id}`, "_blank");
+              }}
               pagination={
                 pagination
                   ? {
@@ -990,8 +1026,9 @@ export default function FilesPage({ params }: FilesPageProps) {
           <DialogHeader>
             <DialogTitle>Delete File</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this file? This action cannot be
-              undone.
+              {deleteCandidate?.status === "failed"
+                ? "Are you sure you want to delete this failed file record? This action cannot be undone."
+                : "Are you sure you want to delete this file and all associated data? This action cannot be undone."}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -1111,18 +1148,27 @@ export default function FilesPage({ params }: FilesPageProps) {
           <div className="bg-border mx-1 h-4 w-px" />
           {(() => {
             const selectedRows = multiselect.getSelectedRows(fileKeys);
-            const hasPending = selectedRows.some((r) => r.status === "pending");
+            const canBulkDelete =
+              selectedRows.length > 0 &&
+              selectedRows.every(
+                (row) => row.status === "completed" || row.status === "failed",
+              );
+            const canBulkMarkFailed =
+              selectedRows.length > 0 &&
+              selectedRows.every((row) => row.status === "pending");
             return (
               <>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => setBulkAction("delete")}
-                >
-                  <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                  Delete
-                </Button>
-                {hasPending && (
+                {canBulkDelete && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setBulkAction("delete")}
+                  >
+                    <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                    Delete
+                  </Button>
+                )}
+                {canBulkMarkFailed && (
                   <Button
                     variant="outline"
                     size="sm"

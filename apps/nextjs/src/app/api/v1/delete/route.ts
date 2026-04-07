@@ -1,15 +1,11 @@
 import { z } from "zod";
 
 import {
-  enqueueDeleteObjectJob,
-  enqueueFinalizeFailedFileKeyJob,
+  deleteFileKey,
   lookupFileKey,
   runLifecycleJobBatch,
 } from "@silo-storage/api/services";
-import { and, eq } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
-import { fileKeys } from "@silo-storage/db/schema";
-import { clearUploadSessionAdapterData } from "@silo-storage/shared";
 
 import {
   authenticateRequest,
@@ -32,7 +28,8 @@ const schema = z
 type DeleteTransitionResult =
   | { status: "missing" }
   | { status: "already_deleted" }
-  | { status: "no_file" }
+  | { status: "pending_rejected" }
+  | { status: "deleted_without_cleanup" }
   | { status: "transitioned"; fileId: string; storageKey: string };
 
 export async function POST(request: Request) {
@@ -75,7 +72,15 @@ export async function POST(request: Request) {
       return jsonError("Not Found", "File not found.", 404);
     }
 
-    if (!fileKey.file && fileKey.status === "failed") {
+    if (fileKey.environmentId !== environmentId) {
+      return jsonError(
+        "Forbidden",
+        "File does not belong to the specified environment.",
+        403,
+      );
+    }
+
+    if (fileKey.status === "deleted") {
       return new Response(
         JSON.stringify({
           message: "File already deleted",
@@ -85,6 +90,7 @@ export async function POST(request: Request) {
           environmentName: environment.name,
           fileKeyId: fileKey.id,
           accessKey: fileKey.accessKey,
+          lifecycleJobs: null,
         }),
         {
           status: 200,
@@ -93,71 +99,26 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!fileKey.file) {
-      return jsonError("Not Found", "File has not been uploaded yet.", 404);
-    }
+    const deletionResult = await deleteFileKey(db, {
+      projectId,
+      environmentId,
+      fileKeyId: fileKey.id,
+    });
 
-    if (fileKey.environmentId !== environmentId) {
-      return jsonError(
-        "Forbidden",
-        "File does not belong to the specified environment.",
-        403,
-      );
-    }
-
-    const transitionResult: DeleteTransitionResult = await db.transaction(
-      async (tx) => {
-        const current = await tx.query.fileKeys.findFirst({
-          where: and(
-            eq(fileKeys.id, fileKey.id),
-            eq(fileKeys.projectId, projectId),
-          ),
-          with: { file: true },
-        });
-
-        if (!current) {
-          return { status: "missing" };
-        }
-
-        if (!current.file) {
-          return {
-            status: current.status === "failed" ? "already_deleted" : "no_file",
-          };
-        }
-
-        await tx
-          .update(fileKeys)
-          .set({
-            status: "failed",
-            uploadFailedAt: new Date(),
-            adapterData: clearUploadSessionAdapterData(current.adapterData),
-          })
-          .where(eq(fileKeys.id, current.id));
-
-        await enqueueDeleteObjectJob(tx, {
-          projectId,
-          environmentId,
-          fileKeyId: current.id,
-          fileId: current.file.id,
-          storageKey: current.file.storageKey,
-          priority: 120,
-        });
-
-        await enqueueFinalizeFailedFileKeyJob(tx, {
-          projectId,
-          environmentId,
-          fileKeyId: current.id,
-          fileId: current.file.id,
-          priority: 100,
-        });
-
-        return {
-          status: "transitioned",
-          fileId: current.file.id,
-          storageKey: current.file.storageKey,
-        };
-      },
-    );
+    const transitionResult: DeleteTransitionResult =
+      deletionResult.status === "not_found"
+        ? { status: "missing" }
+        : deletionResult.status === "already_deleted"
+          ? { status: "already_deleted" }
+          : deletionResult.status === "pending_rejected"
+            ? { status: "pending_rejected" }
+            : deletionResult.status === "deleted_without_cleanup"
+              ? { status: "deleted_without_cleanup" }
+              : {
+                  status: "transitioned",
+                  fileId: deletionResult.fileId,
+                  storageKey: deletionResult.storageKey,
+                };
 
     if (transitionResult.status === "missing") {
       return jsonError("Not Found", "File not found.", 404);
@@ -173,6 +134,7 @@ export async function POST(request: Request) {
           environmentName: environment.name,
           fileKeyId: fileKey.id,
           accessKey: fileKey.accessKey,
+          lifecycleJobs: null,
         }),
         {
           status: 200,
@@ -181,8 +143,31 @@ export async function POST(request: Request) {
       );
     }
 
-    if (transitionResult.status === "no_file") {
-      return jsonError("Not Found", "File has not been uploaded yet.", 404);
+    if (transitionResult.status === "pending_rejected") {
+      return jsonError(
+        "Bad Request",
+        "Pending uploads must be marked as failed instead of deleted.",
+        400,
+      );
+    }
+
+    if (transitionResult.status === "deleted_without_cleanup") {
+      return new Response(
+        JSON.stringify({
+          message: "File deleted",
+          projectId: project.id,
+          projectName: project.name,
+          environmentId: environment.id,
+          environmentName: environment.name,
+          fileKeyId: fileKey.id,
+          accessKey: fileKey.accessKey,
+          lifecycleJobs: null,
+        }),
+        {
+          status: 202,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }
 
     const transitioned = transitionResult;

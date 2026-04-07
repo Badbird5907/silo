@@ -23,11 +23,19 @@ import {
 import { enqueueUploadWebhookEvent } from "./webhook";
 
 export class UploadFailureError extends Error {
-  public readonly code: "NOT_FOUND" | "ALREADY_COMPLETED" | "ALREADY_FAILED";
+  public readonly code:
+    | "NOT_FOUND"
+    | "ALREADY_COMPLETED"
+    | "ALREADY_FAILED"
+    | "ALREADY_DELETED";
 
   constructor(
     message: string,
-    code: "NOT_FOUND" | "ALREADY_COMPLETED" | "ALREADY_FAILED",
+    code:
+      | "NOT_FOUND"
+      | "ALREADY_COMPLETED"
+      | "ALREADY_FAILED"
+      | "ALREADY_DELETED",
   ) {
     super(message);
     this.name = "UploadFailureError";
@@ -183,6 +191,13 @@ export async function markUploadAsFailed(
       );
     }
 
+    if (fileKey.status === "deleted") {
+      throw new UploadFailureError(
+        "Upload has already been deleted",
+        "ALREADY_DELETED",
+      );
+    }
+
     if (fileKey.status === "failed") {
       throw new UploadFailureError(
         "Upload has already been marked as failed",
@@ -288,4 +303,99 @@ export async function markUploadAsFailed(
   void trackUsageEvent(db, "upload_failed", opts.projectId, opts.environmentId);
 
   return updated;
+}
+
+export type DeleteFileKeyResult =
+  | { status: "not_found" }
+  | { status: "pending_rejected" }
+  | { status: "already_deleted" }
+  | { status: "deleted_without_cleanup" }
+  | {
+      status: "deleted_with_cleanup";
+      fileId: string;
+      storageKey: string;
+    };
+
+/**
+ * Marks an existing file key as deleted.
+ *
+ * Completed and failed file keys are user-deletable tombstones.
+ * Pending uploads must continue through the explicit failure/abort flow.
+ */
+export async function deleteFileKey(
+  db: Db,
+  opts: {
+    projectId: string;
+    fileKeyId: string;
+    environmentId?: string;
+  },
+): Promise<DeleteFileKeyResult> {
+  return db.transaction(async (tx) => {
+    const fileKey = await tx.query.fileKeys.findFirst({
+      where: and(
+        eq(fileKeys.id, opts.fileKeyId),
+        eq(fileKeys.projectId, opts.projectId),
+      ),
+      with: { file: true },
+    });
+
+    if (!fileKey) {
+      return { status: "not_found" };
+    }
+
+    if (opts.environmentId && fileKey.environmentId !== opts.environmentId) {
+      return { status: "not_found" };
+    }
+
+    if (fileKey.status === "deleted") {
+      return { status: "already_deleted" };
+    }
+
+    if (fileKey.status === "pending") {
+      return { status: "pending_rejected" };
+    }
+
+    const nextBase = {
+      status: "deleted" as const,
+      deletedAt: new Date(),
+      adapterData: clearUploadSessionAdapterData(fileKey.adapterData),
+    };
+
+    if (!fileKey.file) {
+      await tx
+        .update(fileKeys)
+        .set(nextBase)
+        .where(eq(fileKeys.id, fileKey.id));
+
+      return { status: "deleted_without_cleanup" };
+    }
+
+    await tx
+      .update(fileKeys)
+      .set(nextBase)
+      .where(eq(fileKeys.id, fileKey.id));
+
+    await enqueueDeleteObjectJob(tx, {
+      projectId: opts.projectId,
+      environmentId: fileKey.environmentId,
+      fileKeyId: fileKey.id,
+      fileId: fileKey.file.id,
+      storageKey: fileKey.file.storageKey,
+      priority: 120,
+    });
+
+    await enqueueFinalizeFailedFileKeyJob(tx, {
+      projectId: opts.projectId,
+      environmentId: fileKey.environmentId,
+      fileKeyId: fileKey.id,
+      fileId: fileKey.file.id,
+      priority: 100,
+    });
+
+    return {
+      status: "deleted_with_cleanup",
+      fileId: fileKey.file.id,
+      storageKey: fileKey.file.storageKey,
+    };
+  });
 }

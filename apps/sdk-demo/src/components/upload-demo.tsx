@@ -62,6 +62,8 @@ function FileRow({ file }: { file: SiloFileSummary }) {
       ? "text-emerald-600"
       : file.status === "failed"
         ? "text-red-500"
+        : file.status === "deleted"
+          ? "text-slate-500"
         : "text-amber-600";
 
   return (
@@ -202,7 +204,7 @@ export function UploadDemo() {
           <CardHeader>
             <CardTitle>My files</CardTitle>
             <CardDescription>
-              Here are the files you have uploaded that are currently active.
+              Here are the files you have uploaded, including deleted records.
             </CardDescription>
           </CardHeader>
 

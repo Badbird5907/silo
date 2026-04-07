@@ -21,11 +21,9 @@ import {
   projectEnvironments,
   projects,
 } from "@silo-storage/db/schema";
-import { clearUploadSessionAdapterData } from "@silo-storage/shared";
 
 import {
-  enqueueDeleteObjectJob,
-  enqueueFinalizeFailedFileKeyJob,
+  deleteFileKey,
   markUploadAsFailed,
   runLifecycleJobBatch,
   UploadFailureError,
@@ -34,7 +32,13 @@ import { organizationProcedure, requirePermission } from "../trpc";
 
 const sortFieldSchema = z.enum(["createdAt", "size", "mimeType", "fileName"]);
 const sortOrderSchema = z.enum(["asc", "desc"]);
-const statusSchema = z.enum(["all", "pending", "completed", "failed"]);
+const statusSchema = z.enum([
+  "all",
+  "pending",
+  "completed",
+  "failed",
+  "deleted",
+]);
 
 export const fileKeyRouter = {
   list: organizationProcedure
@@ -92,12 +96,8 @@ export const fileKeyRouter = {
         if (mimeCondition) conditions.push(mimeCondition);
       }
 
-      if (input.status === "pending") {
-        conditions.push(eq(fileKeys.status, "pending"));
-      } else if (input.status === "completed") {
-        conditions.push(eq(fileKeys.status, "completed"));
-      } else if (input.status === "failed") {
-        conditions.push(eq(fileKeys.status, "failed"));
+      if (input.status !== "all") {
+        conditions.push(eq(fileKeys.status, input.status));
       }
 
       const whereClause = and(...conditions);
@@ -137,6 +137,7 @@ export const fileKeyRouter = {
           isPublic: fileKeys.isPublic,
           uploadCompletedAt: fileKeys.uploadCompletedAt,
           uploadFailedAt: fileKeys.uploadFailedAt,
+          deletedAt: fileKeys.deletedAt,
           createdAt: fileKeys.createdAt,
           fileHash: files.hash,
           fileMimeType: files.mimeType,
@@ -175,6 +176,7 @@ export const fileKeyRouter = {
         isPublic: r.isPublic,
         uploadCompletedAt: r.uploadCompletedAt,
         uploadFailedAt: r.uploadFailedAt,
+        deletedAt: r.deletedAt,
         createdAt: r.createdAt,
         status: r.status,
         hash: r.fileHash ?? r.claimedHash,
@@ -260,6 +262,11 @@ export const fileKeyRouter = {
         .from(fileKeys)
         .where(and(baseWhere, eq(fileKeys.status, "failed")));
 
+      const [deletedResult] = await ctx.db
+        .select({ count: count() })
+        .from(fileKeys)
+        .where(and(baseWhere, eq(fileKeys.status, "deleted")));
+
       const completedFileKeys = await ctx.db.query.fileKeys.findMany({
         where: and(baseWhere, eq(fileKeys.status, "completed")),
         with: { file: { columns: { size: true } } },
@@ -275,6 +282,7 @@ export const fileKeyRouter = {
         completed: completedResult?.count ?? 0,
         pending: pendingResult?.count ?? 0,
         failed: failedResult?.count ?? 0,
+        deleted: deletedResult?.count ?? 0,
         totalSize,
       };
     }),
@@ -466,7 +474,6 @@ export const fileKeyRouter = {
           eq(fileKeys.id, input.id),
           eq(fileKeys.projectId, input.projectId),
         ),
-        with: { file: true },
       });
 
       if (!fileKey) {
@@ -476,81 +483,38 @@ export const fileKeyRouter = {
         });
       }
 
-      if (!fileKey.file && fileKey.status === "failed") {
-        return {
-          success: true,
-          alreadyDeleted: true,
-        };
-      }
-
-      if (!fileKey.file) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "File has not been uploaded yet",
-        });
-      }
-
-      const transitionResult = await ctx.db.transaction(async (tx) => {
-        const current = await tx.query.fileKeys.findFirst({
-          where: and(
-            eq(fileKeys.id, input.id),
-            eq(fileKeys.projectId, input.projectId),
-          ),
-          with: { file: true },
-        });
-
-        if (!current) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "FileKey not found",
-          });
-        }
-
-        if (!current.file) {
-          return {
-            alreadyDeleted: current.status === "failed",
-            fileId: null,
-            storageKey: null,
-          };
-        }
-
-        await tx
-          .update(fileKeys)
-          .set({
-            status: "failed",
-            uploadFailedAt: new Date(),
-            adapterData: clearUploadSessionAdapterData(current.adapterData),
-          })
-          .where(eq(fileKeys.id, current.id));
-
-        await enqueueDeleteObjectJob(tx, {
-          projectId: input.projectId,
-          environmentId: current.environmentId,
-          fileKeyId: current.id,
-          fileId: current.file.id,
-          storageKey: current.file.storageKey,
-          priority: 120,
-        });
-
-        await enqueueFinalizeFailedFileKeyJob(tx, {
-          projectId: input.projectId,
-          environmentId: current.environmentId,
-          fileKeyId: current.id,
-          fileId: current.file.id,
-          priority: 100,
-        });
-
-        return {
-          alreadyDeleted: false,
-          fileId: current.file.id,
-          storageKey: current.file.storageKey,
-        };
+      const transitionResult = await deleteFileKey(ctx.db, {
+        projectId: input.projectId,
+        fileKeyId: input.id,
       });
 
-      if (transitionResult.alreadyDeleted) {
+      if (transitionResult.status === "not_found") {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "FileKey not found",
+        });
+      }
+
+      if (transitionResult.status === "pending_rejected") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Pending uploads must be marked as failed instead of deleted",
+        });
+      }
+
+      if (transitionResult.status === "already_deleted") {
         return {
           success: true,
           alreadyDeleted: true,
+          lifecycleJobs: null,
+        };
+      }
+
+      if (transitionResult.status === "deleted_without_cleanup") {
+        return {
+          success: true,
+          alreadyDeleted: false,
+          lifecycleJobs: null,
         };
       }
 
@@ -654,61 +618,47 @@ export const fileKeyRouter = {
           inArray(fileKeys.id, input.ids),
           eq(fileKeys.projectId, input.projectId),
         ),
-        with: { file: true },
       });
 
       let succeeded = 0;
       let failed = 0;
+      let requiresCleanupDrain = false;
 
-      await ctx.db.transaction(async (tx) => {
-        for (const fk of matchedFileKeys) {
-          if (!fk.file && fk.status === "failed") {
-            succeeded++;
-            continue;
-          }
+      for (const fk of matchedFileKeys) {
+        const result = await deleteFileKey(ctx.db, {
+          projectId: input.projectId,
+          fileKeyId: fk.id,
+        });
 
-          if (!fk.file) {
-            failed++;
-            continue;
-          }
-
-          await tx
-            .update(fileKeys)
-            .set({
-              status: "failed",
-              uploadFailedAt: new Date(),
-              adapterData: clearUploadSessionAdapterData(fk.adapterData),
-            })
-            .where(eq(fileKeys.id, fk.id));
-
-          await enqueueDeleteObjectJob(tx, {
-            projectId: input.projectId,
-            environmentId: fk.environmentId,
-            fileKeyId: fk.id,
-            fileId: fk.file.id,
-            storageKey: fk.file.storageKey,
-            priority: 120,
-          });
-
-          await enqueueFinalizeFailedFileKeyJob(tx, {
-            projectId: input.projectId,
-            environmentId: fk.environmentId,
-            fileKeyId: fk.id,
-            fileId: fk.file.id,
-            priority: 100,
-          });
-
+        if (result.status === "already_deleted") {
           succeeded++;
+          continue;
         }
-      });
+
+        if (
+          result.status === "pending_rejected" ||
+          result.status === "not_found"
+        ) {
+          failed++;
+          continue;
+        }
+
+        if (result.status === "deleted_with_cleanup") {
+          requiresCleanupDrain = true;
+        }
+
+        succeeded++;
+      }
 
       failed += input.ids.length - matchedFileKeys.length;
 
-      await runLifecycleJobBatch(ctx.db, {
-        limit: 50,
-        leaseSeconds: 45,
-        leaseOwner: "trpc:fileKey.bulkDelete",
-      });
+      if (requiresCleanupDrain) {
+        await runLifecycleJobBatch(ctx.db, {
+          limit: 50,
+          leaseSeconds: 45,
+          leaseOwner: "trpc:fileKey.bulkDelete",
+        });
+      }
 
       return { succeeded, failed };
     }),

@@ -18,7 +18,9 @@ const querySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
   search: z.string().min(1).optional(),
-  status: z.enum(["all", "pending", "completed", "failed"]).default("all"),
+  status: z
+    .enum(["all", "pending", "completed", "failed", "deleted"])
+    .default("all"),
   metadata: z.string().optional(),
 });
 
@@ -155,6 +157,7 @@ export async function GET(request: Request) {
         expiresAt: fileKeys.expiresAt,
         uploadCompletedAt: fileKeys.uploadCompletedAt,
         uploadFailedAt: fileKeys.uploadFailedAt,
+        deletedAt: fileKeys.deletedAt,
         createdAt: fileKeys.createdAt,
         fileHash: files.hash,
         fileMimeType: files.mimeType,
@@ -182,6 +185,7 @@ export async function GET(request: Request) {
         expiresAt: row.expiresAt,
         uploadCompletedAt: row.uploadCompletedAt,
         uploadFailedAt: row.uploadFailedAt,
+        deletedAt: row.deletedAt,
         createdAt: row.createdAt,
         hash: row.fileHash ?? row.claimedHash,
         mimeType: row.fileMimeType ?? row.claimedMimeType,

@@ -31,6 +31,7 @@ export const fileKeyStatus = pgEnum("file_key_status", [
   "pending",
   "completed",
   "failed",
+  "deleted",
 ]);
 
 export const fileLifecycleJobKinds = pgEnum("file_lifecycle_job_kind", [
@@ -150,7 +151,7 @@ export const fileKeys = pgTable(
       .$defaultFn(() => nanoid(16)),
     fileName: text("file_name").notNull(),
     accessKey: text("access_key").notNull(),
-    fileId: text("file_id").references(() => files.id, { onDelete: "cascade" }), // nullable - null means pending upload
+    fileId: text("file_id").references(() => files.id, { onDelete: "set null" }), // nullable - null means pending upload or deleted tombstone
     isPublic: boolean("is_public").notNull().default(false), // resolved from project.defaultFileAccess at creation if not explicitly set
     environmentId: text("environment_id")
       .references(() => projectEnvironments.id, { onDelete: "cascade" })
@@ -172,6 +173,7 @@ export const fileKeys = pgTable(
     expiresAt: timestamp("expires_at"),
     uploadCompletedAt: timestamp("upload_completed_at"),
     uploadFailedAt: timestamp("upload_failed_at"),
+    deletedAt: timestamp("deleted_at"),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")

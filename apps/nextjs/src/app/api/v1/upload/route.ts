@@ -13,7 +13,10 @@ import {
   validateProjectAccess,
 } from "@/lib/api-key-middleware";
 import { createDevUploadEventStream } from "@/lib/upload/dev-sse";
-import { registerFileKeyIntent } from "@/lib/upload/register";
+import {
+  DeletedFileKeyReuseError,
+  registerFileKeyIntent,
+} from "@/lib/upload/register";
 
 const schema = z.object({
   environmentId: z.string(),
@@ -210,6 +213,10 @@ export async function POST(request: Request) {
       },
     );
   } catch (error) {
+    if (error instanceof DeletedFileKeyReuseError) {
+      return jsonError("Conflict", error.message, 409);
+    }
+
     console.error("Error creating upload URL:", error);
     return jsonError(
       "Internal Server Error",

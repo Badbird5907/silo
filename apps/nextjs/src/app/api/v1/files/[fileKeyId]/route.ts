@@ -88,6 +88,7 @@ export async function GET(
       expiresAt: fileKey.expiresAt,
       uploadCompletedAt: fileKey.uploadCompletedAt,
       uploadFailedAt: fileKey.uploadFailedAt,
+      deletedAt: fileKey.deletedAt,
       createdAt: fileKey.createdAt,
       updatedAt: fileKey.updatedAt,
       file: fileKey.file

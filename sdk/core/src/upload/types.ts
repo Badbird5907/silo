@@ -61,7 +61,7 @@ export interface ListFilesInput {
   page?: number;
   pageSize?: number;
   search?: string;
-  status?: "all" | "pending" | "completed" | "failed";
+  status?: "all" | "pending" | "completed" | "failed" | "deleted";
   metadata?: Record<string, unknown>;
 }
 
@@ -72,12 +72,13 @@ export interface SiloFileSummary {
   projectId: string;
   environmentId: string;
   fileId: string | null;
-  status: "pending" | "completed" | "failed";
+  status: "pending" | "completed" | "failed" | "deleted";
   isPublic: boolean;
   metadata: Record<string, unknown> | null;
   expiresAt: string | null;
   uploadCompletedAt: string | null;
   uploadFailedAt: string | null;
+  deletedAt: string | null;
   createdAt: string;
   hash: string | null;
   mimeType: string | null;
@@ -110,12 +111,13 @@ export interface SiloFileDetail {
   projectId: string;
   environmentId: string;
   fileId: string | null;
-  status: "pending" | "completed" | "failed";
+  status: "pending" | "completed" | "failed" | "deleted";
   isPublic: boolean;
   metadata: Record<string, unknown> | null;
   expiresAt: string | null;
   uploadCompletedAt: string | null;
   uploadFailedAt: string | null;
+  deletedAt: string | null;
   createdAt: string;
   callbackMetadata: Record<string, unknown> | null;
   claimedHash: string | null;

@@ -46,6 +46,7 @@
     },
     "globalEnv": [
       "POSTGRES_URL",
+      "POSTGRES_MAX_CONNECTIONS",
       "AUTH_REDIRECT_PROXY_URL",
       "AUTH_SECRET",
       "SILO_URL",

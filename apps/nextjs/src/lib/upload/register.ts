@@ -48,6 +48,13 @@ type FileRow = typeof files.$inferSelect;
 
 type FileKeyMetadata = Record<string, unknown>;
 
+export class DeletedFileKeyReuseError extends Error {
+  constructor() {
+    super("Deleted file keys cannot be reused");
+    this.name = "DeletedFileKeyReuseError";
+  }
+}
+
 function mergeMetadata(
   existing: unknown,
   fileMetadata?: Record<string, unknown>,
@@ -193,6 +200,10 @@ export async function registerFileKeyIntent(input: {
         throw new Error("File key identity mismatch");
       }
 
+      if (existing.status === "deleted") {
+        throw new DeletedFileKeyReuseError();
+      }
+
       const [updated] = await tx
         .update(fileKeys)
         .set({
@@ -264,12 +275,21 @@ export async function completeFileKeyFromCallback(input: {
       file: FileRow;
       alreadyCompleted: boolean;
       alreadyFailed: false;
+      alreadyDeleted: false;
     }
   | {
       fileKey: FileKeyRow;
       file: null;
       alreadyCompleted: false;
       alreadyFailed: true;
+      alreadyDeleted: false;
+    }
+  | {
+      fileKey: FileKeyRow;
+      file: null;
+      alreadyCompleted: false;
+      alreadyFailed: false;
+      alreadyDeleted: true;
     }
 > {
   return db.transaction(async (tx) => {
@@ -342,8 +362,19 @@ export async function completeFileKeyFromCallback(input: {
           file: existingFile,
           alreadyCompleted: true,
           alreadyFailed: false,
+          alreadyDeleted: false,
         };
       }
+    }
+
+    if (claimedFileKey.status === "deleted") {
+      return {
+        fileKey: claimedFileKey,
+        file: null,
+        alreadyCompleted: false,
+        alreadyFailed: false,
+        alreadyDeleted: true,
+      };
     }
 
     if (claimedFileKey.status === "failed") {
@@ -352,6 +383,7 @@ export async function completeFileKeyFromCallback(input: {
         file: null,
         alreadyCompleted: false,
         alreadyFailed: true,
+        alreadyDeleted: false,
       };
     }
 
@@ -398,6 +430,7 @@ export async function completeFileKeyFromCallback(input: {
       file,
       alreadyCompleted: false,
       alreadyFailed: false,
+      alreadyDeleted: false,
     };
   });
 }

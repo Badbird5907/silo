@@ -244,8 +244,11 @@ type DataTableProps<TData, TValue> = {
   emptyMessage?: string;
   emptyIcon?: LucideIcon;
   onRowClick?: (row: TData) => void;
+  onRowMiddleClick?: (
+    row: TData,
+    event: React.MouseEvent<HTMLTableRowElement>,
+  ) => void;
   pagination?: DataTablePaginationProps | null;
-  /** When true, prepends a selection column and enables row selection. Requires `getRowId` (e.g. from `useDataTableMultiselect`). */
   multiselect?: boolean;
   rowSelection?: RowSelectionState;
   onRowSelectionChange?: OnChangeFn<RowSelectionState>;
@@ -278,6 +281,7 @@ function DataTable<TData, TValue>({
   emptyMessage = "No results.",
   emptyIcon: EmptyIcon = FileX,
   onRowClick,
+  onRowMiddleClick,
   pagination,
   multiselect = false,
   rowSelection,
@@ -408,6 +412,16 @@ function DataTable<TData, TValue>({
     }
   };
 
+  const handleRowAuxClick = (
+    row: Row<TData>,
+    event: React.MouseEvent<HTMLTableRowElement>,
+  ) => {
+    if (event.button !== 1 || !onRowMiddleClick) {
+      return;
+    }
+    onRowMiddleClick(row.original, event);
+  };
+
   return (
     <div className="min-w-0 overflow-hidden rounded-md border">
       <Table>
@@ -450,6 +464,7 @@ function DataTable<TData, TValue>({
                 key={row.id}
                 data-state={row.getIsSelected() && "selected"}
                 onClick={() => handleRowClick(row)}
+                onAuxClick={(e) => handleRowAuxClick(row, e)}
                 onMouseDownCapture={
                   multiselect
                     ? (e) => {
@@ -457,7 +472,9 @@ function DataTable<TData, TValue>({
                       }
                     : undefined
                 }
-                className={cn(onRowClick && "cursor-pointer")}
+                className={cn(
+                  (onRowClick ?? onRowMiddleClick) && "cursor-pointer",
+                )}
               >
                 {row.getVisibleCells().map((cell) => {
                   const { cellClassName } = getColumnLayoutMeta(
