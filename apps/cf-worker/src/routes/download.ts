@@ -3,6 +3,7 @@ import type { Context } from "hono";
 import type { Bindings, Variables } from "../types/bindings";
 import type { FileKeyInfo } from "../types/project";
 import { verifyDownloadSignature } from "../middleware/auth";
+import { trackDownloadStream } from "../services/download-stream";
 import {
   lookupFileKey,
   reportMissingObject,
@@ -215,23 +216,41 @@ export async function handleDownload(
   headers.set("ETag", etag);
   headers.set("Accept-Ranges", "bytes");
 
+  const trackedStream = trackDownloadStream(
+    object.body as ReadableStream<Uint8Array> | null,
+  );
+
   c.executionCtx.waitUntil(
-    trackDownload(
-      {
-        projectId,
-        environmentId: fileKey.environmentId,
-        fileId: fileKey.file.id,
-        bytes: isPartialContent ? rangeEnd - rangeStart + 1 : fileSize,
-      },
-      c.env,
-    ),
+    trackedStream.completion.then(({ bytes, completed }) => {
+      if (!completed) {
+        console.warn("[analytics] Download stream interrupted", {
+          projectId,
+          fileId: fileKey.file.id,
+          bytes,
+        });
+      }
+
+      if (!completed && bytes === 0) {
+        return;
+      }
+
+      return trackDownload(
+        {
+          projectId,
+          environmentId: fileKey.environmentId,
+          fileId: fileKey.file.id,
+          bytes,
+        },
+        c.env,
+      );
+    }),
   );
 
   if (isPartialContent) {
     headers.set("Content-Range", `bytes ${rangeStart}-${rangeEnd}/${fileSize}`);
     headers.set("Content-Length", (rangeEnd - rangeStart + 1).toString());
 
-    return new Response(object.body, {
+    return new Response(trackedStream.body, {
       status: 206,
       headers,
     });
@@ -239,7 +258,7 @@ export async function handleDownload(
 
   headers.set("Content-Length", fileSize.toString());
 
-  return new Response(object.body, {
+  return new Response(trackedStream.body, {
     status: 200,
     headers,
   });

@@ -7,6 +7,7 @@ import {
   count,
   desc,
   eq,
+  gte,
   ilike,
   inArray,
   isNotNull,
@@ -242,30 +243,19 @@ export const fileKeyRouter = {
           : []),
       );
 
-      const [totalResult] = await ctx.db
-        .select({ count: count() })
+      // const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+      const [stats] = await ctx.db
+        .select({
+          total: sql<number>`count(*)::int`,
+          completed: sql<number>`count(*) filter (where ${eq(fileKeys.status, "completed")})::int`,
+          pending: sql<number>`count(*) filter (where ${eq(fileKeys.status, "pending")})::int`,
+          // failed7d: sql<number>`count(*) filter (where ${and(eq(fileKeys.status, "failed"), gte(fileKeys.createdAt, sevenDaysAgo))})::int`,
+          failed: sql<number>`count(*) filter (where ${eq(fileKeys.status, "failed")})::int`,
+          deleted: sql<number>`count(*) filter (where ${eq(fileKeys.status, "deleted")})::int`,
+        })
         .from(fileKeys)
         .where(baseWhere);
-
-      const [completedResult] = await ctx.db
-        .select({ count: count() })
-        .from(fileKeys)
-        .where(and(baseWhere, eq(fileKeys.status, "completed")));
-
-      const [pendingResult] = await ctx.db
-        .select({ count: count() })
-        .from(fileKeys)
-        .where(and(baseWhere, eq(fileKeys.status, "pending")));
-
-      const [failedResult] = await ctx.db
-        .select({ count: count() })
-        .from(fileKeys)
-        .where(and(baseWhere, eq(fileKeys.status, "failed")));
-
-      const [deletedResult] = await ctx.db
-        .select({ count: count() })
-        .from(fileKeys)
-        .where(and(baseWhere, eq(fileKeys.status, "deleted")));
 
       const completedFileKeys = await ctx.db.query.fileKeys.findMany({
         where: and(baseWhere, eq(fileKeys.status, "completed")),
@@ -278,11 +268,11 @@ export const fileKeyRouter = {
       );
 
       return {
-        total: totalResult?.count ?? 0,
-        completed: completedResult?.count ?? 0,
-        pending: pendingResult?.count ?? 0,
-        failed: failedResult?.count ?? 0,
-        deleted: deletedResult?.count ?? 0,
+        total: stats?.total ?? 0,
+        completed: stats?.completed ?? 0,
+        pending: stats?.pending ?? 0,
+        failed: stats?.failed ?? 0,
+        deleted: stats?.deleted ?? 0,
         totalSize,
       };
     }),

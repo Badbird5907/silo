@@ -21,7 +21,6 @@ import {
   FileText,
   FileVideo,
   Filter,
-  HardDrive,
   Loader2,
   MoreHorizontal,
   Search,
@@ -704,11 +703,10 @@ export default function FilesPage({ params }: FilesPageProps) {
   const fileKeys = fileKeysQuery.data?.fileKeys ?? [];
   const pagination = fileKeysQuery.data?.pagination;
   const filterOptions = filterOptionsQuery.data;
-  const stats = statsQuery.data;
-  const fileCountTotal = stats?.total ?? 0;
-  const fileCountCompleted = stats?.completed ?? 0;
-  const fileCountPending = stats?.pending ?? 0;
-  const fileCountFailed = stats?.failed ?? 0;
+  const fileCountTotal = statsQuery.data?.total ?? 0;
+  const fileCountCompleted = statsQuery.data?.completed ?? 0;
+  const fileCountPending = statsQuery.data?.pending ?? 0;
+  const fileCountFailed = statsQuery.data?.failed ?? 0;
   const fileCountShare = (n: number) =>
     fileCountTotal > 0 ? (n / fileCountTotal) * 100 : 0;
   const deleteCandidate = deleteFileId
@@ -770,7 +768,7 @@ export default function FilesPage({ params }: FilesPageProps) {
                         Storage used
                       </p>
                       <p className="text-3xl font-bold tracking-tight tabular-nums">
-                        {formatFileSize(stats?.totalSize ?? 0)}
+                        {formatFileSize(statsQuery.data?.totalSize ?? 0)}
                       </p>
                     </div>
                   </div>

@@ -270,6 +270,7 @@ export async function trackDownload(
   env: Bindings,
 ): Promise<void> {
   try {
+    console.log("[analytics] Tracking download:", data.bytes + " bytes");
     const response = await fetch(
       `${env.NEXTJS_CALLBACK_URL}/api/internal/track-download`,
       {
