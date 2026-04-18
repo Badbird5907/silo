@@ -2,11 +2,16 @@
 
 import type { ListFilesResult, SiloFileSummary } from "@silo-storage/sdk-core";
 import * as React from "react";
-import { Show, SignInButton, SignUpButton, UserButton, useAuth } from "@clerk/nextjs";
+import {
+  Show,
+  SignInButton,
+  SignUpButton,
+  useAuth,
+  UserButton,
+} from "@clerk/nextjs";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, RefreshCcw, Upload } from "lucide-react";
 
-import { useUpload } from "@/lib/sdk-demo/upload";
 import { Button } from "@silo-storage/ui/components/button";
 import {
   Card,
@@ -16,6 +21,8 @@ import {
   CardTitle,
 } from "@silo-storage/ui/components/card";
 import { Progress } from "@silo-storage/ui/components/progress";
+
+import { useUpload } from "@/lib/sdk-demo/upload";
 
 interface MyFilesApiResponse {
   data: ListFilesResult;
@@ -41,7 +48,8 @@ async function fetchMyFiles(): Promise<SiloFileSummary[]> {
     throw new Error(message);
   }
 
-  const listResult = payload && "data" in payload ? payload.data : { files: [] };
+  const listResult =
+    payload && "data" in payload ? payload.data : { files: [] };
   return listResult.files;
 }
 
@@ -85,7 +93,7 @@ function FileRow({ file }: { file: SiloFileSummary }) {
         </span>
       </div>
 
-      <div className="mt-2 space-y-1 text-xs text-fd-muted-foreground">
+      <div className="text-fd-muted-foreground mt-2 space-y-1 text-xs">
         <p>Uploaded: {formatDate(file.uploadCompletedAt ?? file.createdAt)}</p>
         <p>Expires: {file.expiresAt ? formatDate(file.expiresAt) : "Never"}</p>
         <p className="truncate">fileKeyId: {file.id}</p>
@@ -121,13 +129,14 @@ export function SdkUploadDemo() {
   });
 
   return (
-    <div className="grid gap-6">
+    <div className="not-prose grid gap-6">
       <Show when="signed-out">
         <Card className="max-w-xl">
           <CardHeader>
             <CardTitle>Sign in to try the SDK demo</CardTitle>
             <CardDescription>
-              Upload a couple of test images and view the files tied to your account.
+              Upload a couple of test images and view the files tied to your
+              account.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-3">
@@ -152,9 +161,8 @@ export function SdkUploadDemo() {
             </div>
 
             <div className="flex items-center gap-2">
-              <UserButton />
               <Button
-                variant="outline"
+                variant="ghost"
                 disabled={myFilesQuery.isFetching}
                 onClick={() => {
                   setUploadError(null);
@@ -166,10 +174,11 @@ export function SdkUploadDemo() {
                 ) : (
                   <RefreshCcw className="size-4" />
                 )}
-                Refresh
               </Button>
+              <UserButton />
 
               <Button
+                variant="outline"
                 disabled={upload.isUploading || !userId}
                 onClick={() => {
                   if (!userId) return;
@@ -189,11 +198,12 @@ export function SdkUploadDemo() {
           <CardContent className="space-y-3">
             {upload.isUploading ? (
               <div className="space-y-2">
-                <p className="text-sm text-fd-muted-foreground">
-                  Upload progress: {Math.round(upload.progress.aggregatePercent)}%
+                <p className="text-fd-muted-foreground text-sm">
+                  Upload progress:{" "}
+                  {Math.round(upload.progress.aggregatePercent)}%
                 </p>
                 {upload.currentUploadingFile ? (
-                  <p className="text-sm text-fd-muted-foreground">
+                  <p className="text-fd-muted-foreground text-sm">
                     Uploading: {upload.currentUploadingFile.name} (
                     {formatBytes(upload.currentUploadingFile.size)})
                   </p>
@@ -202,7 +212,9 @@ export function SdkUploadDemo() {
               </div>
             ) : null}
 
-            {listError ? <p className="text-sm text-red-500">{listError}</p> : null}
+            {listError ? (
+              <p className="text-sm text-red-500">{listError}</p>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -210,13 +222,14 @@ export function SdkUploadDemo() {
           <CardHeader>
             <CardTitle>My files</CardTitle>
             <CardDescription>
-              Uploaded files for the signed-in demo user, including deleted records.
+              Uploaded files for the signed-in demo user, including deleted
+              records.
             </CardDescription>
           </CardHeader>
 
           <CardContent>
             {myFilesQuery.isPending && files.length === 0 ? (
-              <div className="flex items-center gap-2 text-sm text-fd-muted-foreground">
+              <div className="text-fd-muted-foreground flex items-center gap-2 text-sm">
                 <Loader2 className="size-4 animate-spin" />
                 Loading files...
               </div>
@@ -227,8 +240,9 @@ export function SdkUploadDemo() {
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-fd-muted-foreground">
-                No files found for this user yet. Upload an image to get started.
+              <p className="text-fd-muted-foreground text-sm">
+                No files found for this user yet. Upload an image to get
+                started.
               </p>
             )}
           </CardContent>
