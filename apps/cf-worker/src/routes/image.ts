@@ -193,7 +193,7 @@ export async function handleImage(c: ImageContext): Promise<Response> {
   try {
     width = normalizeImageWidth(c.req.query("w"));
     quality = normalizeImageQuality(c.req.query("q"));
-    requestedFormat = normalizeImageFormat(c.req.query("fmt"));
+    requestedFormat = normalizeImageFormat(c.req.query("fmt") ?? c.req.header("format"));
   } catch (error) {
     throw Errors.invalidRequest(
       error instanceof Error ? error.message : "Invalid image transform params",
