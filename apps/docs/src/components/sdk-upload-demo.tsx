@@ -160,9 +160,9 @@ export function SdkUploadDemo() {
               </CardDescription>
             </div>
 
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
+            <div className="flex items-center gap-4">
+              <button
+                className="cursor-pointer"
                 disabled={myFilesQuery.isFetching}
                 onClick={() => {
                   setUploadError(null);
@@ -174,7 +174,8 @@ export function SdkUploadDemo() {
                 ) : (
                   <RefreshCcw className="size-4" />
                 )}
-              </Button>
+              </button>
+
               <UserButton />
 
               <Button
