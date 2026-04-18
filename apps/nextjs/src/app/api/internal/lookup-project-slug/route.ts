@@ -25,6 +25,7 @@ export async function POST(request: Request) {
         id: true,
         defaultFileAccess: true,
         imageDeliveryPolicy: true,
+        defaultServeImage: true,
         preserveImageExif: true,
         lifecycleState: true,
       },

@@ -102,6 +102,7 @@ export const projectRouter = {
         imageDeliveryPolicy: z
           .enum(["disabled", "public_only", "public_and_private_opt_in"])
           .optional(),
+        defaultServeImage: z.boolean().optional(),
         preserveImageExif: z.boolean().optional(),
         pendingUploadFailAfterMinutes: z
           .number()
@@ -134,6 +135,7 @@ export const projectRouter = {
         name: input.name,
         defaultFileAccess: input.defaultFileAccess,
         imageDeliveryPolicy: input.imageDeliveryPolicy,
+        defaultServeImage: input.defaultServeImage,
         preserveImageExif: input.preserveImageExif,
         pendingUploadFailAfterHours: input.pendingUploadFailAfterMinutes,
       });

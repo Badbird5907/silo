@@ -1,0 +1,1 @@
+ALTER TABLE "silo_projects" ADD COLUMN "default_serve_image" boolean DEFAULT false NOT NULL;

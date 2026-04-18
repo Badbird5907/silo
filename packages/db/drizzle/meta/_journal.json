@@ -43,6 +43,13 @@
       "when": 1776488208283,
       "tag": "0005_colorful_squirrel_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1776497036033,
+      "tag": "0006_perfect_franklin_richards",
+      "breakpoints": true
     }
   ]
 }

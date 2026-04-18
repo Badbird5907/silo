@@ -32,6 +32,7 @@ interface ProjectGeneralSettingsProps {
     slug: string;
     defaultFileAccess: string;
     imageDeliveryPolicy: string;
+    defaultServeImage: boolean;
     preserveImageExif: boolean;
     pendingUploadFailAfterMinutes: number;
   };
@@ -74,6 +75,9 @@ export function ProjectGeneralSettings({
   const [imageDeliveryPolicy, setImageDeliveryPolicy] = React.useState(
     initialImageDeliveryPolicy,
   );
+  const [defaultServeImage, setDefaultServeImage] = React.useState(
+    project.defaultServeImage,
+  );
   const [preserveImageExif, setPreserveImageExif] = React.useState(
     project.preserveImageExif,
   );
@@ -103,6 +107,7 @@ export function ProjectGeneralSettings({
     if (
       defaultFileAccess !== initialDefaultFileAccess ||
       imageDeliveryPolicy !== initialImageDeliveryPolicy ||
+      defaultServeImage !== project.defaultServeImage ||
       preserveImageExif !== project.preserveImageExif ||
       pendingUploadFailAfterMinutes !== project.pendingUploadFailAfterMinutes
     ) {
@@ -111,6 +116,7 @@ export function ProjectGeneralSettings({
         organizationId,
         defaultFileAccess,
         imageDeliveryPolicy,
+        defaultServeImage,
         preserveImageExif,
         pendingUploadFailAfterMinutes,
       });
@@ -126,6 +132,7 @@ export function ProjectGeneralSettings({
   const hasChanges =
     defaultFileAccess !== initialDefaultFileAccess ||
     imageDeliveryPolicy !== initialImageDeliveryPolicy ||
+    defaultServeImage !== project.defaultServeImage ||
     preserveImageExif !== project.preserveImageExif ||
     pendingUploadFailAfterMinutes !== project.pendingUploadFailAfterMinutes;
 
@@ -138,8 +145,8 @@ export function ProjectGeneralSettings({
             Basic information about your project
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col md:flex-row gap-4 w-full">
-          <div className="space-y-2 flex-1">
+        <CardContent className="flex w-full flex-col gap-4 md:flex-row">
+          <div className="flex-1 space-y-2">
             <Label htmlFor="project-id">Project ID</Label>
             <div className="flex items-center gap-2">
               <Input
@@ -158,7 +165,7 @@ export function ProjectGeneralSettings({
             </div>
           </div>
 
-          <div className="space-y-2 flex-1">
+          <div className="flex-1 space-y-2">
             <Label htmlFor="project-slug">Project Slug</Label>
             <div className="flex items-center gap-2">
               <Input
@@ -259,9 +266,7 @@ export function ProjectGeneralSettings({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="image-delivery-policy">
-                  Enable Image CDN
-                </Label>
+                <Label htmlFor="image-delivery-policy">Enable Image CDN</Label>
                 <Select
                   value={imageDeliveryPolicy}
                   onValueChange={(value) =>
@@ -278,7 +283,9 @@ export function ProjectGeneralSettings({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="disabled">Disabled</SelectItem>
-                    <SelectItem value="public_only">Public files only</SelectItem>
+                    <SelectItem value="public_only">
+                      Public files only
+                    </SelectItem>
                     <SelectItem value="public_and_private_opt_in">
                       Public + serve image opt-in
                     </SelectItem>
@@ -290,26 +297,55 @@ export function ProjectGeneralSettings({
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="preserve-image-exif">Preserve Image EXIF</Label>
-                <Select
-                  value={preserveImageExif ? "true" : "false"}
-                  onValueChange={(value) =>
-                    setPreserveImageExif(value === "true")
-                  }
-                >
-                  <SelectTrigger id="preserve-image-exif" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="false">Strip EXIF</SelectItem>
-                    <SelectItem value="true">Preserve EXIF</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-muted-foreground text-xs leading-relaxed">
-                  Applies to transformed image responses when the chosen output
-                  format supports metadata retention.
-                </p>
+              <div className="flex flex-col gap-2 md:flex-row">
+                <div className="space-y-2">
+                  <Label htmlFor="default-serve-image">
+                    Default Serve Image
+                  </Label>
+                  <Select
+                    value={defaultServeImage ? "true" : "false"}
+                    onValueChange={(value) =>
+                      setDefaultServeImage(value === "true")
+                    }
+                  >
+                    <SelectTrigger id="default-serve-image" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="false">Disabled</SelectItem>
+                      <SelectItem value="true">Enabled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-muted-foreground text-xs leading-relaxed">
+                    Used only for private image uploads when the SDK request
+                    does not explicitly set{" "}
+                    <span className="font-mono">serveImage</span>.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="preserve-image-exif">
+                    Preserve Image EXIF
+                  </Label>
+                  <Select
+                    value={preserveImageExif ? "true" : "false"}
+                    onValueChange={(value) =>
+                      setPreserveImageExif(value === "true")
+                    }
+                  >
+                    <SelectTrigger id="preserve-image-exif" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="false">Strip EXIF</SelectItem>
+                      <SelectItem value="true">Preserve EXIF</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-muted-foreground text-xs leading-relaxed">
+                    Applies to transformed image responses when the chosen
+                    output format supports metadata retention.
+                  </p>
+                </div>
               </div>
             </div>
           </div>

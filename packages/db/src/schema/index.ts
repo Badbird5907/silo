@@ -72,6 +72,7 @@ export const projects = pgTable("projects", {
   imageDeliveryPolicy: imageDeliveryPolicy("image_delivery_policy")
     .notNull()
     .default("public_and_private_opt_in"),
+  defaultServeImage: boolean("default_serve_image").notNull().default(false),
   preserveImageExif: boolean("preserve_image_exif").notNull().default(false),
   lifecycleState: resourceLifecycleState("lifecycle_state")
     .notNull()

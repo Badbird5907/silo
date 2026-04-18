@@ -113,6 +113,7 @@ export async function updateProject(
       | "disabled"
       | "public_only"
       | "public_and_private_opt_in";
+    defaultServeImage?: boolean;
     preserveImageExif?: boolean;
     pendingUploadFailAfterMinutes?: number;
     pendingUploadFailAfterHours?: number;
@@ -124,6 +125,8 @@ export async function updateProject(
     updates.defaultFileAccess = input.defaultFileAccess;
   if (input.imageDeliveryPolicy !== undefined)
     updates.imageDeliveryPolicy = input.imageDeliveryPolicy;
+  if (input.defaultServeImage !== undefined)
+    updates.defaultServeImage = input.defaultServeImage;
   if (input.preserveImageExif !== undefined)
     updates.preserveImageExif = input.preserveImageExif;
   const pendingUploadFailAfterMinutes =

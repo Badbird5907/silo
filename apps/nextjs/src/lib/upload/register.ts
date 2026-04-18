@@ -116,20 +116,27 @@ function isImageMimeType(value: string | null | undefined): boolean {
 function resolveServeImageValue(input: {
   serveImage?: boolean;
   mimeType?: string | null;
+  isPublic?: boolean;
+  projectDefaultServeImage?: boolean;
   existingServeImage?: boolean | null;
 }): boolean | null {
   if (typeof input.serveImage === "boolean") {
     return isImageMimeType(input.mimeType) ? input.serveImage : null;
   }
 
-  if (input.existingServeImage !== undefined) {
-    return (
-      input.existingServeImage ??
-      (isImageMimeType(input.mimeType) ? false : null)
-    );
+  if (!isImageMimeType(input.mimeType)) {
+    return null;
   }
 
-  return isImageMimeType(input.mimeType) ? false : null;
+  if (typeof input.existingServeImage === "boolean") {
+    return input.existingServeImage;
+  }
+
+  if (input.isPublic) {
+    return false;
+  }
+
+  return input.projectDefaultServeImage ?? false;
 }
 
 interface LockableExecutor {
@@ -158,7 +165,7 @@ export async function registerFileKeyIntent(input: {
     const [project, environment] = await Promise.all([
       tx.query.projects.findFirst({
         where: eq(projects.id, input.projectId),
-        columns: { id: true, lifecycleState: true },
+        columns: { id: true, lifecycleState: true, defaultServeImage: true },
       }),
       tx.query.projectEnvironments.findFirst({
         where: and(
@@ -240,6 +247,8 @@ export async function registerFileKeyIntent(input: {
           serveImage: resolveServeImageValue({
             serveImage: input.fileKey.serveImage,
             mimeType: input.fileKey.mimeType ?? existing.claimedMimeType,
+            isPublic: input.fileKey.isPublic ?? existing.isPublic,
+            projectDefaultServeImage: project.defaultServeImage,
             existingServeImage: existing.serveImage,
           }),
           claimedSize: input.fileKey.size,
@@ -272,6 +281,8 @@ export async function registerFileKeyIntent(input: {
         serveImage: resolveServeImageValue({
           serveImage: input.fileKey.serveImage,
           mimeType: input.fileKey.mimeType,
+          isPublic: input.fileKey.isPublic ?? false,
+          projectDefaultServeImage: project.defaultServeImage,
         }),
         metadata: mergedMetadata,
         callbackMetadata: mergedCallbackMetadata,
@@ -333,6 +344,14 @@ export async function completeFileKeyFromCallback(input: {
   return db.transaction(async (tx) => {
     await lockFileKey(tx, input.fileKeyId);
 
+    const project = await tx.query.projects.findFirst({
+      where: eq(projects.id, input.projectId),
+      columns: { id: true, defaultServeImage: true },
+    });
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
     const existingById = await tx.query.fileKeys.findFirst({
       where: eq(fileKeys.id, input.fileKeyId),
     });
@@ -359,12 +378,14 @@ export async function completeFileKeyFromCallback(input: {
           fileName: input.fileName,
           projectId: input.projectId,
           environmentId: input.environmentId,
-          fileId: null,
+        fileId: null,
+        isPublic: input.isPublic ?? false,
+        serveImage: resolveServeImageValue({
+          serveImage: input.serveImage ?? undefined,
+          mimeType: input.actualMimeType,
           isPublic: input.isPublic ?? false,
-          serveImage: resolveServeImageValue({
-            serveImage: input.serveImage ?? undefined,
-            mimeType: input.actualMimeType,
-          }),
+          projectDefaultServeImage: project.defaultServeImage,
+        }),
           metadata: mergedMetadata,
           claimedSize: input.claimedSize,
           claimedMimeType: input.claimedMimeType ?? null,
@@ -461,6 +482,8 @@ export async function completeFileKeyFromCallback(input: {
         serveImage: resolveServeImageValue({
           serveImage: input.serveImage ?? undefined,
           mimeType: input.actualMimeType,
+          isPublic: input.isPublic ?? claimedFileKey.isPublic,
+          projectDefaultServeImage: project.defaultServeImage,
           existingServeImage: claimedFileKey.serveImage,
         }),
         metadata: mergedMetadata,

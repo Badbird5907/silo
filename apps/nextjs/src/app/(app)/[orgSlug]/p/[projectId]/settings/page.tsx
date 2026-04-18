@@ -72,6 +72,7 @@ export default function ProjectSettingsPage({
             slug: projectQuery.data.slug,
             defaultFileAccess: projectQuery.data.defaultFileAccess,
             imageDeliveryPolicy: projectQuery.data.imageDeliveryPolicy,
+            defaultServeImage: projectQuery.data.defaultServeImage,
             preserveImageExif: projectQuery.data.preserveImageExif,
             pendingUploadFailAfterMinutes:
               projectQuery.data.pendingUploadFailAfterMinutes,

@@ -6,7 +6,6 @@ import { and, eq, gt, isNull, or } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import {
   apiKeys,
-  fileKeys,
   members,
   projectEnvironments,
   projects,
@@ -15,6 +14,7 @@ import { generateSignedUploadUrlFromHash } from "@silo-storage/shared/signing";
 
 import { auth } from "@/auth/server";
 import { env } from "@/env";
+import { registerFileKeyIntent } from "@/lib/upload/register";
 
 const schema = z.object({
   projectId: z.string(),
@@ -141,29 +141,20 @@ export async function POST(request: Request) {
 
     const resolvedIsPublic = isPublic ?? project.defaultFileAccess === "public";
 
-    const [newFileKey] = await db
-      .insert(fileKeys)
-      .values({
-        id: fileKeyId,
+    const newFileKey = await registerFileKeyIntent({
+      projectId,
+      environmentId,
+      fileKey: {
+        fileKeyId,
         accessKey,
         fileName,
-        projectId,
-        environmentId,
-        fileId: null,
+        size,
+        mimeType,
         isPublic: resolvedIsPublic,
-        serveImage:
-          typeof serveImage === "boolean" && mimeType?.startsWith("image/")
-            ? serveImage
-            : mimeType?.startsWith("image/")
-              ? false
-              : null,
-        metadata: metadata ?? {},
-        claimedSize: size,
-        claimedMimeType: mimeType ?? null,
-        claimedHash: null,
-        status: "pending",
-      })
-      .returning();
+        serveImage,
+        metadata,
+      },
+    });
 
     if (!newFileKey) {
       throw new Error("Failed to create file key record");
