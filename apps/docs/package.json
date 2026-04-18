@@ -10,13 +10,23 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.0.4",
+    "@silo-storage/sdk-core": "link:../../sdk/core",
+    "@silo-storage/sdk-next": "link:../../sdk/next",
+    "@silo-storage/sdk-react": "link:../../sdk/react",
+    "@silo-storage/sdk-server": "link:../../sdk/server",
+    "@silo-storage/ui": "workspace:*",
+    "@t3-oss/env-nextjs": "^0.13.10",
+    "@tanstack/react-query": "catalog:",
     "fumadocs-core": "^16.7.16",
     "fumadocs-mdx": "^14.3.0",
     "fumadocs-ui": "^16.7.16",
+    "lucide-react": "catalog:",
     "next": "16.1.6",
     "next-themes": "^0.4.6",
     "react": "catalog:react19",
-    "react-dom": "catalog:react19"
+    "react-dom": "catalog:react19",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@silo-storage/eslint-config": "workspace:*",
