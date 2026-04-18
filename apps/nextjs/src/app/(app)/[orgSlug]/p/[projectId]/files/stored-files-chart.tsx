@@ -1,7 +1,8 @@
 "use client";
 
+import { useId } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Bar, BarChart, XAxis } from "recharts";
+import { Area, AreaChart, XAxis } from "recharts";
 
 import {
   ChartContainer,
@@ -13,16 +14,28 @@ import { Skeleton } from "@silo-storage/ui/components/skeleton";
 import { useTRPC } from "@/trpc/react";
 import { getFilesDashboardDateRange } from "./chart-timeframe";
 
-interface UploadActivityChartProps {
+interface StoredFilesChartProps {
   projectId: string;
   organizationId: string;
   environmentId?: string;
 }
 
-interface UploadChartDatum {
+interface StoredFilesDatum {
   date: string;
-  uploadsCompleted: number;
-  uploadsFailed: number;
+  storedFiles: number;
+}
+
+function getStoredFilesValue(value: unknown): number {
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    "storedFiles" in value &&
+    typeof value.storedFiles === "number"
+  ) {
+    return value.storedFiles;
+  }
+
+  return 0;
 }
 
 function formatChartDate(value: string): string {
@@ -33,13 +46,13 @@ function formatChartDate(value: string): string {
   });
 }
 
-export function UploadActivityChart({
+export function StoredFilesChart({
   projectId,
   organizationId,
   environmentId,
-}: UploadActivityChartProps) {
+}: StoredFilesChartProps) {
+  const areaGradientId = `stored-files-fill-${useId().replace(/:/g, "")}`;
   const { startDate, endDate } = getFilesDashboardDateRange();
-
   const trpc = useTRPC();
 
   const analyticsQuery = useQuery(
@@ -55,16 +68,10 @@ export function UploadActivityChart({
     ),
   );
 
-  const chartConfig = {
-    uploadsCompleted: { label: "Completed", color: "var(--chart-1)" },
-    uploadsFailed: { label: "Failed", color: "var(--chart-2)" },
-  };
-
-  const dailyData: UploadChartDatum[] =
+  const dailyData: StoredFilesDatum[] =
     analyticsQuery.data?.daily.map((d) => ({
       date: d.date,
-      uploadsCompleted: d.uploadsCompleted,
-      uploadsFailed: d.uploadsFailed,
+      storedFiles: getStoredFilesValue(d),
     })) ?? [];
   const startDateLabel = dailyData[0]?.date;
   const endDateLabel = dailyData[dailyData.length - 1]?.date;
@@ -75,9 +82,7 @@ export function UploadActivityChart({
         : [startDateLabel, endDateLabel]
       : [];
 
-  const hasActivity = dailyData.some(
-    (d) => d.uploadsCompleted > 0 || d.uploadsFailed > 0,
-  );
+  const hasStoredFiles = dailyData.some((d) => d.storedFiles > 0);
 
   if (analyticsQuery.isLoading) {
     return <Skeleton className="h-[110px] w-full" />;
@@ -87,37 +92,57 @@ export function UploadActivityChart({
     return (
       <div className="flex h-[110px] items-center justify-center">
         <p className="text-muted-foreground text-center text-sm">
-          Unable to load upload activity.
+          Unable to load stored files trend.
         </p>
       </div>
     );
   }
 
-  if (!hasActivity) {
+  if (!hasStoredFiles) {
     return (
       <div className="flex h-[110px] items-center justify-center">
         <p className="text-muted-foreground text-center text-sm">
-          No upload activity in the last 7 days.
+          No completed uploads in the last 7 days.
         </p>
       </div>
     );
   }
 
   return (
-    <ChartContainer config={chartConfig} className="aspect-auto h-[110px]">
-      <BarChart data={dailyData}>
+    <ChartContainer
+      config={{ storedFiles: { label: "Stored files", color: "var(--chart-4)" } }}
+      className="aspect-auto h-[110px]"
+    >
+      <AreaChart data={dailyData}>
+        <defs>
+          <linearGradient id={areaGradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--color-storedFiles)" stopOpacity={0.28} />
+            <stop
+              offset="55%"
+              stopColor="var(--color-storedFiles)"
+              stopOpacity={0.08}
+            />
+            <stop offset="100%" stopColor="var(--color-storedFiles)" stopOpacity={0} />
+          </linearGradient>
+        </defs>
         <ChartTooltip
           content={
             <ChartTooltipContent
               labelFormatter={(_value, payload) => {
-                const data = payload[0]?.payload as
-                  | UploadChartDatum
-                  | undefined;
+                const data = payload[0]?.payload as StoredFilesDatum | undefined;
                 if (data?.date) {
                   return formatChartDate(data.date);
                 }
                 return "";
               }}
+              formatter={(value, name) => (
+                <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                  <span className="text-muted-foreground">{name}</span>
+                  <span className="text-foreground font-mono font-medium tabular-nums">
+                    {typeof value === "number" ? `${value.toLocaleString()} files` : "-"}
+                  </span>
+                </div>
+              )}
             />
           }
         />
@@ -132,17 +157,14 @@ export function UploadActivityChart({
           tickMargin={8}
           className="fill-muted-foreground text-[10px]"
         />
-        <Bar
-          dataKey="uploadsCompleted"
-          fill="var(--color-uploadsCompleted)"
-          radius={[2, 2, 0, 0]}
+        <Area
+          type="monotone"
+          name="Stored files"
+          dataKey="storedFiles"
+          stroke="var(--color-storedFiles)"
+          fill={`url(#${areaGradientId})`}
         />
-        <Bar
-          dataKey="uploadsFailed"
-          fill="var(--color-uploadsFailed)"
-          radius={[2, 2, 0, 0]}
-        />
-      </BarChart>
+      </AreaChart>
     </ChartContainer>
   );
 }

@@ -8,10 +8,10 @@ import {
 } from "@silo-storage/ui/components/chart";
 import { Skeleton } from "@silo-storage/ui/components/skeleton";
 import { useQuery } from "@tanstack/react-query";
-import { useId, useState } from "react";
-import { Area, AreaChart } from "recharts";
+import { useId } from "react";
+import { Area, AreaChart, XAxis } from "recharts";
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
+import { getFilesDashboardDateRange } from "./chart-timeframe";
 
 interface StorageChartProps {
   projectId: string;
@@ -48,15 +48,7 @@ export function StorageChart({
   environmentId,
 }: StorageChartProps) {
   const storageFillGradientId = `storage-fill-${useId().replace(/:/g, "")}`;
-
-  const [{ startDate, endDate }] = useState(() => {
-    const end = new Date();
-    const start = new Date(end.getTime() - 7 * MS_PER_DAY);
-    return {
-      startDate: start.toISOString().slice(0, 10),
-      endDate: end.toISOString().slice(0, 10),
-    };
-  });
+  const { startDate, endDate } = getFilesDashboardDateRange();
 
   const trpc = useTRPC();
 
@@ -80,8 +72,16 @@ export function StorageChart({
   const dailyData: StorageChartDatum[] =
     analyticsQuery.data?.daily.map((d) => ({
       date: d.date,
-      storageBytes: d.storageBytes as number | null,
+      storageBytes: d.storageBytes,
     })) ?? [];
+  const startDateLabel = dailyData[0]?.date;
+  const endDateLabel = dailyData[dailyData.length - 1]?.date;
+  const tickDates =
+    startDateLabel && endDateLabel
+      ? startDateLabel === endDateLabel
+        ? [startDateLabel]
+        : [startDateLabel, endDateLabel]
+      : [];
 
   const hasStorageHistory = dailyData.some((d) => d.storageBytes !== null);
 
@@ -162,6 +162,17 @@ export function StorageChart({
               )}
             />
           }
+        />
+        <XAxis
+          dataKey="date"
+          ticks={tickDates}
+          interval={0}
+          padding={{ left: 10, right: 10 }}
+          tickFormatter={(value) => formatChartDate(String(value))}
+          tickLine={false}
+          axisLine={false}
+          tickMargin={8}
+          className="fill-muted-foreground text-[10px]"
         />
         <Area
           type="monotone"

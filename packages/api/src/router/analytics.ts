@@ -5,6 +5,7 @@ import { z } from "zod/v4";
 
 import type { Db } from "@silo-storage/db/client";
 import {
+  fileKeys,
   files,
   projectEnvironments,
   projects,
@@ -326,6 +327,66 @@ async function getProjectStorageTimeline(
   );
 }
 
+async function getStoredFilesTimeline(
+  db: Db,
+  input: {
+    projectId: string;
+    environmentId?: string;
+  },
+  startDate: string,
+  endDate: string,
+) {
+  const dates = enumerateDates(startDate, endDate);
+  const startDateTime = new Date(`${startDate}T00:00:00.000Z`);
+  const endDateExclusive = new Date(`${endDate}T00:00:00.000Z`);
+  endDateExclusive.setUTCDate(endDateExclusive.getUTCDate() + 1);
+
+  const baseConditions = [
+    eq(fileKeys.projectId, input.projectId),
+    eq(fileKeys.status, "completed"),
+    isNotNull(fileKeys.uploadCompletedAt),
+    ...(input.environmentId
+      ? [eq(fileKeys.environmentId, input.environmentId)]
+      : []),
+  ];
+
+  const [baselineResult, dailyRows] = await Promise.all([
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(fileKeys)
+      .where(and(...baseConditions, lt(fileKeys.uploadCompletedAt, startDateTime))),
+    db
+      .select({
+        date: sql<string>`${fileKeys.uploadCompletedAt}::date::text`,
+        storedFiles: sql<number>`count(*)::int`,
+      })
+      .from(fileKeys)
+      .where(
+        and(
+          ...baseConditions,
+          gte(fileKeys.uploadCompletedAt, startDateTime),
+          lt(fileKeys.uploadCompletedAt, endDateExclusive),
+        ),
+      )
+      .groupBy(sql`${fileKeys.uploadCompletedAt}::date`)
+      .orderBy(sql`${fileKeys.uploadCompletedAt}::date`),
+  ]);
+
+  const countsByDate = new Map(
+    dailyRows.map((row) => [row.date, Number(row.storedFiles)] as const),
+  );
+  let cumulativeCount = Number(baselineResult[0]?.count ?? 0);
+
+  return dates.map((date) => {
+    cumulativeCount += countsByDate.get(date) ?? 0;
+
+    return {
+      date,
+      storedFiles: cumulativeCount,
+    };
+  });
+}
+
 export const analyticsRouter = {
   getProjectStats: organizationProcedure
     .input(
@@ -371,10 +432,17 @@ export const analyticsRouter = {
         input.startDate ?? thirtyDaysAgo.toISOString().slice(0, 10);
       const endDate = input.endDate ?? now.toISOString().slice(0, 10);
 
-      const [dailyCounterStats, dailyStorageStats, totals, storageResult] =
+      const [
+        dailyCounterStats,
+        dailyStorageStats,
+        dailyStoredFilesStats,
+        totals,
+        storageResult,
+      ] =
         await Promise.all([
           getProjectDailyCounters(ctx.db, input, startDate, endDate),
           getProjectStorageTimeline(ctx.db, input, startDate, endDate),
+          getStoredFilesTimeline(ctx.db, input, startDate, endDate),
           ctx.db
             .select({
               totalUploadsStarted: sum(usageDaily.uploadsStarted),
@@ -430,6 +498,7 @@ export const analyticsRouter = {
       const dailyStatsWithBackfill = backfilledCounterStats.map((row, index) => ({
         ...row,
         storageBytes: dailyStorageStats[index]?.storageBytes ?? null,
+        storedFiles: dailyStoredFilesStats[index]?.storedFiles ?? 0,
       }));
 
       return {

@@ -21,6 +21,7 @@ import {
   FileText,
   FileVideo,
   Filter,
+  HardDrive,
   Loader2,
   MoreHorizontal,
   Search,
@@ -70,12 +71,14 @@ import { useIsMobile } from "@silo-storage/ui/hooks/use-mobile";
 import { cn } from "@silo-storage/ui/lib/utils";
 
 import { getDownloadUrl } from "@/actions/file";
+import { StorageChart } from "@/app/(app)/[orgSlug]/p/[projectId]/files/chart";
+import { StoredFilesChart } from "@/app/(app)/[orgSlug]/p/[projectId]/files/stored-files-chart";
+import { UploadActivityChart } from "@/app/(app)/[orgSlug]/p/[projectId]/files/upload-chart";
+import { UploadOutcomeRateChart } from "@/app/(app)/[orgSlug]/p/[projectId]/files/upload-outcome-rate-chart";
 import { FileStatusBadge } from "@/components/file-status-badge";
 import { UploadDialog } from "@/components/upload-dialog";
 import { useOrganization } from "@/hooks/use-organization";
 import { useTRPC } from "@/trpc/react";
-import { StorageChart } from "@/app/(app)/[orgSlug]/p/[projectId]/files/chart";
-import { UploadActivityChart } from "@/app/(app)/[orgSlug]/p/[projectId]/files/upload-chart";
 
 interface FilesPageProps {
   params: Promise<{
@@ -298,8 +301,7 @@ export default function FilesPage({ params }: FilesPageProps) {
       { enabled: !!organizationId },
     ),
   );
-
-  const statsQuery = useQuery(
+  const fileStatsQuery = useQuery(
     trpc.fileKey.getStats.queryOptions(
       { organizationId, projectId, environmentId },
       { enabled: !!organizationId },
@@ -316,6 +318,9 @@ export default function FilesPage({ params }: FilesPageProps) {
         });
         void queryClient.invalidateQueries({
           queryKey: trpc.fileKey.getStats.queryKey(),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.analytics.getProjectStats.queryKey(),
         });
       },
       onError: (error: { message?: string }) => {
@@ -334,6 +339,9 @@ export default function FilesPage({ params }: FilesPageProps) {
         });
         void queryClient.invalidateQueries({
           queryKey: trpc.fileKey.getStats.queryKey(),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.analytics.getProjectStats.queryKey(),
         });
       },
       onError: (error: { message?: string }) => {
@@ -380,6 +388,9 @@ export default function FilesPage({ params }: FilesPageProps) {
         void queryClient.invalidateQueries({
           queryKey: trpc.fileKey.getStats.queryKey(),
         });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.analytics.getProjectStats.queryKey(),
+        });
       },
       onError: (error: { message?: string }) => {
         toast.error(error.message ?? "Failed to delete files");
@@ -406,6 +417,9 @@ export default function FilesPage({ params }: FilesPageProps) {
         });
         void queryClient.invalidateQueries({
           queryKey: trpc.fileKey.getStats.queryKey(),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.analytics.getProjectStats.queryKey(),
         });
       },
       onError: (error: { message?: string }) => {
@@ -703,12 +717,7 @@ export default function FilesPage({ params }: FilesPageProps) {
   const fileKeys = fileKeysQuery.data?.fileKeys ?? [];
   const pagination = fileKeysQuery.data?.pagination;
   const filterOptions = filterOptionsQuery.data;
-  const fileCountTotal = statsQuery.data?.total ?? 0;
-  const fileCountCompleted = statsQuery.data?.completed ?? 0;
-  const fileCountPending = statsQuery.data?.pending ?? 0;
-  const fileCountFailed = statsQuery.data?.failed ?? 0;
-  const fileCountShare = (n: number) =>
-    fileCountTotal > 0 ? (n / fileCountTotal) * 100 : 0;
+  const fileStats = fileStatsQuery.data;
   const deleteCandidate = deleteFileId
     ? (fileKeys.find((fileKey) => fileKey.id === deleteFileId) ?? null)
     : null;
@@ -731,110 +740,45 @@ export default function FilesPage({ params }: FilesPageProps) {
     <>
       <div className="flex min-w-0 flex-1 flex-col gap-4 p-4">
         <div className="grid min-w-0 grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-          <Card className="col-span-2 min-w-0 lg:col-span-2">
+          <Card>
             <CardContent>
-              {statsQuery.isLoading ? (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                    <div className="space-y-2">
-                      <Skeleton className="h-3 w-20" />
-                      <Skeleton className="h-9 w-16" />
-                    </div>
-                    <div className="space-y-2">
-                      <Skeleton className="h-3 w-24" />
-                      <Skeleton className="h-9 w-28" />
-                    </div>
-                  </div>
-                  <Skeleton className="h-2 w-full rounded-full" />
-                  <div className="grid grid-cols-3 gap-2">
-                    <Skeleton className="h-10 w-full rounded-md" />
-                    <Skeleton className="h-10 w-full rounded-md" />
-                    <Skeleton className="h-10 w-full rounded-md" />
-                  </div>
+              <div className="mb-2 flex items-start justify-between gap-2">
+                <p className="text-muted-foreground text-sm font-medium">
+                  Files Stored
+                </p>
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10">
+                  <File className="h-4 w-4 text-blue-500" />
                 </div>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                    <div className="min-w-0">
-                      <p className="text-muted-foreground mb-1 text-xs font-medium">
-                        Total files
-                      </p>
-                      <p className="text-3xl font-bold tracking-tight tabular-nums">
-                        {fileCountCompleted.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-muted-foreground mb-1 text-xs font-medium">
-                        Storage used
-                      </p>
-                      <p className="text-3xl font-bold tracking-tight tabular-nums">
-                        {formatFileSize(statsQuery.data?.totalSize ?? 0)}
-                      </p>
-                    </div>
-                  </div>
-                  <div
-                    className="bg-muted flex h-2 w-full overflow-hidden rounded-full"
-                    role="img"
-                    aria-label={`File status mix: ${fileCountCompleted} completed, ${fileCountPending} pending, ${fileCountFailed} failed`}
-                  >
-                    {fileCountTotal > 0 ? (
-                      <>
-                        <div
-                          className="h-full bg-emerald-500"
-                          style={{
-                            width: `${fileCountShare(fileCountCompleted)}%`,
-                          }}
-                        />
-                        <div
-                          className="h-full bg-amber-500"
-                          style={{
-                            width: `${fileCountShare(fileCountPending)}%`,
-                          }}
-                        />
-                        <div
-                          className="h-full bg-red-500"
-                          style={{ width: `${fileCountShare(fileCountFailed)}%` }}
-                        />
-                      </>
-                    ) : null}
-                  </div>
-                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
-                    <div className="flex min-w-0 flex-col gap-1 rounded-md px-2 py-1.5">
-                      <span className="text-muted-foreground flex items-center gap-1.5 text-[10px] font-medium sm:text-xs">
-                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
-                        Completed
-                      </span>
-                      <span className="text-foreground font-semibold tabular-nums">
-                        {fileCountCompleted.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex min-w-0 flex-col gap-1 rounded-md px-2 py-1.5">
-                      <span className="text-muted-foreground flex items-center gap-1.5 text-[10px] font-medium sm:text-xs">
-                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
-                        Pending
-                      </span>
-                      <span className="text-foreground font-semibold tabular-nums">
-                        {fileCountPending.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex min-w-0 flex-col gap-1 rounded-md px-2 py-1.5">
-                      <span className="text-muted-foreground flex items-center gap-1.5 text-[10px] font-medium sm:text-xs">
-                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
-                        Failed
-                      </span>
-                      <span className="text-foreground font-semibold tabular-nums">
-                        {fileCountFailed.toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
+              </div>
+              <StoredFilesChart
+                projectId={projectId}
+                organizationId={organizationId}
+                environmentId={selectedEnvironmentId}
+              />
             </CardContent>
           </Card>
 
           <Card>
             <CardContent>
-              <div className="mb-2 flex items-center justify-between">
+              <div className="mb-2 flex items-start justify-between gap-2">
+                <p className="text-muted-foreground text-sm font-medium">
+                  Outcome Rate
+                </p>
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10">
+                  <Activity className="h-4 w-4 text-amber-500" />
+                </div>
+              </div>
+              <UploadOutcomeRateChart
+                projectId={projectId}
+                organizationId={organizationId}
+                environmentId={selectedEnvironmentId}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent>
+              <div className="mb-2 flex items-start justify-between gap-2">
                 <p className="text-muted-foreground text-sm font-medium">
                   Upload Activity
                 </p>
@@ -852,12 +796,12 @@ export default function FilesPage({ params }: FilesPageProps) {
 
           <Card>
             <CardContent>
-              <div className="mb-2 flex items-center justify-between">
+              <div className="mb-2 flex items-start justify-between gap-2">
                 <p className="text-muted-foreground text-sm font-medium">
                   Storage Trend
                 </p>
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-500/10">
-                  <Activity className="h-4 w-4 text-purple-500" />
+                  <HardDrive className="h-4 w-4 text-purple-500" />
                 </div>
               </div>
               <StorageChart
@@ -871,19 +815,55 @@ export default function FilesPage({ params }: FilesPageProps) {
 
         <Card className="min-w-0">
           <CardHeader>
-            <div className="flex flex-col gap-3 md:flex-row md:items-center">
-              <SearchInput
-                value={search}
-                onDebouncedChange={handleSearchChange}
-                placeholder="Search by filename..."
-                className="w-full md:max-w-sm"
-              />
-              <div className="grid w-full min-w-0 grid-cols-[auto,minmax(0,1fr)] items-center gap-2 md:ml-auto md:flex md:w-auto md:grid-cols-none md:justify-end">
+            <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center">
+              <div className="flex min-w-0 flex-col-reverse gap-4 md:flex-row">
+                <SearchInput
+                  value={search}
+                  onDebouncedChange={handleSearchChange}
+                  placeholder="Search by filename..."
+                  className="w-full md:w-md"
+                />
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  {fileStatsQuery.isLoading ? (
+                    <>
+                      <Skeleton className="h-6 w-24 rounded-full" />
+                      <Skeleton className="h-6 w-20 rounded-full" />
+                      <Skeleton className="h-6 w-20 rounded-full" />
+                    </>
+                  ) : fileStatsQuery.isError ? (
+                    <span className="text-muted-foreground text-xs">
+                      Unable to load status counts
+                    </span>
+                  ) : (
+                    <>
+                      <Badge
+                        variant="outline"
+                        className="border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                      >
+                        Successful {fileStats?.completed ?? 0}
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className="border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                      >
+                        Pending {fileStats?.pending ?? 0}
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className="border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-400"
+                      >
+                        Errors {fileStats?.failed ?? 0}
+                      </Badge>
+                    </>
+                  )}
+                </div>
+              </div>
+              <div className="grid w-full min-w-0 grid-cols-2 items-center gap-2 md:ml-auto md:flex md:w-auto md:grid-cols-none md:justify-end">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
-                      className="shrink-0 border md:border-none"
+                      className="w-full shrink-0 border md:w-auto md:border-none"
                     >
                       <Filter className="h-4 w-4" />
                       <span className="block md:hidden">Filter</span>
@@ -1110,7 +1090,12 @@ export default function FilesPage({ params }: FilesPageProps) {
                   }
                   onUploadComplete={() => {
                     void fileKeysQuery.refetch();
-                    void statsQuery.refetch();
+                    void queryClient.invalidateQueries({
+                      queryKey: trpc.fileKey.getStats.queryKey(),
+                    });
+                    void queryClient.invalidateQueries({
+                      queryKey: trpc.analytics.getProjectStats.queryKey(),
+                    });
                   }}
                 />
               </div>
