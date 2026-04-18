@@ -10,11 +10,6 @@ binding = "R2_BUCKET"
 bucket_name = "silo-uploads"
 preview_bucket_name = "silo-uploads-preview"
 
-[[kv_namespaces]]
-binding = "PROJECT_CACHE"
-id = "a0757c0d8b3b425cab809627e475ac85"
-preview_id = "9e99fefbb2ac475c81fe48b51d733cae"
-
 [[durable_objects.bindings]]
 name = "TUS_STATE_DO"
 class_name = "TusStateDO"
@@ -86,11 +81,6 @@ vars.LIFECYCLE_JOB_LEASE_SECONDS = "60"
 binding = "R2_BUCKET"
 bucket_name = "silo-uploads"
 preview_bucket_name = "silo-uploads-preview"
-
-[[env.production.kv_namespaces]]
-binding = "PROJECT_CACHE"
-id = "a0757c0d8b3b425cab809627e475ac85"
-preview_id = "9e99fefbb2ac475c81fe48b51d733cae"
 
 [[env.production.durable_objects.bindings]]
 name = "TUS_STATE_DO"

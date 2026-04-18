@@ -8,6 +8,18 @@ export interface ProjectInfo {
   lifecycleState?: "active" | "deleting";
 }
 
+export const projectInfoSchema = z.object({
+  id: z.string(),
+  defaultFileAccess: z.enum(["public", "private"]),
+  imageDeliveryPolicy: z.enum([
+    "disabled",
+    "public_only",
+    "public_and_private_opt_in",
+  ]),
+  preserveImageExif: z.boolean(),
+  lifecycleState: z.enum(["active", "deleting"]).optional(),
+});
+
 export interface FileKeyInfo {
   id: string;
   fileName: string;

@@ -1,5 +1,7 @@
 import type { Bindings } from "../types/bindings";
 import type { ProjectInfo } from "../types/project";
+import { projectInfoSchema } from "../types/project";
+import { cacheProject, getCachedProject } from "../services/metadata-cache";
 import { Errors, TusError } from "../utils/errors";
 import { buildNextJsInternalHeaders } from "./nextjs-internal";
 
@@ -7,15 +9,13 @@ export async function lookupProject(
   slug: string,
   env: Bindings,
 ): Promise<ProjectInfo> {
-  const cacheKey = `project:slug:${slug}`;
-
   try {
-    const cached = await env.PROJECT_CACHE.get(cacheKey, "json");
+    const cached = await getCachedProject(slug, env);
     if (cached) {
-      return cached as ProjectInfo;
+      return cached;
     }
   } catch (error) {
-    console.error("Failed to read from KV cache:", error);
+    console.error("Failed to read project metadata cache:", error);
   }
 
   try {
@@ -44,17 +44,15 @@ export async function lookupProject(
       );
     }
 
-    const project = await response.json();
+    const project = projectInfoSchema.parse(await response.json());
 
     try {
-      await env.PROJECT_CACHE.put(cacheKey, JSON.stringify(project), {
-        expirationTtl: 60,
-      });
+      await cacheProject(slug, project, env);
     } catch (error) {
-      console.error("Failed to write to KV cache:", error);
+      console.error("Failed to write project metadata cache:", error);
     }
 
-    return project as ProjectInfo;
+    return project;
   } catch (error) {
     if (error instanceof TusError) {
       throw error;
@@ -62,12 +60,4 @@ export async function lookupProject(
     console.error("Failed to lookup project:", error);
     throw new Error("Failed to lookup project");
   }
-}
-
-export async function invalidateProjectCache(
-  slug: string,
-  env: Bindings,
-): Promise<void> {
-  const cacheKey = `project:slug:${slug}`;
-  await env.PROJECT_CACHE.delete(cacheKey);
 }

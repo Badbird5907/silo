@@ -149,7 +149,7 @@ pnpm install`}
     content: (
       <>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Silo needs an R2 bucket, a KV namespace, and two Queues. Run all of
+          Silo needs an R2 bucket and two Queues. Run all of
           these before deploying — Wrangler will error at deploy time if any
           binding references a resource that doesn't exist yet.
         </p>
@@ -157,11 +157,7 @@ pnpm install`}
           code={`# R2 buckets (one for prod, one for local dev)
 wrangler r2 bucket create silo-uploads
 wrangler r2 bucket create silo-uploads-preview
-
-# KV namespace + a preview namespace for local dev
-wrangler kv namespace create PROJECT_CACHE
-wrangler kv namespace create PROJECT_CACHE --preview
-
+ 
 # Queues (producer + dead-letter queue)
 # If you are on the free plan, queues have a 24 hour message retention period.
 # You must set the --message-retention-period-secs flag. Omit if you are on workers paid
@@ -169,10 +165,8 @@ wrangler queues create silo-delete-prefix --message-retention-period-secs 86400
 wrangler queues create silo-delete-prefix-dlq --message-retention-period-secs 86400`}
         />
         <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
-          Copy both KV namespace IDs that Wrangler prints (the regular one and
-          the preview one). You'll need them in the next step. The queue names
-          are referenced by name in <InlineCode>wrangler.toml</InlineCode> so no
-          ID is needed for those.
+          The queue names are referenced by name in{" "}
+          <InlineCode>wrangler.toml</InlineCode> so no ID is needed for them.
         </p>
       </>
     ),
@@ -188,15 +182,10 @@ wrangler queues create silo-delete-prefix-dlq --message-retention-period-secs 86
         </p>
         <CodeBlock
           language="toml"
-          code={`[[kv_namespaces]]
-binding = "PROJECT_CACHE"
-id = "<your-kv-namespace-id>"          # ← from: wrangler kv namespace create PROJECT_CACHE
-preview_id = "<your-kv-preview-id>"   # ← from: wrangler kv namespace create PROJECT_CACHE --preview
-
-[vars]
+          code={`[vars]
 WORKER_DOMAIN = "worker.your-domain.com"   # public hostname for the Worker
 PROJECT_ROUTE_MODE = "subdomain"           # "subdomain" or "path"
-
+ 
 [env.production]
 vars.WORKER_DOMAIN = "worker.your-domain.com"
 vars.PROJECT_ROUTE_MODE = "subdomain"

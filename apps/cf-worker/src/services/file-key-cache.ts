@@ -1,33 +1,32 @@
 import type { Bindings } from "../types/bindings";
 import type { FileKeyInfo } from "../types/project";
+import {
+  cacheFileKey,
+  getCachedFileKeyValue,
+} from "./metadata-cache";
 import { lookupFileKey } from "./callback";
-
-const FILE_KEY_CACHE_TTL = 60;
 
 export async function getCachedFileKey(
   accessKey: string,
   projectId: string,
   env: Bindings,
 ): Promise<FileKeyInfo> {
-  const cache = caches.default;
-  const cacheKey = new Request(
-    `https://cache.internal/file-key/${projectId}/${accessKey}`,
-  );
-
-  const cachedResponse = await cache.match(cacheKey);
-  if (cachedResponse) {
-    return cachedResponse.json();
+  try {
+    const cached = await getCachedFileKeyValue(accessKey, projectId, env);
+    if (cached) {
+      return cached;
+    }
+  } catch (error) {
+    console.error("Failed to read file key metadata cache:", error);
   }
 
   const fileKey = await lookupFileKey(accessKey, projectId, env);
 
-  const response = new Response(JSON.stringify(fileKey), {
-    headers: {
-      "Content-Type": "application/json",
-      "Cache-Control": `max-age=${FILE_KEY_CACHE_TTL}`,
-    },
-  });
-  await cache.put(cacheKey, response);
+  try {
+    await cacheFileKey(accessKey, projectId, fileKey, env);
+  } catch (error) {
+    console.error("Failed to write file key metadata cache:", error);
+  }
 
   return fileKey;
 }

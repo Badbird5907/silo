@@ -244,42 +244,19 @@ export default {
         });
 
         if (isDlqBatch) {
-          const now = new Date();
-          const key = `dlq:delete-prefix:${requestId}:${now.getTime()}`;
-
-          await env.PROJECT_CACHE.put(
-            key,
-            JSON.stringify({
-              queue: batch.queue,
-              requestId,
-              prefix,
-              cursor,
-              failedAt: now.toISOString(),
-              error:
-                error instanceof Error
-                  ? {
-                      name: error.name,
-                      message: error.message,
-                    }
-                  : String(error),
-            }),
-            { expirationTtl: 60 * 60 * 24 * 14 },
-          ).catch((kvError: unknown) => {
-            console.error("Failed to persist DLQ failure record", {
-              queue: batch.queue,
-              requestId,
-              prefix,
-              cursor,
-              kvError,
-            });
-          });
-
           console.error("DLQ delete-prefix failure requeued", {
             queue: batch.queue,
             requestId,
             prefix,
             cursor,
-            dlqRecordKey: key,
+            failedAt: new Date().toISOString(),
+            error:
+              error instanceof Error
+                ? {
+                    name: error.name,
+                    message: error.message,
+                  }
+                : String(error),
           });
           message.retry();
           continue;
