@@ -1,0 +1,91 @@
+---
+title: Introduction
+description: What is Silo?
+---
+
+## Overview
+
+Silo is an open-source blob (file) storage solution built for the modern web. It's built on Cloudflare R2
+and Workers, implementing the [TUS Protocol](https://tus.io/) for robust file uploads.
+
+## The problem
+
+### Why not just use S3/R2 directly?
+S3 (and R2) are great, but it's old. It's not built for the modern web, so everyone ends up solving
+the same set of problems over and over again.
+
+The typical upload flow looks like this:
+
+1. Client requests a pre-signed upload URL from the server.
+2. Client uploads file directly to S3 using that signed URL.
+3. <span style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+     <span>The client then notifies the server that the upload is complete.</span>
+     <span className="font-bold text-red-500">{'<-'} this is where it breaks</span>
+   </span>
+
+<Callout type="error">
+Step 3 is controlled by the client, meaning the browser has to **voluntarily** tell the server that the upload is complete.
+What if the user closes the tab right after the upload is complete? What if they're on a bad connection? What if someone intentionally
+skips this step? You get an orphaned file: an object sitting in your bucket that you don't know about, costing you money indefinitely.
+</Callout>
+This isn't hypothetical either, I was able to use this exact issue to store a file on [Github's S3 infra](https://github.com/NationalSecurityAgency/ghidra/assets/118324883/b8209e95-1bb7-4c1c-875b-8cceed44c3a1) two years ago,
+and it's still there today. Essentially, you request a signed URL for a file attachment, upload the file, but never tell GitHub the file exists.
+
+
+<div className="mt-6 overflow-hidden rounded-lg">
+  <iframe
+    width="100%"
+    height="450"
+    src="https://www.youtube.com/embed/LLaVhYZbmTU?si=RkSh6zmDu10q90Mg"
+    title="Hosting screenshots on GitHub's S3 for free"
+    frameBorder="0"
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+    referrerPolicy="strict-origin-when-cross-origin"
+    allowFullScreen
+    className="rounded-lg"
+  />
+  I wrote a tool to automatically host my screenshots on GitHub's S3
+  bucket by exploiting this exact issue.
+</div>
+
+## Existing Workarounds
+How do people solve this problem today with S3?
+
+### S3 Event Notifications + Lambda
+Configure S3 to send events to a Lambda function when a file is uploaded. The lambda function can then do the business
+logic to notify the server that the upload is complete. It works, but it's a lot of overhead and provider-specific infra to set up and maintain.
+
+### Cron jobs
+Run a cron job that scans the bucket for files that have been uploaded but not yet notified the server.
+It also works, but it's a bunch of extra code you have to write and maintain.
+
+*I know there are more approaches than the two I've listed here, but none of them are ideal.*
+
+
+## The Solution
+
+Instead of patching the problem with infrastructure, silo solves it at the protocol level:
+
+1. Before/during the upload, your server tells Silo about the intent to upload a file with the Worker. 
+2. The client uploads using the TUS protocol directly to the worker, which streams data directly into R2. TUS is resumable by design, if the connection drops out, the client can resume from where it left off.
+3. When the upload is complete, the worker fires a callback back to your server. The browser never self-reports the upload is complete.
+4. Any upload that doesn't complete within a reasonable amount of time is automatically cleaned up by the worker. No clunky Lamdba/Cron jobs needed
+
+## Feature list
+Silo currently has the following features:
+- TUS protocol support
+- ACLs for files
+  - Private files require a signed URL to access
+- Full dev server support (no need to port forward!)
+- Multiple environments per project
+  - Easily create as many environments as you need
+  - This makes it trivial to seperate production, development, and staging environments
+- Server-side Image transformation
+  - Easily serve optimized images to your users, with built in support for scaling, quality, format, and EXIF stripping.
+
+## Isn't this just UploadThing?
+
+Yes, it's essentially a UploadThing clone, except it's built on top of R2 and Cloudflare Workers.
+Sue me :)
+
+If you don't want to deploy this yourself, consider using [UploadThing](https://uploadthing.com). It's mostly the same thing, with hosted infra.
