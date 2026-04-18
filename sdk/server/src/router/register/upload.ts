@@ -106,10 +106,20 @@ export async function registerRouteUpload<
     route.routeOptions?.isPublic,
     routeOptionData,
   );
+  const resolvedServeImage = await resolveRouteOption(
+    route.routeOptions?.serveImage,
+    routeOptionData,
+  );
 
   if (typeof resolvedIsPublic === "boolean") {
     for (const file of files) {
       file.isPublic = resolvedIsPublic;
+    }
+  }
+
+  if (typeof resolvedServeImage === "boolean") {
+    for (const file of files) {
+      file.serveImage = resolvedServeImage;
     }
   }
 

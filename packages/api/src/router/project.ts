@@ -99,6 +99,10 @@ export const projectRouter = {
         id: z.string(),
         name: z.string().min(1).max(100).optional(),
         defaultFileAccess: z.enum(["public", "private"]).optional(),
+        imageDeliveryPolicy: z
+          .enum(["disabled", "public_only", "public_and_private_opt_in"])
+          .optional(),
+        preserveImageExif: z.boolean().optional(),
         pendingUploadFailAfterMinutes: z
           .number()
           .int()
@@ -129,6 +133,8 @@ export const projectRouter = {
         id: input.id,
         name: input.name,
         defaultFileAccess: input.defaultFileAccess,
+        imageDeliveryPolicy: input.imageDeliveryPolicy,
+        preserveImageExif: input.preserveImageExif,
         pendingUploadFailAfterHours: input.pendingUploadFailAfterMinutes,
       });
     }),

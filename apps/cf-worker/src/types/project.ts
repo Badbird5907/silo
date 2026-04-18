@@ -3,6 +3,8 @@ import { z } from "zod";
 export interface ProjectInfo {
   id: string;
   defaultFileAccess: "public" | "private";
+  imageDeliveryPolicy: "disabled" | "public_only" | "public_and_private_opt_in";
+  preserveImageExif: boolean;
   lifecycleState?: "active" | "deleting";
 }
 
@@ -12,7 +14,9 @@ export interface FileKeyInfo {
   accessKey: string;
   projectId: string;
   environmentId: string;
+  status: "pending" | "completed" | "failed" | "deleted";
   isPublic: boolean;
+  serveImage?: boolean | null;
   expiresAt?: string | null;
   file: FileInfo;
 }
@@ -53,7 +57,9 @@ export const fileKeyInfoSchema = z.object({
   accessKey: z.string(),
   projectId: z.string(),
   environmentId: z.string(),
+  status: z.enum(["pending", "completed", "failed", "deleted"]),
   isPublic: z.boolean(),
+  serveImage: z.boolean().nullable().optional(),
   expiresAt: z.string().datetime().nullable().optional(),
   file: fileInfoSchema,
 });

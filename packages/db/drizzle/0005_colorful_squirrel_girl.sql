@@ -1,0 +1,1 @@
+ALTER TABLE "silo_projects" ALTER COLUMN "image_delivery_policy" SET DEFAULT 'public_and_private_opt_in';

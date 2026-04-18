@@ -37,6 +37,18 @@ export interface SignedDownloadUrlParams {
   expiresIn?: number; // seconds, default 3600 (1 hour)
 }
 
+export type ImageFormat = "auto" | "avif" | "webp" | "jpeg" | "jpg" | "png";
+export type NormalizedImageFormat = Exclude<ImageFormat, "jpg">;
+
+export interface SignedImageUrlParams {
+  accessKey: string;
+  fileName?: string;
+  expiresIn?: number;
+  width?: number;
+  quality?: number;
+  format?: ImageFormat;
+}
+
 export interface ParsedSignedUploadUrl {
   type: "upload";
   environmentId: string;
@@ -61,7 +73,21 @@ export interface ParsedSignedDownloadUrl {
   signature: string;
 }
 
-export type ParsedSignedUrl = ParsedSignedUploadUrl | ParsedSignedDownloadUrl;
+export interface ParsedSignedImageUrl {
+  type: "image";
+  accessKey: string;
+  fileName?: string;
+  expiresAt: number;
+  width?: number;
+  quality?: number;
+  format: NormalizedImageFormat;
+  signature: string;
+}
+
+export type ParsedSignedUrl =
+  | ParsedSignedUploadUrl
+  | ParsedSignedDownloadUrl
+  | ParsedSignedImageUrl;
 
 export type ProjectRouteMode = "subdomain" | "path";
 
@@ -73,6 +99,14 @@ const ACCEPTED_MIME_VALUE_REGEX =
   /^[a-z0-9!#$&^_.+-]+(?:\/[a-z0-9!#$&^_.+-]+)?$/;
 
 const PROJECT_ROUTE_PREFIX = "/p";
+const IMAGE_FORMAT_VALUES = new Set<ImageFormat>([
+  "auto",
+  "avif",
+  "webp",
+  "jpeg",
+  "jpg",
+  "png",
+]);
 
 function buildProjectScopedUrl(
   workerDomain: string,
@@ -81,14 +115,18 @@ function buildProjectScopedUrl(
   protocol: "http" | "https",
   routing?: SignedUrlRoutingOptions,
 ): URL {
-  const normalizedPath = routePath.startsWith("/") ? routePath : `/${routePath}`;
+  const normalizedPath = routePath.startsWith("/")
+    ? routePath
+    : `/${routePath}`;
   if (routing?.routeMode === "path") {
     return new URL(
       `${protocol}://${workerDomain}${PROJECT_ROUTE_PREFIX}/${projectSlug}${normalizedPath}`,
     );
   }
 
-  return new URL(`${protocol}://${projectSlug}.${workerDomain}${normalizedPath}`);
+  return new URL(
+    `${protocol}://${projectSlug}.${workerDomain}${normalizedPath}`,
+  );
 }
 
 export function normalizeAcceptedMimeTypePattern(pattern: string): string {
@@ -135,6 +173,48 @@ export function parseAcceptedMimeTypePatterns(
   }
 
   return normalizeAcceptedMimeTypePatterns(parts);
+}
+
+export function normalizeImageWidth(
+  value: string | number | undefined | null,
+): number | undefined {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+
+  const normalized =
+    typeof value === "number" ? value : Number.parseInt(value.trim(), 10);
+  if (!Number.isInteger(normalized) || normalized <= 0 || normalized > 10000) {
+    throw new Error(`Invalid image width "${value}"`);
+  }
+
+  return normalized;
+}
+
+export function normalizeImageQuality(
+  value: string | number | undefined | null,
+): number | undefined {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+
+  const normalized =
+    typeof value === "number" ? value : Number.parseInt(value.trim(), 10);
+  if (!Number.isInteger(normalized) || normalized < 1 || normalized > 100) {
+    throw new Error(`Invalid image quality "${value}"`);
+  }
+
+  return normalized;
+}
+
+export function normalizeImageFormat(
+  value: string | undefined | null,
+): NormalizedImageFormat {
+  const normalized = value?.trim().toLowerCase() ?? "auto";
+  if (!IMAGE_FORMAT_VALUES.has(normalized as ImageFormat)) {
+    throw new Error(`Invalid image format "${value}"`);
+  }
+  return normalized === "jpg" ? "jpeg" : (normalized as NormalizedImageFormat);
 }
 
 /**
@@ -430,6 +510,95 @@ export function generatePublicDownloadUrl(
 
   if (fileName) {
     url.searchParams.set("fileName", fileName);
+  }
+
+  return url.toString();
+}
+
+export async function generateSignedImageUrl(
+  workerDomain: string,
+  projectSlug: string,
+  params: SignedImageUrlParams,
+  signingSecret: string,
+  routing?: SignedUrlRoutingOptions,
+): Promise<string> {
+  const expiresAt = Math.floor(Date.now() / 1000) + (params.expiresIn ?? 3600);
+  const width = normalizeImageWidth(params.width);
+  const quality = normalizeImageQuality(params.quality);
+  const format = normalizeImageFormat(params.format);
+
+  const payload: Record<string, string> = {
+    type: "image",
+    accessKey: params.accessKey,
+    expiresAt: expiresAt.toString(),
+    fmt: format,
+  };
+  if (width !== undefined) {
+    payload.w = width.toString();
+  }
+  if (quality !== undefined) {
+    payload.q = quality.toString();
+  }
+
+  const signature = await createSignature(payload, signingSecret);
+
+  const url = buildProjectScopedUrl(
+    workerDomain,
+    projectSlug,
+    `/i/${params.accessKey}`,
+    "https",
+    routing,
+  );
+  url.searchParams.set("expiresAt", expiresAt.toString());
+  url.searchParams.set("sig", signature);
+  url.searchParams.set("fmt", format);
+  if (width !== undefined) {
+    url.searchParams.set("w", width.toString());
+  }
+  if (quality !== undefined) {
+    url.searchParams.set("q", quality.toString());
+  }
+
+  if (params.fileName) {
+    url.searchParams.set("fileName", params.fileName);
+  }
+
+  return url.toString();
+}
+
+export function generatePublicImageUrl(
+  workerDomain: string,
+  projectSlug: string,
+  accessKey: string,
+  options?: {
+    fileName?: string;
+    width?: number;
+    quality?: number;
+    format?: ImageFormat;
+  },
+  routing?: SignedUrlRoutingOptions,
+): string {
+  const width = normalizeImageWidth(options?.width);
+  const quality = normalizeImageQuality(options?.quality);
+  const format = normalizeImageFormat(options?.format);
+  const url = buildProjectScopedUrl(
+    workerDomain,
+    projectSlug,
+    `/i/${accessKey}`,
+    "https",
+    routing,
+  );
+
+  url.searchParams.set("fmt", format);
+  if (width !== undefined) {
+    url.searchParams.set("w", width.toString());
+  }
+  if (quality !== undefined) {
+    url.searchParams.set("q", quality.toString());
+  }
+
+  if (options?.fileName) {
+    url.searchParams.set("fileName", options.fileName);
   }
 
   return url.toString();

@@ -10,10 +10,7 @@ export const requireProject: MiddlewareHandler<{
   Variables: Variables;
 }> = async (c, next) => {
   const url = new URL(c.req.raw.url);
-  const projectSlug = extractProjectSlugFromUrl(
-    url,
-    c.env.WORKER_DOMAIN,
-  );
+  const projectSlug = extractProjectSlugFromUrl(url, c.env.WORKER_DOMAIN);
   if (!projectSlug) {
     throw Errors.projectNotFound("missing-project-scope");
   }
@@ -23,6 +20,8 @@ export const requireProject: MiddlewareHandler<{
   c.set("projectSlug", projectSlug);
   c.set("projectId", project.id);
   c.set("defaultFileAccess", project.defaultFileAccess);
+  c.set("imageDeliveryPolicy", project.imageDeliveryPolicy);
+  c.set("preserveImageExif", project.preserveImageExif);
   c.set("projectLifecycleState", project.lifecycleState ?? "active");
 
   await next();
@@ -33,10 +32,7 @@ export const extractProject: MiddlewareHandler<{
   Variables: Variables;
 }> = async (c, next) => {
   const url = new URL(c.req.raw.url);
-  const projectSlug = extractProjectSlugFromUrl(
-    url,
-    c.env.WORKER_DOMAIN,
-  );
+  const projectSlug = extractProjectSlugFromUrl(url, c.env.WORKER_DOMAIN);
 
   c.set("projectSlug", projectSlug);
 

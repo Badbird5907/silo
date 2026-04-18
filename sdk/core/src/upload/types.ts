@@ -25,6 +25,19 @@ export interface GenerateDownloadUrlInput {
   projectSlug?: string;
 }
 
+export interface GenerateImageUrlInput {
+  accessKey: string;
+  isPublic: boolean;
+  serveImage?: boolean | null;
+  fileKeyId?: string;
+  fileName?: string;
+  expiresIn?: number;
+  projectSlug?: string;
+  width?: number;
+  quality?: number;
+  format?: "auto" | "avif" | "webp" | "jpeg" | "jpg" | "png";
+}
+
 export interface UploadFileInput {
   fileName: string;
   size: number;
@@ -34,6 +47,7 @@ export interface UploadFileInput {
   mimeType?: string;
   acceptedMimeTypes?: string[]; // shorthand keys (image, video, ...) or exact MIME values
   isPublic?: boolean;
+  serveImage?: boolean;
   metadata?: Record<string, unknown>;
 }
 
@@ -74,6 +88,7 @@ export interface SiloFileSummary {
   fileId: string | null;
   status: "pending" | "completed" | "failed" | "deleted";
   isPublic: boolean;
+  serveImage: boolean | null;
   metadata: Record<string, unknown> | null;
   expiresAt: string | null;
   uploadCompletedAt: string | null;
@@ -113,6 +128,7 @@ export interface SiloFileDetail {
   fileId: string | null;
   status: "pending" | "completed" | "failed" | "deleted";
   isPublic: boolean;
+  serveImage: boolean | null;
   metadata: Record<string, unknown> | null;
   expiresAt: string | null;
   uploadCompletedAt: string | null;
@@ -145,6 +161,7 @@ export interface PreparedUploadFile {
   mimeType?: string;
   acceptedMimeTypes?: string[];
   isPublic?: boolean;
+  serveImage?: boolean;
   metadata?: Record<string, unknown>;
   expiresAt: string;
 }

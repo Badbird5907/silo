@@ -109,6 +109,11 @@ export async function updateProject(
     id: string;
     name?: string;
     defaultFileAccess?: "public" | "private";
+    imageDeliveryPolicy?:
+      | "disabled"
+      | "public_only"
+      | "public_and_private_opt_in";
+    preserveImageExif?: boolean;
     pendingUploadFailAfterMinutes?: number;
     pendingUploadFailAfterHours?: number;
   },
@@ -117,6 +122,10 @@ export async function updateProject(
   if (input.name !== undefined) updates.name = input.name;
   if (input.defaultFileAccess !== undefined)
     updates.defaultFileAccess = input.defaultFileAccess;
+  if (input.imageDeliveryPolicy !== undefined)
+    updates.imageDeliveryPolicy = input.imageDeliveryPolicy;
+  if (input.preserveImageExif !== undefined)
+    updates.preserveImageExif = input.preserveImageExif;
   const pendingUploadFailAfterMinutes =
     input.pendingUploadFailAfterMinutes ?? input.pendingUploadFailAfterHours;
   if (pendingUploadFailAfterMinutes !== undefined)

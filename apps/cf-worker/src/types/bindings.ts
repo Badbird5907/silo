@@ -31,5 +31,7 @@ export interface Variables {
   projectSlug: string | null;
   projectId: string;
   defaultFileAccess: "public" | "private";
+  imageDeliveryPolicy: "disabled" | "public_only" | "public_and_private_opt_in";
+  preserveImageExif: boolean;
   projectLifecycleState: "active" | "deleting";
 }

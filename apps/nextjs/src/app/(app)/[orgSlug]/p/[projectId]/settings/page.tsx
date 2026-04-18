@@ -11,6 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { Skeleton } from "@silo-storage/ui/components/skeleton";
 
+import { DangerZone } from "@/components/project-settings/danger-zone";
 import {
   ApiKeysList,
   CreatePersonalEnvironmentWizard,
@@ -19,7 +20,6 @@ import {
 } from "@/components/project-settings";
 import { useOrganization } from "@/hooks/use-organization";
 import { useTRPC } from "@/trpc/react";
-import { DangerZone } from "@/components/project-settings/danger-zone";
 
 interface ProjectSettingsPageProps {
   params: Promise<{
@@ -71,6 +71,8 @@ export default function ProjectSettingsPage({
             name: projectQuery.data.name,
             slug: projectQuery.data.slug,
             defaultFileAccess: projectQuery.data.defaultFileAccess,
+            imageDeliveryPolicy: projectQuery.data.imageDeliveryPolicy,
+            preserveImageExif: projectQuery.data.preserveImageExif,
             pendingUploadFailAfterMinutes:
               projectQuery.data.pendingUploadFailAfterMinutes,
           }}
@@ -99,7 +101,11 @@ export default function ProjectSettingsPage({
             router.replace(query ? `${pathname}?${query}` : pathname);
           }}
         />
-        <DangerZone projectId={projectId} organizationId={organizationId} orgSlug={orgSlug} />
+        <DangerZone
+          projectId={projectId}
+          organizationId={organizationId}
+          orgSlug={orgSlug}
+        />
       </div>
     </>
   );

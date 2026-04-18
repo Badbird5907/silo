@@ -1,5 +1,12 @@
 import type { MiddlewareHandler } from "hono";
 
+import {
+  createSignature,
+  normalizeImageFormat,
+  normalizeImageWidth,
+  normalizeImageQuality,
+} from "@silo-storage/shared";
+
 import type { Bindings, Variables } from "../types/bindings";
 import { Errors } from "../utils/errors";
 
@@ -63,6 +70,43 @@ export async function verifyDownloadSignature(params: {
     return timingSafeEqual(params.signature, expectedSignature);
   } catch (error) {
     console.error("Signature verification failed:", error);
+    return false;
+  }
+}
+
+export async function verifyImageSignature(params: {
+  accessKey: string;
+  signature: string;
+  expiresAt: string;
+  width: string | number | undefined | null;
+  quality: string | number | undefined | null;
+  format: string | undefined | null;
+  signingSecret: string;
+}): Promise<boolean> {
+  try {
+    const payload: Record<string, string> = {
+      type: "image",
+      accessKey: params.accessKey,
+      expiresAt: params.expiresAt,
+      fmt: normalizeImageFormat(params.format),
+    };
+    const width = normalizeImageWidth(params.width);
+    const quality = normalizeImageQuality(params.quality);
+    if (width !== undefined) {
+      payload.w = width.toString();
+    }
+    if (quality !== undefined) {
+      payload.q = quality.toString();
+    }
+
+    const expectedSignature = await createSignature(
+      payload,
+      params.signingSecret,
+    );
+
+    return timingSafeEqual(params.signature, expectedSignature);
+  } catch (error) {
+    console.error("Image signature verification failed:", error);
     return false;
   }
 }

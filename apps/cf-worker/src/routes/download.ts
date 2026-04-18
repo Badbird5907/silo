@@ -1,49 +1,14 @@
 import type { Context } from "hono";
 
 import type { Bindings, Variables } from "../types/bindings";
-import type { FileKeyInfo } from "../types/project";
 import { verifyDownloadSignature } from "../middleware/auth";
 import { trackDownloadStream } from "../services/download-stream";
+import { getCachedFileKey } from "../services/file-key-cache";
 import {
-  lookupFileKey,
   reportMissingObject,
   trackDownload,
 } from "../services/callback";
 import { Errors } from "../utils/errors";
-
-const FILE_KEY_CACHE_TTL = 60; // 1 minute cache for file key lookups
-
-/**
- * Get cached file key info or fetch from origin
- */
-async function getCachedFileKey(
-  accessKey: string,
-  projectId: string,
-  env: Bindings,
-): Promise<FileKeyInfo> {
-  const cache = caches.default;
-  const cacheKey = new Request(
-    `https://cache.internal/file-key/${projectId}/${accessKey}`,
-  );
-
-  const cachedResponse = await cache.match(cacheKey);
-  if (cachedResponse) {
-    return cachedResponse.json();
-  }
-
-  const fileKey = await lookupFileKey(accessKey, projectId, env);
-
-  // Cache the result
-  const response = new Response(JSON.stringify(fileKey), {
-    headers: {
-      "Content-Type": "application/json",
-      "Cache-Control": `max-age=${FILE_KEY_CACHE_TTL}`,
-    },
-  });
-  await cache.put(cacheKey, response);
-
-  return fileKey;
-}
 
 /**
  * Parse Range header and return range options for R2

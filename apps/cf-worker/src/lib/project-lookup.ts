@@ -34,7 +34,11 @@ export async function lookupProject(
       if (response.status === 404) {
         throw Errors.projectNotFound(slug);
       }
-      console.error("Failed to lookup project:", response.status, response.statusText);
+      console.error(
+        "Failed to lookup project:",
+        response.status,
+        response.statusText,
+      );
       throw new Error(
         `Failed to lookup project: ${response.status} ${response.statusText}`,
       );

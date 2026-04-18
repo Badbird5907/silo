@@ -31,6 +31,7 @@ export type SiloRouteExpiryInput =
   | Date
   | null;
 export type SiloRoutePublicInput = boolean | null | undefined;
+export type SiloRouteServeImageInput = boolean | null | undefined;
 export type SiloRouteMimeTypesInput = string | string[];
 
 export type CoreFileExpiryInput =
@@ -65,6 +66,7 @@ export type SiloRouteOptionResolver<
 
 export interface SiloRouteOptions {
   isPublic?: SiloRouteOptionResolver<SiloRoutePublicInput>;
+  serveImage?: SiloRouteOptionResolver<SiloRouteServeImageInput>;
   fileExpiry?: SiloRouteOptionResolver<SiloRouteExpiryInput | undefined>;
   mimeTypes?: SiloRouteOptionResolver<SiloRouteMimeTypesInput | undefined>;
 }
@@ -182,6 +184,19 @@ export interface SiloRouteBuilder<
   public: (
     isPublic: SiloRouteOptionResolver<
       SiloRoutePublicInput,
+      TMiddlewareData,
+      TContext
+    >,
+  ) => SiloRouteBuilder<
+    TRequest,
+    TContext,
+    TRouteConfig,
+    TMiddlewareData,
+    TInput
+  >;
+  serveImage: (
+    serveImage: SiloRouteOptionResolver<
+      SiloRouteServeImageInput,
       TMiddlewareData,
       TContext
     >,

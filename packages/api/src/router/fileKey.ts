@@ -7,7 +7,6 @@ import {
   count,
   desc,
   eq,
-  gte,
   ilike,
   inArray,
   isNotNull,
@@ -136,6 +135,7 @@ export const fileKeyRouter = {
           claimedSize: fileKeys.claimedSize,
           status: fileKeys.status,
           isPublic: fileKeys.isPublic,
+          serveImage: fileKeys.serveImage,
           uploadCompletedAt: fileKeys.uploadCompletedAt,
           uploadFailedAt: fileKeys.uploadFailedAt,
           deletedAt: fileKeys.deletedAt,
@@ -175,6 +175,7 @@ export const fileKeyRouter = {
         claimedMimeType: r.claimedMimeType,
         claimedSize: r.claimedSize,
         isPublic: r.isPublic,
+        serveImage: r.serveImage,
         uploadCompletedAt: r.uploadCompletedAt,
         uploadFailedAt: r.uploadFailedAt,
         deletedAt: r.deletedAt,
@@ -320,27 +321,28 @@ export const fileKeyRouter = {
           : []),
       ];
 
-      const [environments, completedMimeTypes, pendingMimeTypes] = await Promise.all([
-        ctx.db.query.projectEnvironments.findMany({
-          where: eq(projectEnvironments.projectId, input.projectId),
-          columns: { id: true, name: true, type: true },
-        }),
-        ctx.db
-          .select({ mimeType: files.mimeType })
-          .from(fileKeys)
-          .innerJoin(files, eq(fileKeys.fileId, files.id))
-          .where(and(...baseFileKeyFilters)),
-        ctx.db
-          .select({ mimeType: fileKeys.claimedMimeType })
-          .from(fileKeys)
-          .where(
-            and(
-              ...baseFileKeyFilters,
-              eq(fileKeys.status, "pending"),
-              isNotNull(fileKeys.claimedMimeType),
+      const [environments, completedMimeTypes, pendingMimeTypes] =
+        await Promise.all([
+          ctx.db.query.projectEnvironments.findMany({
+            where: eq(projectEnvironments.projectId, input.projectId),
+            columns: { id: true, name: true, type: true },
+          }),
+          ctx.db
+            .select({ mimeType: files.mimeType })
+            .from(fileKeys)
+            .innerJoin(files, eq(fileKeys.fileId, files.id))
+            .where(and(...baseFileKeyFilters)),
+          ctx.db
+            .select({ mimeType: fileKeys.claimedMimeType })
+            .from(fileKeys)
+            .where(
+              and(
+                ...baseFileKeyFilters,
+                eq(fileKeys.status, "pending"),
+                isNotNull(fileKeys.claimedMimeType),
+              ),
             ),
-          ),
-      ]);
+        ]);
 
       const mimeTypeCategorySet = new Set<string>();
 
@@ -401,6 +403,7 @@ export const fileKeyRouter = {
         id: z.string(),
         projectId: z.string(),
         isPublic: z.boolean(),
+        serveImage: z.boolean().optional(),
       }),
     )
     .use(requirePermission({ fileKey: ["update"] }))
@@ -421,6 +424,13 @@ export const fileKeyRouter = {
           eq(fileKeys.id, input.id),
           eq(fileKeys.projectId, input.projectId),
         ),
+        with: {
+          file: {
+            columns: {
+              mimeType: true,
+            },
+          },
+        },
       });
 
       if (!fileKey) {
@@ -430,9 +440,30 @@ export const fileKeyRouter = {
         });
       }
 
+      if (typeof input.serveImage === "boolean") {
+        const mimeType = fileKey.file?.mimeType ?? fileKey.claimedMimeType;
+        const isImageFile =
+          typeof mimeType === "string" && mimeType.startsWith("image/");
+
+        if (!isImageFile) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "serveImage can only be updated for image files",
+          });
+        }
+      }
+
+      const updatePayload: { isPublic: boolean; serveImage?: boolean } = {
+        isPublic: input.isPublic,
+      };
+
+      if (typeof input.serveImage === "boolean") {
+        updatePayload.serveImage = input.serveImage;
+      }
+
       const [updated] = await ctx.db
         .update(fileKeys)
-        .set({ isPublic: input.isPublic })
+        .set(updatePayload)
         .where(eq(fileKeys.id, input.id))
         .returning();
 
@@ -488,7 +519,8 @@ export const fileKeyRouter = {
       if (transitionResult.status === "pending_rejected") {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "Pending uploads must be marked as failed instead of deleted",
+          message:
+            "Pending uploads must be marked as failed instead of deleted",
         });
       }
 

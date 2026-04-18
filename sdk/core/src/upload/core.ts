@@ -5,6 +5,7 @@ import type { UpdateFileExpiryInput, UpdateFileExpiryResult } from "./expiry";
 import type { CreateSiloCoreFromTokenInput } from "./token";
 import type {
   GenerateDownloadUrlInput,
+  GenerateImageUrlInput,
   GetFileInput,
   ListFilesInput,
   ListFilesResult,
@@ -17,7 +18,9 @@ import type {
   UploadStrategy,
 } from "./types";
 import {
+  generatePublicImageUrl,
   generatePublicDownloadUrl,
+  generateSignedImageUrl,
   generateSignedDownloadUrl,
   generateSignedUploadUrlWithSecret,
 } from "../signing";
@@ -162,6 +165,7 @@ export function createSiloCore(config: UploadCoreConfig) {
           mimeType: file.mimeType,
           acceptedMimeTypes: file.acceptedMimeTypes,
           isPublic: file.isPublic,
+          serveImage: file.serveImage,
           metadata: file.metadata,
           callbackUrl,
           callbackMetadata: input.callbackMetadata ?? {},
@@ -196,6 +200,7 @@ export function createSiloCore(config: UploadCoreConfig) {
           mimeType: file.mimeType,
           acceptedMimeTypes: file.acceptedMimeTypes,
           isPublic: file.isPublic,
+          serveImage: file.serveImage,
           metadata: file.metadata,
           expiresAt: parsed.expiresAt,
         });
@@ -247,6 +252,7 @@ export function createSiloCore(config: UploadCoreConfig) {
         mimeType: file.mimeType,
         acceptedMimeTypes: file.acceptedMimeTypes,
         isPublic: file.isPublic,
+        serveImage: file.serveImage,
         metadata: file.metadata,
         expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
       });
@@ -262,6 +268,7 @@ export function createSiloCore(config: UploadCoreConfig) {
         mimeType: file.mimeType,
         hash: file.hash,
         isPublic: file.isPublic,
+        serveImage: file.serveImage,
         acceptedMimeTypes: file.acceptedMimeTypes,
         metadata: file.metadata,
       })),
@@ -500,12 +507,61 @@ export function createSiloCore(config: UploadCoreConfig) {
     );
   }
 
+  async function generateImageUrl(
+    input: GenerateImageUrlInput,
+  ): Promise<string> {
+    const projectSlug = input.projectSlug ?? config.projectSlug;
+    if (!projectSlug) {
+      throw new Error(
+        "Missing projectSlug for image URL generation. Provide projectSlug in SILO_TOKEN or input.",
+      );
+    }
+
+    if (input.isPublic) {
+      return generatePublicImageUrl(
+        config.ingestServer,
+        projectSlug,
+        input.accessKey,
+        {
+          fileName: input.fileName,
+          width: input.width,
+          quality: input.quality,
+          format: input.format,
+        },
+        { routeMode: resolvedRouteMode },
+      );
+    }
+
+    return generateSignedImageUrl(
+      config.ingestServer,
+      projectSlug,
+      {
+        accessKey: input.accessKey,
+        fileName: input.fileName,
+        expiresIn: input.expiresIn,
+        width: input.width,
+        quality: input.quality,
+        format: input.format,
+      },
+      (() => {
+        if (!config.signingSecret) {
+          throw new Error(
+            "Missing signingSecret for private image URL generation.",
+          );
+        }
+        return config.signingSecret;
+      })(),
+      { routeMode: resolvedRouteMode },
+    );
+  }
+
   return {
     registerUploadBatch,
     prepareUpload,
     listFiles,
     getFile,
     generateDownloadUrl,
+    generateImageUrl,
     updateFileExpiry,
     config,
   };

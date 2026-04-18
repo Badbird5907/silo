@@ -27,6 +27,12 @@ export const fileAccessTypes = pgEnum("file_access_types", [
   "private",
 ]);
 
+export const imageDeliveryPolicy = pgEnum("image_delivery_policy", [
+  "disabled",
+  "public_only",
+  "public_and_private_opt_in",
+]);
+
 export const fileKeyStatus = pgEnum("file_key_status", [
   "pending",
   "completed",
@@ -63,6 +69,10 @@ export const projects = pgTable("projects", {
   defaultFileAccess: fileAccessTypes("default_file_access")
     .notNull()
     .default("private"),
+  imageDeliveryPolicy: imageDeliveryPolicy("image_delivery_policy")
+    .notNull()
+    .default("public_and_private_opt_in"),
+  preserveImageExif: boolean("preserve_image_exif").notNull().default(false),
   lifecycleState: resourceLifecycleState("lifecycle_state")
     .notNull()
     .default("active"),
@@ -112,7 +122,10 @@ export const projectEnvironments = pgTable("project_environments", {
     .array()
     .notNull()
     .default(sql`'{}'::silo_webhook_event_types[]`),
-  callbackHeaders: jsonb("callback_headers").notNull().default("{}").$type<Record<string, string>>(),
+  callbackHeaders: jsonb("callback_headers")
+    .notNull()
+    .default("{}")
+    .$type<Record<string, string>>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
@@ -151,8 +164,11 @@ export const fileKeys = pgTable(
       .$defaultFn(() => nanoid(16)),
     fileName: text("file_name").notNull(),
     accessKey: text("access_key").notNull(),
-    fileId: text("file_id").references(() => files.id, { onDelete: "set null" }), // nullable - null means pending upload or deleted tombstone
+    fileId: text("file_id").references(() => files.id, {
+      onDelete: "set null",
+    }), // nullable - null means pending upload or deleted tombstone
     isPublic: boolean("is_public").notNull().default(false), // resolved from project.defaultFileAccess at creation if not explicitly set
+    serveImage: boolean("serve_image"),
     environmentId: text("environment_id")
       .references(() => projectEnvironments.id, { onDelete: "cascade" })
       .notNull(),

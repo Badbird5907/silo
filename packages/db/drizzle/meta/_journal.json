@@ -29,6 +29,20 @@
       "when": 1775548620478,
       "tag": "0003_opposite_dreadnoughts",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1776484091942,
+      "tag": "0004_nervous_dragon_lord",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1776488208283,
+      "tag": "0005_colorful_squirrel_girl",
+      "breakpoints": true
     }
   ]
 }

@@ -14,6 +14,7 @@ import {
 } from "./middleware/project";
 import { handleDevR2ListAll } from "./routes/dev/r2-list-all";
 import { handleDownload } from "./routes/download";
+import { handleImage, handleInternalImageSource } from "./routes/image";
 import { handleInternalDelete } from "./routes/internal/delete";
 import { handleInternalDeletePrefix } from "./routes/internal/delete-prefix";
 import { handleInternalList } from "./routes/internal/list";
@@ -52,6 +53,7 @@ app.patch("/ingest/tus/:uploadId", requireProject, handleTusPatch);
 app.delete("/ingest/tus/:uploadId", requireProject, handleTusDelete);
 
 app.get("/f/:accessKey", requireProject, handleDownload);
+app.get("/i/:accessKey", requireProject, handleImage);
 
 // Path-mode project routes (e.g. /p/:projectSlug/...)
 app.options(
@@ -96,6 +98,11 @@ app.get(
   requireProject,
   handleDownload,
 );
+app.get(
+  "/:projectRoutePrefix/:projectSlug/i/:accessKey",
+  requireProject,
+  handleImage,
+);
 
 // internal routes
 app.delete(
@@ -133,6 +140,12 @@ app.post(
   requireMainDomain,
   requireCallbackSecret,
   handleInternalTusDelete,
+);
+app.get(
+  "/internal/image-source/:projectId/:accessKey",
+  requireMainDomain,
+  requireCallbackSecret,
+  handleInternalImageSource,
 );
 
 app.onError((err, c) => {

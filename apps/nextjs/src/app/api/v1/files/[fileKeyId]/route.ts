@@ -80,6 +80,7 @@ export async function GET(
       fileId: fileKey.fileId,
       status: fileKey.status,
       isPublic: fileKey.isPublic,
+      serveImage: fileKey.serveImage,
       metadata: fileKey.metadata,
       callbackMetadata: fileKey.callbackMetadata,
       claimedHash: fileKey.claimedHash,

@@ -49,6 +49,7 @@ export async function POST(request: Request) {
 
     const responseBody = {
       ...fileKey,
+      serveImage: fileKey.serveImage,
       file: {
         ...fileKey.file,
         adapterKey: fileKey.file.storageKey,

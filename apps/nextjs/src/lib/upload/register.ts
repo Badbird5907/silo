@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { and, eq, sql } from "@silo-storage/db";
 import { syncEnvironmentStorageSnapshot } from "@silo-storage/api/services";
+import { and, eq, sql } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import {
   fileKeys,
@@ -21,6 +21,7 @@ export const registerFileKeySchema = z.object({
   mimeType: z.string().optional(),
   hash: z.string().optional(),
   isPublic: z.boolean().optional(),
+  serveImage: z.boolean().optional(),
   metadata: unknownRecordSchema.optional(),
 });
 
@@ -108,6 +109,29 @@ function mergeCallbackMetadata(
   return Object.keys(merged).length > 0 ? merged : null;
 }
 
+function isImageMimeType(value: string | null | undefined): boolean {
+  return typeof value === "string" && value.toLowerCase().startsWith("image/");
+}
+
+function resolveServeImageValue(input: {
+  serveImage?: boolean;
+  mimeType?: string | null;
+  existingServeImage?: boolean | null;
+}): boolean | null {
+  if (typeof input.serveImage === "boolean") {
+    return isImageMimeType(input.mimeType) ? input.serveImage : null;
+  }
+
+  if (input.existingServeImage !== undefined) {
+    return (
+      input.existingServeImage ??
+      (isImageMimeType(input.mimeType) ? false : null)
+    );
+  }
+
+  return isImageMimeType(input.mimeType) ? false : null;
+}
+
 interface LockableExecutor {
   execute: typeof db.execute;
 }
@@ -175,7 +199,10 @@ export async function registerFileKeyIntent(input: {
         });
 
     const existing = byId ?? byAccessKey;
-    const mergedMetadata = mergeMetadata(existing?.metadata, input.fileKey.metadata);
+    const mergedMetadata = mergeMetadata(
+      existing?.metadata,
+      input.fileKey.metadata,
+    );
     const mergedCallbackMetadata = mergeCallbackMetadata(
       existing?.callbackMetadata,
       {
@@ -210,6 +237,11 @@ export async function registerFileKeyIntent(input: {
         .set({
           fileName: input.fileKey.fileName,
           isPublic: input.fileKey.isPublic ?? existing.isPublic,
+          serveImage: resolveServeImageValue({
+            serveImage: input.fileKey.serveImage,
+            mimeType: input.fileKey.mimeType ?? existing.claimedMimeType,
+            existingServeImage: existing.serveImage,
+          }),
           claimedSize: input.fileKey.size,
           claimedMimeType: input.fileKey.mimeType ?? existing.claimedMimeType,
           claimedHash: input.fileKey.hash ?? existing.claimedHash,
@@ -237,6 +269,10 @@ export async function registerFileKeyIntent(input: {
         environmentId: input.environmentId,
         fileId: null,
         isPublic: input.fileKey.isPublic ?? false,
+        serveImage: resolveServeImageValue({
+          serveImage: input.fileKey.serveImage,
+          mimeType: input.fileKey.mimeType,
+        }),
         metadata: mergedMetadata,
         callbackMetadata: mergedCallbackMetadata,
         claimedSize: input.fileKey.size,
@@ -265,6 +301,7 @@ export async function completeFileKeyFromCallback(input: {
   claimedMimeType?: string | null;
   claimedHash?: string | null;
   isPublic?: boolean;
+  serveImage?: boolean | null;
   actualSize: number;
   actualMimeType: string;
   actualHash?: string | null;
@@ -324,6 +361,10 @@ export async function completeFileKeyFromCallback(input: {
           environmentId: input.environmentId,
           fileId: null,
           isPublic: input.isPublic ?? false,
+          serveImage: resolveServeImageValue({
+            serveImage: input.serveImage ?? undefined,
+            mimeType: input.actualMimeType,
+          }),
           metadata: mergedMetadata,
           claimedSize: input.claimedSize,
           claimedMimeType: input.claimedMimeType ?? null,
@@ -417,6 +458,11 @@ export async function completeFileKeyFromCallback(input: {
         uploadFailedAt: null,
         adapterData: clearUploadSessionAdapterData(claimedFileKey.adapterData),
         isPublic: input.isPublic ?? claimedFileKey.isPublic,
+        serveImage: resolveServeImageValue({
+          serveImage: input.serveImage ?? undefined,
+          mimeType: input.actualMimeType,
+          existingServeImage: claimedFileKey.serveImage,
+        }),
         metadata: mergedMetadata,
       })
       .where(eq(fileKeys.id, claimedFileKey.id))

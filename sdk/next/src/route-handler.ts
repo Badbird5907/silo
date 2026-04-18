@@ -17,13 +17,14 @@ const registerRequestSchema = z.object({
   expiresIn: z.number().int().positive().optional(),
   protocol: z.enum(["http", "https"]).optional(),
   files: z
-    .object({
-      fileName: z.string().min(1),
-      size: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
-      mimeType: z.string().optional(),
-      hash: z.string().optional(),
-      isPublic: z.boolean().optional(),
-    })
+      .object({
+        fileName: z.string().min(1),
+        size: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+        mimeType: z.string().optional(),
+        hash: z.string().optional(),
+        isPublic: z.boolean().optional(),
+        serveImage: z.boolean().optional(),
+      })
     .array()
     .min(1),
 });
@@ -145,6 +146,7 @@ function toUploadFiles(
     mimeType: file.mimeType,
     hash: file.hash,
     isPublic: file.isPublic,
+    serveImage: file.serveImage,
   }));
 }
 
@@ -366,6 +368,7 @@ export function createRouteHandler<
         hash: file.hash,
         mimeType: file.mimeType,
         isPublic: file.isPublic,
+        serveImage: file.serveImage,
         expiresAt: file.expiresAt,
       })),
     });

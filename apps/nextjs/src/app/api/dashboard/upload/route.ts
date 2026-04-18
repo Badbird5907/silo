@@ -23,6 +23,7 @@ const schema = z.object({
   size: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
   mimeType: z.string().optional(),
   isPublic: z.boolean().optional(),
+  serveImage: z.boolean().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -64,6 +65,7 @@ export async function POST(request: Request) {
     size,
     mimeType,
     isPublic,
+    serveImage,
     metadata,
   } = result.data;
 
@@ -149,6 +151,12 @@ export async function POST(request: Request) {
         environmentId,
         fileId: null,
         isPublic: resolvedIsPublic,
+        serveImage:
+          typeof serveImage === "boolean" && mimeType?.startsWith("image/")
+            ? serveImage
+            : mimeType?.startsWith("image/")
+              ? false
+              : null,
         metadata: metadata ?? {},
         claimedSize: size,
         claimedMimeType: mimeType ?? null,

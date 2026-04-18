@@ -105,9 +105,6 @@ function getFileIcon(mimeType: string | null) {
       ) {
         return FileCode;
       }
-      // if (mimeType.includes("pdf")) {
-      //   return FilePdf;
-      // }
       return File;
     default:
       return File;
@@ -131,6 +128,7 @@ function copyToClipboard(text: string, label: string) {
 }
 
 type AccessValue = "public" | "private";
+type ServeImageValue = "enabled" | "disabled";
 
 export default function FileDetailPage({ params }: FileDetailPageProps) {
   const trpc = useTRPC();
@@ -254,6 +252,18 @@ export default function FileDetailPage({ params }: FileDetailPageProps) {
     });
   };
 
+  const handleServeImageChange = (value: ServeImageValue) => {
+    updateAccessMutation.mutate(
+      {
+        id: fileId,
+        projectId,
+        organizationId,
+        isPublic,
+        serveImage: value === "enabled",
+      } as never,
+    );
+  };
+
   const handleDelete = () => {
     deleteMutation.mutate({
       id: fileId,
@@ -283,13 +293,16 @@ export default function FileDetailPage({ params }: FileDetailPageProps) {
   }
 
   if (projectQuery.error || !projectQuery.data) {
+    console.error("Project not found", { projectQuery });
     notFound();
   }
 
   if (fileKeyQuery.error || !fileKeyQuery.data) {
+    console.error("File key not found", { fileKeyQuery });
     notFound();
   }
   if (environmentSlug && !environmentsQuery.isLoading && !selectedEnvironment) {
+    console.error("Environment not found", { environmentSlug, selectedEnvironment });
     notFound();
   }
 
@@ -300,10 +313,12 @@ export default function FileDetailPage({ params }: FileDetailPageProps) {
   const hash = fileKey.file?.hash ?? fileKey.claimedHash;
   const FileIcon = getFileIcon(mimeType);
   const effectiveAccess: AccessValue = fileKey.isPublic ? "public" : "private";
+  const effectiveServeImage: ServeImageValue = fileKey.serveImage
+    ? "enabled"
+    : "disabled";
   const isPublic = fileKey.isPublic;
-  const expiresAt = fileKey.expiresAt
-    ? new Date(fileKey.expiresAt)
-    : null;
+  const isImageFile = typeof mimeType === "string" && mimeType.startsWith("image/");
+  const expiresAt = fileKey.expiresAt ? new Date(fileKey.expiresAt) : null;
   const isExpired =
     !!expiresAt &&
     !Number.isNaN(expiresAt.getTime()) &&
@@ -314,7 +329,10 @@ export default function FileDetailPage({ params }: FileDetailPageProps) {
   return (
     <>
       <div className="flex flex-1 flex-col gap-4 p-4">
-        <Link href={`${projectBasePath}/files`} className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-2">
+        <Link
+          href={`${projectBasePath}/files`}
+          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+        >
           <ArrowLeft className="h-4 w-4" /> Back to files
         </Link>
         <div className="flex items-center gap-4">
@@ -525,6 +543,31 @@ export default function FileDetailPage({ params }: FileDetailPageProps) {
                 ? "Anyone with the link can access this file"
                 : "A signed URL is required to access this file"}
             </p>
+            {isImageFile && !isPublic && projectQuery.data.imageDeliveryPolicy === "public_and_private_opt_in" && (
+              <div className="flex items-center justify-between border-t pt-4">
+                <div className="space-y-1">
+                  <Label>Serve Image</Label>
+                  <p className="text-muted-foreground text-xs">
+                    Allow image transform URLs for this file when private.
+                  </p>
+                </div>
+                <Select
+                  value={effectiveServeImage}
+                  onValueChange={(v) =>
+                    handleServeImageChange(v as ServeImageValue)
+                  }
+                  disabled={updateAccessMutation.isPending || status === "deleted"}
+                >
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="enabled">Enabled</SelectItem>
+                    <SelectItem value="disabled">Disabled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </CardContent>
         </Card>
 

@@ -24,6 +24,8 @@ export async function POST(request: Request) {
       columns: {
         id: true,
         defaultFileAccess: true,
+        imageDeliveryPolicy: true,
+        preserveImageExif: true,
         lifecycleState: true,
       },
     });

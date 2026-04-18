@@ -64,6 +64,11 @@ function createRouteBuilder<
         ...routeOptions,
         isPublic: isPublic as SiloRouteOptions["isPublic"],
       }),
+    serveImage: (serveImage) =>
+      withRouteOptions({
+        ...routeOptions,
+        serveImage: serveImage as SiloRouteOptions["serveImage"],
+      }),
     expires: (fileExpiry) =>
       withRouteOptions({
         ...routeOptions,
