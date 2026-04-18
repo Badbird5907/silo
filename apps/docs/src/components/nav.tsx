@@ -8,7 +8,7 @@ export function Nav() {
     <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur supports-backdrop-filter:bg-background/60">
       <div className="flex h-16 w-full max-w-none items-center justify-between gap-4 px-4 sm:px-6">
         <Link href="/" className="text-lg font-semibold tracking-tight">
-          Silo SDK Demo
+          Silo Docs
         </Link>
 
         <div className="ml-auto flex shrink-0 items-center gap-2">

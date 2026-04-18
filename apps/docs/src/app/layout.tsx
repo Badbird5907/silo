@@ -24,8 +24,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Silo SDK Demo",
-  description: "Demo of the Silo SDK",
+  title: "Silo Docs",
+  description: "Documentation for the Silo SDK",
 };
 
 export default function RootLayout({
