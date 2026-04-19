@@ -2,14 +2,9 @@
 
 import type { ListFilesResult, SiloFileSummary } from "@silo-storage/sdk-core";
 import * as React from "react";
-import {
-  Show,
-  SignInButton,
-  SignUpButton,
-  useAuth,
-} from "@clerk/nextjs";
+import { Show, SignInButton, SignUpButton, useAuth } from "@clerk/nextjs";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, RefreshCcw, UploadIcon } from "lucide-react";
+import { Eye, Loader2, RefreshCcw, UploadIcon } from "lucide-react";
 
 import { Button } from "@silo-storage/ui/components/button";
 import {
@@ -22,6 +17,7 @@ import {
 } from "@silo-storage/ui/components/card";
 
 import { UploadDropzone, useUpload } from "@/lib/sdk-demo/upload";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 
 interface MyFilesApiResponse {
   data: ListFilesResult;
@@ -77,6 +73,10 @@ function FileRow({ file }: { file: SiloFileSummary }) {
         : file.status === "deleted"
           ? "text-slate-500"
           : "text-amber-600";
+  const url =
+    file.status === "completed"
+      ? (file as unknown as { url: string }).url
+      : null;
 
   return (
     <li className="rounded-lg border p-3">
@@ -92,10 +92,35 @@ function FileRow({ file }: { file: SiloFileSummary }) {
         </span>
       </div>
 
-      <div className="text-fd-muted-foreground mt-2 space-y-1 text-xs">
-        <p>Uploaded: {formatDate(file.uploadCompletedAt ?? file.createdAt)}</p>
-        <p>Expires: {file.expiresAt ? formatDate(file.expiresAt) : "Never"}</p>
-        <p className="truncate">fileKeyId: {file.id}</p>
+      <div className="flex items-start justify-between gap-2">
+        <div className="text-fd-muted-foreground mt-2 space-y-1 text-xs">
+          <p>
+            Uploaded: {formatDate(file.uploadCompletedAt ?? file.createdAt)}
+          </p>
+          <p>
+            Expires: {file.expiresAt ? formatDate(file.expiresAt) : "Never"}
+          </p>
+          <p className="truncate">fileKeyId: {file.id}</p>
+        </div>
+        {url && (
+          <Dialog>
+            <DialogTrigger>
+              <Button variant="outline" size="icon-sm">
+                <Eye />
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{file.fileName}</DialogTitle>
+                <DialogDescription>
+                  {file.mimeType ?? "unknown"} - {formatBytes(file.size)}
+                </DialogDescription>
+              </DialogHeader>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={url} alt={file.fileName} />
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
     </li>
   );
@@ -174,7 +199,12 @@ export function SdkUploadDemo() {
         </UploadDropzone>
         <Card>
           <CardHeader>
-            <CardTitle>My files {myFilesQuery.isLoading && <Loader2 className="size-4 animate-spin" />}</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              My files{" "}
+              {myFilesQuery.isLoading && (
+                <Loader2 className="size-4 animate-spin" />
+              )}
+            </CardTitle>
             <CardDescription>The files you have uploaded</CardDescription>
             <CardAction>
               <Button
