@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@base-ui/react": "^1.4.0",
     "@clerk/nextjs": "^7.0.4",
     "@silo-storage/sdk-core": "link:../../sdk/core",
     "@silo-storage/sdk-next": "link:../../sdk/next",
@@ -18,6 +19,8 @@
     "@silo-storage/ui": "workspace:*",
     "@t3-oss/env-nextjs": "^0.13.10",
     "@tanstack/react-query": "catalog:",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "fumadocs-core": "^16.7.16",
     "fumadocs-mdx": "^14.3.0",
     "fumadocs-ui": "^16.7.16",
@@ -26,6 +29,10 @@
     "next-themes": "^0.4.6",
     "react": "catalog:react19",
     "react-dom": "catalog:react19",
+    "react-resizable-panels": "^4.10.0",
+    "shadcn": "^4.3.0",
+    "tailwind-merge": "^3.5.0",
+    "tw-animate-css": "^1.4.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

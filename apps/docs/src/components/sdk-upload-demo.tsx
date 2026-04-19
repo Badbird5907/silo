@@ -7,7 +7,6 @@ import {
   SignInButton,
   SignUpButton,
   useAuth,
-  UserButton,
 } from "@clerk/nextjs";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, RefreshCcw, UploadIcon } from "lucide-react";
@@ -15,6 +14,7 @@ import { Loader2, RefreshCcw, UploadIcon } from "lucide-react";
 import { Button } from "@silo-storage/ui/components/button";
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -129,29 +129,6 @@ export function SdkUploadDemo() {
 
   return (
     <div className="not-prose grid gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">SDK Demo</h1>
-
-        <Show when="signed-in">
-          <div className="flex items-center gap-4">
-            <button
-              className="cursor-pointer"
-              disabled={myFilesQuery.isFetching}
-              onClick={() => {
-                setUploadError(null);
-                void myFilesQuery.refetch();
-              }}
-            >
-              {myFilesQuery.isFetching ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <RefreshCcw className="size-4" />
-              )}
-            </button>
-            <UserButton />
-          </div>
-        </Show>
-      </div>
       <Show when="signed-out">
         <Card className="max-w-xl">
           <CardHeader>
@@ -197,8 +174,26 @@ export function SdkUploadDemo() {
         </UploadDropzone>
         <Card>
           <CardHeader>
-            <CardTitle>My files</CardTitle>
+            <CardTitle>My files {myFilesQuery.isLoading && <Loader2 className="size-4 animate-spin" />}</CardTitle>
             <CardDescription>The files you have uploaded</CardDescription>
+            <CardAction>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                disabled={myFilesQuery.isFetching}
+                onClick={() => {
+                  void myFilesQuery.refetch();
+                }}
+                title="Refresh file list"
+              >
+                {myFilesQuery.isFetching ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <RefreshCcw className="size-4" />
+                )}
+              </Button>
+            </CardAction>
           </CardHeader>
 
           <CardContent>

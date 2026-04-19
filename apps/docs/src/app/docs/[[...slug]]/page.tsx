@@ -11,6 +11,7 @@ import {
 
 import { getMDXComponents } from "@/components/mdx";
 import { source } from "@/lib/source";
+import { cn } from "@/lib/utils";
 
 interface DocPageData {
   title: string;
@@ -37,21 +38,20 @@ export default async function DocPage({
   }
 
   const Mdx = page.data.body;
-
+  if (page.data.full) {
+    return (
+      <Mdx components={getMDXComponents()} />
+    )
+  }
   return (
     <DocsPage
       toc={page.data.toc}
       tableOfContent={{
         style: "clerk",
       }}
-      full={page.data.full}
     >
-      {!page.data.full && (
-        <>
-          <DocsTitle>{page.data.title}</DocsTitle>
-          <DocsDescription>{page.data.description}</DocsDescription>
-        </>
-      )}
+      <DocsTitle>{page.data.title}</DocsTitle>
+      <DocsDescription>{page.data.description}</DocsDescription>
       <DocsBody>
         <Mdx components={getMDXComponents()} />
       </DocsBody>
