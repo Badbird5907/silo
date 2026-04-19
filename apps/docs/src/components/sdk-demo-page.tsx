@@ -14,26 +14,26 @@ export function SdkDemoPage() {
   const missingClerkVars = getMissingClerkVars();
   const missingSiloVars = getMissingSiloVars();
 
-  if (!hasClerkDemoConfig()) {
-    return (
-      <SdkDemoPageClient
-        missingClerkVars={missingClerkVars}
-        missingSiloVars={missingSiloVars}
-      />
-    );
-  }
-
-  const routerConfig = hasSiloDemoConfig()
-    ? extractRouterConfig(fileRouter)
-    : null;
-
-  return (
+  const content = !hasClerkDemoConfig() ? (
+    <SdkDemoPageClient
+      missingClerkVars={missingClerkVars}
+      missingSiloVars={missingSiloVars}
+    />
+  ) : (
     <ClerkProvider>
       <SdkDemoPageClient
         missingClerkVars={missingClerkVars}
         missingSiloVars={missingSiloVars}
-        routerConfig={routerConfig}
+        routerConfig={
+          hasSiloDemoConfig() ? extractRouterConfig(fileRouter) : null
+        }
       />
     </ClerkProvider>
+  );
+
+  return (
+    <article className="mx-auto w-full max-w-[1168px] [grid-area:main]">
+      {content}
+    </article>
   );
 }

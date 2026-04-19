@@ -38,6 +38,34 @@ interface SdkDemoPageClientProps {
   routerConfig?: RouterConfig<AppFileRouter> | null;
 }
 
+function DemoPanels({
+  left,
+  right,
+}: {
+  left: React.ReactNode;
+  right: React.ReactNode;
+}) {
+  return (
+    <>
+      <div className="grid gap-6 lg:hidden">
+        <div className="min-w-0">{left}</div>
+        <div className="min-w-0">{right}</div>
+      </div>
+      <div className="hidden lg:block">
+        <ResizablePanelGroup orientation="horizontal" className="min-w-0">
+          <ResizablePanel defaultSize={"60%"}>
+            <div className="min-w-0">{left}</div>
+          </ResizablePanel>
+          <ResizableHandle className="mx-4" />
+          <ResizablePanel defaultSize={"40%"}>
+            <div className="min-w-0">{right}</div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </div>
+    </>
+  );
+}
+
 function MissingConfigCard({
   title,
   description,
@@ -57,7 +85,7 @@ function MissingConfigCard({
         <ul className="text-fd-muted-foreground list-disc space-y-1 ps-5 text-sm">
           {vars.map((value) => (
             <li key={value}>
-              <code>{value}</code>
+              <code className="break-all">{value}</code>
             </li>
           ))}
         </ul>
@@ -68,13 +96,13 @@ function MissingConfigCard({
 
 function SdkDemoPageSkeleton() {
   return (
-    <div>
-      <div className="flex items-center justify-between pb-4">
+    <div className="min-w-0">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
         <h1 className="text-2xl font-bold">SDK Demo</h1>
         <Skeleton className="size-9 shrink-0 rounded-full" aria-hidden />
       </div>
-      <ResizablePanelGroup orientation="horizontal">
-        <ResizablePanel defaultSize={"60%"}>
+      <DemoPanels
+        left={
           <div className="not-prose grid gap-6">
             <Skeleton className="h-36 w-full rounded-xl" aria-hidden />
             <Card>
@@ -88,10 +116,9 @@ function SdkDemoPageSkeleton() {
               </CardContent>
             </Card>
           </div>
-        </ResizablePanel>
-        <ResizableHandle className="mx-4" />
-        <ResizablePanel defaultSize={"40%"}>
-          <div className="flex h-full min-h-88 flex-col">
+        }
+        right={
+          <div className="flex min-h-0 flex-col lg:h-full lg:min-h-88">
             <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
               <CardHeader className="space-y-2">
                 <Skeleton className="h-5 w-28" aria-hidden />
@@ -99,12 +126,15 @@ function SdkDemoPageSkeleton() {
               </CardHeader>
               <CardContent className="flex min-h-0 flex-1 flex-col gap-2 p-3 pt-0">
                 <Skeleton className="h-9 w-full shrink-0" aria-hidden />
-                <Skeleton className="min-h-48 w-full flex-1 rounded-md" aria-hidden />
+                <Skeleton
+                  className="min-h-48 w-full flex-1 rounded-md"
+                  aria-hidden
+                />
               </CardContent>
             </Card>
           </div>
-        </ResizablePanel>
-      </ResizablePanelGroup>
+        }
+      />
     </div>
   );
 }
@@ -119,35 +149,30 @@ function SdkDemoPageLoadedBody({
   routerConfig?: RouterConfig<AppFileRouter> | null;
 }) {
   return (
-    <div>
-      <div className="flex items-center justify-between pb-4">
+    <div className="min-w-0">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
         <h1 className="text-2xl font-bold">SDK Demo</h1>
 
         <Show when="signed-in">
           <UserButton />
         </Show>
       </div>
-      <ResizablePanelGroup orientation="horizontal">
-        <ResizablePanel defaultSize={"60%"}>
-          <div>
-            {siloConfigured && routerConfig ? (
-              <SiloRouterConfigProvider routerConfig={routerConfig}>
-                <SdkUploadDemo />
-              </SiloRouterConfigProvider>
-            ) : (
-              <MissingConfigCard
-                title="Silo env is not configured for uploads"
-                description="Auth is available, but the upload route and file listing APIs need these values."
-                vars={missingSiloVars}
-              />
-            )}
-          </div>
-        </ResizablePanel>
-        <ResizableHandle className="mx-4" />
-        <ResizablePanel defaultSize={"40%"}>
-          <CodeDemo />
-        </ResizablePanel>
-      </ResizablePanelGroup>
+      <DemoPanels
+        left={
+          siloConfigured && routerConfig ? (
+            <SiloRouterConfigProvider routerConfig={routerConfig}>
+              <SdkUploadDemo />
+            </SiloRouterConfigProvider>
+          ) : (
+            <MissingConfigCard
+              title="Silo env is not configured for uploads"
+              description="Auth is available, but the upload route and file listing APIs need these values."
+              vars={missingSiloVars}
+            />
+          )
+        }
+        right={<CodeDemo />}
+      />
     </div>
   );
 }
@@ -162,7 +187,7 @@ function SdkDemoPageInner({
   routerConfig?: RouterConfig<AppFileRouter> | null;
 }) {
   return (
-    <div className="p-6">
+    <div className="min-w-0 px-4 py-6 sm:px-6">
       <ClerkLoading>
         <SdkDemoPageSkeleton />
       </ClerkLoading>

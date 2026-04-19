@@ -79,8 +79,8 @@ function FileRow({ file }: { file: SiloFileSummary }) {
       : null;
 
   return (
-    <li className="rounded-lg border p-3">
-      <div className="flex items-start justify-between gap-2">
+    <li className="overflow-hidden rounded-lg border p-3">
+      <div className="flex flex-col items-start justify-between gap-2 sm:flex-row">
         <div className="min-w-0">
           <p className="truncate font-medium">{file.fileName}</p>
           <p className="text-fd-muted-foreground text-xs">
@@ -92,15 +92,15 @@ function FileRow({ file }: { file: SiloFileSummary }) {
         </span>
       </div>
 
-      <div className="flex items-start justify-between gap-2">
-        <div className="text-fd-muted-foreground mt-2 space-y-1 text-xs">
+      <div className="mt-2 flex flex-col items-start justify-between gap-3 sm:flex-row">
+        <div className="text-fd-muted-foreground min-w-0 space-y-1 text-xs">
           <p>
             Uploaded: {formatDate(file.uploadCompletedAt ?? file.createdAt)}
           </p>
           <p>
             Expires: {file.expiresAt ? formatDate(file.expiresAt) : "Never"}
           </p>
-          <p className="truncate">fileKeyId: {file.id}</p>
+          <p className="break-all">fileKeyId: {file.id}</p>
         </div>
         {url && (
           <Dialog>
@@ -109,15 +109,21 @@ function FileRow({ file }: { file: SiloFileSummary }) {
                 <Eye />
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
               <DialogHeader>
-                <DialogTitle>{file.fileName}</DialogTitle>
-                <DialogDescription>
+                <DialogTitle className="break-words pr-8">
+                  {file.fileName}
+                </DialogTitle>
+                <DialogDescription className="break-words">
                   {file.mimeType ?? "unknown"} - {formatBytes(file.size)}
                 </DialogDescription>
               </DialogHeader>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt={file.fileName} />
+              <img
+                src={url}
+                alt={file.fileName}
+                className="max-h-[70vh] w-full rounded-md object-contain"
+              />
             </DialogContent>
           </Dialog>
         )}
@@ -155,7 +161,7 @@ export function SdkUploadDemo() {
   return (
     <div className="not-prose grid gap-6">
       <Show when="signed-out">
-        <Card className="max-w-xl">
+        <Card className="max-w-xl min-w-0">
           <CardHeader>
             <CardTitle>Sign in to try the SDK demo</CardTitle>
             <CardDescription>
@@ -177,13 +183,13 @@ export function SdkUploadDemo() {
         <UploadDropzone
           upload={upload}
           clickable
-          className="text-fd-muted-foreground data-[dragging=true]:border-primary data-[dragging=true]:bg-primary/10 data-[dragging=true]:text-foreground data-[dragging=true]:ring-primary/40 flex h-36 w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed text-center transition-all duration-150 data-[can-upload=false]:cursor-not-allowed data-[disabled=true]:cursor-not-allowed data-[disabled=true]:opacity-50 data-[dragging=true]:border-solid data-[dragging=true]:shadow-md data-[dragging=true]:ring-2 data-[uploading=true]:pointer-events-none data-[uploading=true]:opacity-60"
+          className="text-fd-muted-foreground data-[dragging=true]:border-primary data-[dragging=true]:bg-primary/10 data-[dragging=true]:text-foreground data-[dragging=true]:ring-primary/40 flex h-36 w-full min-w-0 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-4 text-center transition-all duration-150 data-[can-upload=false]:cursor-not-allowed data-[disabled=true]:cursor-not-allowed data-[disabled=true]:opacity-50 data-[dragging=true]:border-solid data-[dragging=true]:shadow-md data-[dragging=true]:ring-2 data-[uploading=true]:pointer-events-none data-[uploading=true]:opacity-60"
         >
           {upload.isUploading ? (
             <>
               <Loader2 className="size-4 animate-spin" />
               Uploading...
-              <p className="text-fd-muted-foreground text-sm">
+              <p className="text-fd-muted-foreground break-all text-sm">
                 {upload.currentUploadingFile?.name} -{" "}
                 {upload.progress.aggregatePercent}%
               </p>
@@ -197,9 +203,9 @@ export function SdkUploadDemo() {
 
           {listError && <p className="text-sm text-red-500">{listError}</p>}
         </UploadDropzone>
-        <Card>
+        <Card className="min-w-0">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex min-w-0 items-center gap-2">
               My files{" "}
               {myFilesQuery.isLoading && (
                 <Loader2 className="size-4 animate-spin" />
