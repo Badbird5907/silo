@@ -26,7 +26,8 @@ export interface SignedUploadUrlParams {
   expiresIn?: number; // seconds, optional - no expiry if omitted
   keyId: string; // Unique API key record id for server-side key lookup
   isPublic?: boolean; // optional - whether file should be publicly accessible
-  protocol?: "http" | "https"; // optional - defaults to https
+  /** Used when `workerDomain` has no scheme; ignored if `workerDomain` is `http://...` or `https://...`. */
+  protocol?: "http" | "https";
   acceptedMimeTypes?: string[]; // optional - shorthand keys or exact MIME values
 }
 
@@ -108,24 +109,59 @@ const IMAGE_FORMAT_VALUES = new Set<ImageFormat>([
   "png",
 ]);
 
+/**
+ * Host (and optional port) plus scheme. If `workerDomain` includes `http://` or `https://`,
+ * that scheme wins. For a bare host, uses `protocolOverride` when set, otherwise `https`.
+ */
+function resolveWorkerDomain(
+  workerDomain: string,
+  protocolOverride?: "http" | "https",
+): { host: string; protocol: "http" | "https" } {
+  let host = workerDomain.trim();
+  const lower = host.toLowerCase();
+  if (lower.startsWith("https://")) {
+    host = host.slice("https://".length);
+    return {
+      host: host.replace(/\/+$/, ""),
+      protocol: "https",
+    };
+  }
+  if (lower.startsWith("http://")) {
+    host = host.slice("http://".length);
+    return {
+      host: host.replace(/\/+$/, ""),
+      protocol: "http",
+    };
+  }
+  return {
+    host: host.replace(/\/+$/, ""),
+    protocol: protocolOverride ?? "https",
+  };
+}
+
 function buildProjectScopedUrl(
   workerDomain: string,
   projectSlug: string,
   routePath: string,
-  protocol: "http" | "https",
   routing?: SignedUrlRoutingOptions,
+  protocolOverride?: "http" | "https",
 ): URL {
+  const { host, protocol } = resolveWorkerDomain(
+    workerDomain,
+    protocolOverride,
+  );
   const normalizedPath = routePath.startsWith("/")
     ? routePath
     : `/${routePath}`;
+
   if (routing?.routeMode === "path") {
     return new URL(
-      `${protocol}://${workerDomain}${PROJECT_ROUTE_PREFIX}/${projectSlug}${normalizedPath}`,
+      `${protocol}://${host}${PROJECT_ROUTE_PREFIX}/${projectSlug}${normalizedPath}`,
     );
   }
 
   return new URL(
-    `${protocol}://${projectSlug}.${workerDomain}${normalizedPath}`,
+    `${protocol}://${projectSlug}.${host}${normalizedPath}`,
   );
 }
 
@@ -330,13 +366,12 @@ export async function generateSignedUploadUrl(
 
   const signature = await createSignature(payload, signingSecret);
 
-  const protocol = params.protocol ?? "https";
   const url = buildProjectScopedUrl(
     workerDomain,
     projectSlug,
     "/ingest/tus",
-    protocol,
     routing,
+    params.protocol,
   );
   Object.entries(payload).forEach(([key, value]) => {
     if (key !== "type") {
@@ -393,13 +428,12 @@ export async function generateSignedUploadUrlWithSecret(
 
   const signature = await createSignature(payload, signingSecret);
 
-  const protocol = params.protocol ?? "https";
   const url = buildProjectScopedUrl(
     workerDomain,
     projectSlug,
     "/ingest/tus",
-    protocol,
     routing,
+    params.protocol,
   );
   Object.entries(payload).forEach(([key, value]) => {
     if (key !== "type") {
@@ -470,7 +504,6 @@ export async function generateSignedDownloadUrl(
     workerDomain,
     projectSlug,
     `/f/${params.accessKey}`,
-    "https",
     routing,
   );
   url.searchParams.set("expiresAt", expiresAt.toString());
@@ -504,7 +537,6 @@ export function generatePublicDownloadUrl(
     workerDomain,
     projectSlug,
     `/f/${accessKey}`,
-    "https",
     routing,
   );
 
@@ -546,7 +578,6 @@ export async function generateSignedImageUrl(
     workerDomain,
     projectSlug,
     `/i/${params.accessKey}`,
-    "https",
     routing,
   );
   url.searchParams.set("expiresAt", expiresAt.toString());
@@ -585,7 +616,6 @@ export function generatePublicImageUrl(
     workerDomain,
     projectSlug,
     `/i/${accessKey}`,
-    "https",
     routing,
   );
 

@@ -25,6 +25,26 @@ export interface GenerateDownloadUrlInput {
   projectSlug?: string;
 }
 
+export interface GenerateUrlFileLike {
+  accessKey: string;
+  fileName?: string;
+  fileKeyId?: string;
+  id?: string;
+  isPublic?: boolean;
+  serveImage?: boolean | null;
+}
+
+export interface GenerateUrlOverrideBase {
+  sign?: boolean;
+  fileName?: string;
+  fileKeyId?: string;
+  expiresIn?: number;
+  projectSlug?: string;
+}
+
+export interface GenerateDownloadUrlOverrides
+  extends GenerateUrlOverrideBase {}
+
 export interface GenerateImageUrlInput {
   accessKey: string;
   isPublic: boolean;
@@ -33,6 +53,12 @@ export interface GenerateImageUrlInput {
   fileName?: string;
   expiresIn?: number;
   projectSlug?: string;
+  width?: number;
+  quality?: number;
+  format?: "auto" | "avif" | "webp" | "jpeg" | "jpg" | "png";
+}
+
+export interface GenerateImageUrlOverrides extends GenerateUrlOverrideBase {
   width?: number;
   quality?: number;
   format?: "auto" | "avif" | "webp" | "jpeg" | "jpg" | "png";

@@ -10,7 +10,7 @@ import {
   UserButton,
 } from "@clerk/nextjs";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, RefreshCcw, Upload } from "lucide-react";
+import { Loader2, RefreshCcw } from "lucide-react";
 
 import { Button } from "@silo-storage/ui/components/button";
 import {
@@ -20,9 +20,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@silo-storage/ui/components/card";
-import { Progress } from "@silo-storage/ui/components/progress";
-
-import { useUpload } from "@/lib/sdk-demo/upload";
+import { UploadDropzone } from "@/lib/sdk-demo/upload";
 
 interface MyFilesApiResponse {
   data: ListFilesResult;
@@ -117,26 +115,37 @@ export function SdkUploadDemo() {
     uploadError ??
     (myFilesQuery.error instanceof Error ? myFilesQuery.error.message : null);
 
-  const upload = useUpload({
-    endpoint: "imageUploader",
-    onComplete: () => {
-      setUploadError(null);
-      void myFilesQuery.refetch();
-    },
-    onError: (error) => {
-      setUploadError(error.message);
-    },
-  });
-
   return (
     <div className="not-prose grid gap-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">SDK Demo</h1>
+
+        <Show when="signed-in">
+          <div className="flex items-center gap-4">
+            <button
+              className="cursor-pointer"
+              disabled={myFilesQuery.isFetching}
+              onClick={() => {
+                setUploadError(null);
+                void myFilesQuery.refetch();
+              }}
+            >
+              {myFilesQuery.isFetching ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <RefreshCcw className="size-4" />
+              )}
+            </button>
+            <UserButton />
+          </div>
+        </Show>
+      </div>
       <Show when="signed-out">
         <Card className="max-w-xl">
           <CardHeader>
             <CardTitle>Sign in to try the SDK demo</CardTitle>
             <CardDescription>
-              Upload a couple of test images and view the files tied to your
-              account.
+              Please sign in to try out the demo!
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-3">
@@ -151,81 +160,21 @@ export function SdkUploadDemo() {
       </Show>
 
       <Show when="signed-in">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-3">
-            <div>
-              <CardTitle>SDK demo</CardTitle>
-              <CardDescription>
-                Upload files and inspect the records associated with your user.
-              </CardDescription>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <button
-                className="cursor-pointer"
-                disabled={myFilesQuery.isFetching}
-                onClick={() => {
-                  setUploadError(null);
-                  void myFilesQuery.refetch();
-                }}
-              >
-                {myFilesQuery.isFetching ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <RefreshCcw className="size-4" />
-                )}
-              </button>
-
-              <UserButton />
-
-              <Button
-                variant="outline"
-                disabled={upload.isUploading || !userId}
-                onClick={() => {
-                  if (!userId) return;
-                  void upload.beginUpload({ awaitTimeoutMs: 60_000 });
-                }}
-              >
-                {upload.isUploading ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Upload className="size-4" />
-                )}
-                {upload.isUploading ? "Uploading..." : "Upload images"}
-              </Button>
-            </div>
-          </CardHeader>
-
-          <CardContent className="space-y-3">
-            {upload.isUploading ? (
-              <div className="space-y-2">
-                <p className="text-fd-muted-foreground text-sm">
-                  Upload progress:{" "}
-                  {Math.round(upload.progress.aggregatePercent)}%
-                </p>
-                {upload.currentUploadingFile ? (
-                  <p className="text-fd-muted-foreground text-sm">
-                    Uploading: {upload.currentUploadingFile.name} (
-                    {formatBytes(upload.currentUploadingFile.size)})
-                  </p>
-                ) : null}
-                <Progress value={upload.progress.aggregatePercent} />
-              </div>
-            ) : null}
-
-            {listError ? (
-              <p className="text-sm text-red-500">{listError}</p>
-            ) : null}
-          </CardContent>
-        </Card>
+        <UploadDropzone
+          endpoint="imageUploader"
+          onComplete={() => {
+            setUploadError(null);
+            void myFilesQuery.refetch();
+          }}
+          onError={(error) => {
+            setUploadError(error.message);
+          }}
+        />
 
         <Card>
           <CardHeader>
             <CardTitle>My files</CardTitle>
-            <CardDescription>
-              Uploaded files for the signed-in demo user, including deleted
-              records.
-            </CardDescription>
+            <CardDescription>The files you have uploaded</CardDescription>
           </CardHeader>
 
           <CardContent>

@@ -25,6 +25,7 @@ export const fileRouter = {
     })
     .expires("2 minutes")
     .public(false)
+    .serveImage(true)
     .onUploadComplete(({ metadata, file }) => {
       console.info("[sdk-demo:onUploadComplete]", { metadata, file });
 

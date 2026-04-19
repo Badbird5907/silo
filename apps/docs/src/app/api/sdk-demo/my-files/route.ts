@@ -23,14 +23,27 @@ export async function GET(request: Request) {
   );
 
   try {
-    const result = await getSiloCore().listFiles({
+    const silo = getSiloCore();
+    const result = await silo.listFiles({
       page,
       pageSize,
       status: "all",
       metadata: { userId },
     });
 
-    return new Response(JSON.stringify({ data: result }), {
+    const data = {
+      data: {
+        ...result,
+        files: await Promise.all(
+          result.files.map(async (file) => ({
+            ...file,
+            url: file.status === "completed" ? await silo.generateImageUrl(file) : null,
+          })),
+        ),
+      },
+    };
+
+    return new Response(JSON.stringify(data), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });

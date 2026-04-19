@@ -70,6 +70,51 @@ const downloadUrl = await uploadCore.generateDownloadUrl({
 });
 ```
 
+## URL Generation
+
+
+```ts
+const downloadUrl = await uploadCore.generateDownloadUrl({
+  accessKey: "file-access-key",
+  isPublic: false,
+  fileName: "photo.png",
+});
+
+const imageUrl = await uploadCore.generateImageUrl({
+  accessKey: "file-access-key",
+  isPublic: false,
+  serveImage: true,
+  fileName: "photo.png",
+});
+```
+
+You can also generate URLs from an access key or file-like object.
+Bare access keys default to signed/private-style URLs.
+
+```ts
+const signedDownloadUrl =
+  await uploadCore.generateDownloadUrl("file-access-key");
+
+const publicDownloadUrl = await uploadCore.generateDownloadUrl(
+  "file-access-key",
+  { sign: false },
+);
+
+const imageFromFile = await uploadCore.generateImageUrl(prepared.file);
+
+const signedImageUrl = await uploadCore.generateImageUrl("file-access-key", {
+  width: 800,
+});
+
+const publicImageUrl = await uploadCore.generateImageUrl("file-access-key", {
+  sign: false,
+  width: 800,
+});
+```
+
+`sign` is only available on the overload override object.
+The existing explicit object API continues to use `isPublic` and `serveImage`.
+
 `SILO_TOKEN` is a base64url JSON payload with compact keys:
 
 - `v` version

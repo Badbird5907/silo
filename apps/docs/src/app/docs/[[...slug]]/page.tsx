@@ -1,13 +1,13 @@
-import { notFound } from "next/navigation";
+import type { TOCItemType } from "fumadocs-core/toc";
+import type { MDXComponents } from "mdx/types";
 import type { ComponentType } from "react";
+import { notFound } from "next/navigation";
 import {
   DocsBody,
   DocsDescription,
   DocsPage,
   DocsTitle,
 } from "fumadocs-ui/layouts/docs/page";
-import type { TOCItemType } from "fumadocs-core/toc";
-import type { MDXComponents } from "mdx/types";
 
 import { getMDXComponents } from "@/components/mdx";
 import { source } from "@/lib/source";
@@ -15,6 +15,7 @@ import { source } from "@/lib/source";
 interface DocPageData {
   title: string;
   description?: string;
+  full?: boolean;
   body: ComponentType<{ components?: MDXComponents }>;
   toc: TOCItemType[];
 }
@@ -38,11 +39,19 @@ export default async function DocPage({
   const Mdx = page.data.body;
 
   return (
-    <DocsPage toc={page.data.toc} tableOfContent={{
-      style: "clerk"
-    }}>
-      <DocsTitle>{page.data.title}</DocsTitle>
-      <DocsDescription>{page.data.description}</DocsDescription>
+    <DocsPage
+      toc={page.data.toc}
+      tableOfContent={{
+        style: "clerk",
+      }}
+      full={page.data.full}
+    >
+      {!page.data.full && (
+        <>
+          <DocsTitle>{page.data.title}</DocsTitle>
+          <DocsDescription>{page.data.description}</DocsDescription>
+        </>
+      )}
       <DocsBody>
         <Mdx components={getMDXComponents()} />
       </DocsBody>

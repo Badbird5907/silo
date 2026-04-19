@@ -5,7 +5,10 @@ import type { UpdateFileExpiryInput, UpdateFileExpiryResult } from "./expiry";
 import type { CreateSiloCoreFromTokenInput } from "./token";
 import type {
   GenerateDownloadUrlInput,
+  GenerateDownloadUrlOverrides,
   GenerateImageUrlInput,
+  GenerateImageUrlOverrides,
+  GenerateUrlFileLike,
   GetFileInput,
   ListFilesInput,
   ListFilesResult,
@@ -69,6 +72,87 @@ function requireAbsoluteCallbackUrl(value: string): string {
     );
   }
   return value;
+}
+
+type GenerateDownloadUrlSource =
+  | string
+  | GenerateDownloadUrlInput
+  | GenerateUrlFileLike;
+type GenerateImageUrlSource =
+  | string
+  | GenerateImageUrlInput
+  | GenerateUrlFileLike;
+type GenerateDownloadUrlObjectSource = GenerateUrlFileLike &
+  Partial<GenerateDownloadUrlInput>;
+type GenerateImageUrlObjectSource = GenerateUrlFileLike &
+  Partial<GenerateImageUrlInput>;
+
+interface NormalizedGenerateDownloadUrlInput {
+  input: GenerateDownloadUrlInput;
+  sign?: boolean;
+}
+
+interface NormalizedGenerateImageUrlInput {
+  input: GenerateImageUrlInput;
+  sign?: boolean;
+}
+
+function resolveGenerateUrlFileKeyId(
+  source: GenerateDownloadUrlInput | GenerateImageUrlInput | GenerateUrlFileLike,
+): string {
+  return source.fileKeyId ?? ("id" in source ? source.id : undefined) ?? source.accessKey;
+}
+
+function normalizeGenerateDownloadUrlInput(
+  source: GenerateDownloadUrlSource,
+  overrides?: GenerateDownloadUrlOverrides,
+): NormalizedGenerateDownloadUrlInput {
+  const sourceInput: GenerateDownloadUrlObjectSource =
+    typeof source === "string" ? { accessKey: source } : source;
+
+  return {
+    sign: overrides?.sign,
+    input: {
+      accessKey: sourceInput.accessKey,
+      isPublic:
+        overrides?.sign === undefined
+          ? sourceInput.isPublic ?? false
+          : !overrides.sign,
+      fileKeyId:
+        overrides?.fileKeyId ?? resolveGenerateUrlFileKeyId(sourceInput),
+      fileName: overrides?.fileName ?? sourceInput.fileName,
+      expiresIn: overrides?.expiresIn ?? sourceInput.expiresIn,
+      projectSlug: overrides?.projectSlug ?? sourceInput.projectSlug,
+    },
+  };
+}
+
+function normalizeGenerateImageUrlInput(
+  source: GenerateImageUrlSource,
+  overrides?: GenerateImageUrlOverrides,
+): NormalizedGenerateImageUrlInput {
+  const sourceInput: GenerateImageUrlObjectSource =
+    typeof source === "string" ? { accessKey: source } : source;
+
+  return {
+    sign: overrides?.sign,
+    input: {
+      accessKey: sourceInput.accessKey,
+      isPublic:
+        overrides?.sign === undefined
+          ? sourceInput.isPublic ?? false
+          : !overrides.sign,
+      serveImage: sourceInput.serveImage ?? null,
+      fileKeyId:
+        overrides?.fileKeyId ?? resolveGenerateUrlFileKeyId(sourceInput),
+      fileName: overrides?.fileName ?? sourceInput.fileName,
+      expiresIn: overrides?.expiresIn ?? sourceInput.expiresIn,
+      projectSlug: overrides?.projectSlug ?? sourceInput.projectSlug,
+      width: overrides?.width ?? sourceInput.width,
+      quality: overrides?.quality ?? sourceInput.quality,
+      format: overrides?.format ?? sourceInput.format,
+    },
+  };
 }
 
 export function createSiloCore(config: UploadCoreConfig) {
@@ -468,7 +552,21 @@ export function createSiloCore(config: UploadCoreConfig) {
 
   async function generateDownloadUrl(
     input: GenerateDownloadUrlInput,
+  ): Promise<string>;
+  async function generateDownloadUrl(
+    accessKey: string,
+    overrides?: GenerateDownloadUrlOverrides,
+  ): Promise<string>;
+  async function generateDownloadUrl(
+    file: GenerateUrlFileLike,
+    overrides?: GenerateDownloadUrlOverrides,
+  ): Promise<string>;
+  async function generateDownloadUrl(
+    source: GenerateDownloadUrlSource,
+    overrides?: GenerateDownloadUrlOverrides,
   ): Promise<string> {
+    const normalized = normalizeGenerateDownloadUrlInput(source, overrides);
+    const { input, sign } = normalized;
     const projectSlug = input.projectSlug ?? config.projectSlug;
     if (!projectSlug) {
       throw new Error(
@@ -476,7 +574,7 @@ export function createSiloCore(config: UploadCoreConfig) {
       );
     }
 
-    if (input.isPublic) {
+    if (sign === false || (sign === undefined && input.isPublic)) {
       return generatePublicDownloadUrl(
         config.ingestServer,
         projectSlug,
@@ -509,7 +607,21 @@ export function createSiloCore(config: UploadCoreConfig) {
 
   async function generateImageUrl(
     input: GenerateImageUrlInput,
+  ): Promise<string>;
+  async function generateImageUrl(
+    accessKey: string,
+    overrides?: GenerateImageUrlOverrides,
+  ): Promise<string>;
+  async function generateImageUrl(
+    file: GenerateUrlFileLike,
+    overrides?: GenerateImageUrlOverrides,
+  ): Promise<string>;
+  async function generateImageUrl(
+    source: GenerateImageUrlSource,
+    overrides?: GenerateImageUrlOverrides,
   ): Promise<string> {
+    const normalized = normalizeGenerateImageUrlInput(source, overrides);
+    const { input, sign } = normalized;
     const projectSlug = input.projectSlug ?? config.projectSlug;
     if (!projectSlug) {
       throw new Error(
@@ -517,7 +629,11 @@ export function createSiloCore(config: UploadCoreConfig) {
       );
     }
 
-    if (input.isPublic) {
+    if (
+      sign === false ||
+      (sign === undefined &&
+        (input.isPublic || input.serveImage === true))
+    ) {
       return generatePublicImageUrl(
         config.ingestServer,
         projectSlug,

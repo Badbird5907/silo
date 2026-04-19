@@ -11,6 +11,7 @@ export interface UploadDropzoneProps<
   TRouter extends AnyFileRouterLike,
   TEndpoint extends RouteSlug<TRouter>,
 > extends UseUploadOptions<TRouter, TEndpoint> {
+  upload?: UseUploadResult<TRouter, TEndpoint>;
   disabled?: boolean;
   input?: unknown;
   awaitTimeoutMs?: number;
@@ -42,7 +43,7 @@ export function UploadDropzone<
     className,
     children,
   } = props;
-  const upload = useUpload({
+  const uploadInternal = useUpload({
     endpoint,
     onUploadBegin,
     onUploadProgress,
@@ -52,6 +53,7 @@ export function UploadDropzone<
     onFileDialogCancel,
   });
   const [isDragging, setIsDragging] = React.useState(false);
+  const upload = props.upload ?? uploadInternal;
 
   const canUpload = !disabled && !upload.isUploading;
 
