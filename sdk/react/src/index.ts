@@ -1,7 +1,15 @@
 import * as React from "react";
 
-import type { UploadButtonProps } from "./components/upload-button";
-import type { UploadDropzoneProps } from "./components/upload-dropzone";
+import type {
+  UploadButtonProps,
+  UploadButtonWithExternalUploadProps,
+  UploadButtonWithHookProps,
+} from "./components/upload-button";
+import type {
+  UploadDropzoneProps,
+  UploadDropzoneWithExternalUploadProps,
+  UploadDropzoneWithHookProps,
+} from "./components/upload-dropzone";
 import type {
   AnyFileRouterLike,
   RouterConfigLike,
@@ -32,6 +40,40 @@ export interface CreateSiloReactOptions {
   fetch?: typeof fetch;
   routerConfig?: RouterConfigLike;
 }
+
+type UploadButtonHookComponentProps<
+  TRouter extends AnyFileRouterLike,
+  TEndpoint extends RouteSlug<TRouter>,
+> = Omit<UploadButtonWithHookProps<TRouter, TEndpoint>, "useUpload">;
+
+type UploadButtonExternalComponentProps<
+  TRouter extends AnyFileRouterLike,
+  TEndpoint extends RouteSlug<TRouter>,
+> = Omit<UploadButtonWithExternalUploadProps<TRouter, TEndpoint>, "useUpload">;
+
+type UploadButtonComponentProps<
+  TRouter extends AnyFileRouterLike,
+  TEndpoint extends RouteSlug<TRouter>,
+> =
+  | UploadButtonHookComponentProps<TRouter, TEndpoint>
+  | UploadButtonExternalComponentProps<TRouter, TEndpoint>;
+
+type UploadDropzoneHookComponentProps<
+  TRouter extends AnyFileRouterLike,
+  TEndpoint extends RouteSlug<TRouter>,
+> = Omit<UploadDropzoneWithHookProps<TRouter, TEndpoint>, "useUpload">;
+
+type UploadDropzoneExternalComponentProps<
+  TRouter extends AnyFileRouterLike,
+  TEndpoint extends RouteSlug<TRouter>,
+> = Omit<UploadDropzoneWithExternalUploadProps<TRouter, TEndpoint>, "useUpload">;
+
+type UploadDropzoneComponentProps<
+  TRouter extends AnyFileRouterLike,
+  TEndpoint extends RouteSlug<TRouter>,
+> =
+  | UploadDropzoneHookComponentProps<TRouter, TEndpoint>
+  | UploadDropzoneExternalComponentProps<TRouter, TEndpoint>;
 
 export function createSiloReact<TRouter extends AnyFileRouterLike>(
   options: CreateSiloReactOptions,
@@ -80,27 +122,39 @@ export function createSiloReact<TRouter extends AnyFileRouterLike>(
   }
 
   function UploadButton<TEndpoint extends RouteSlug<TRouter>>(
-    props: Omit<UploadButtonProps<TRouter, TEndpoint>, "useUpload">,
-  ) {
+    props: UploadButtonHookComponentProps<TRouter, TEndpoint>,
+  ): React.ReactElement;
+  function UploadButton<TEndpoint extends RouteSlug<TRouter>>(
+    props: UploadButtonExternalComponentProps<TRouter, TEndpoint>,
+  ): React.ReactElement;
+  function UploadButton<TEndpoint extends RouteSlug<TRouter>>(
+    props: UploadButtonComponentProps<TRouter, TEndpoint>,
+  ): React.ReactElement {
     const component = UploadButtonImpl as React.JSXElementConstructor<
       UploadButtonProps<TRouter, TEndpoint>
     >;
     return React.createElement(component, {
-      ...props,
+      ...(props as UploadButtonComponentProps<TRouter, TEndpoint>),
       useUpload,
-    });
+    } as UploadButtonProps<TRouter, TEndpoint>);
   }
 
   function UploadDropzone<TEndpoint extends RouteSlug<TRouter>>(
-    props: Omit<UploadDropzoneProps<TRouter, TEndpoint>, "useUpload">,
-  ) {
+    props: UploadDropzoneHookComponentProps<TRouter, TEndpoint>,
+  ): React.ReactElement;
+  function UploadDropzone<TEndpoint extends RouteSlug<TRouter>>(
+    props: UploadDropzoneExternalComponentProps<TRouter, TEndpoint>,
+  ): React.ReactElement;
+  function UploadDropzone<TEndpoint extends RouteSlug<TRouter>>(
+    props: UploadDropzoneComponentProps<TRouter, TEndpoint>,
+  ): React.ReactElement {
     const component = UploadDropzoneImpl as React.JSXElementConstructor<
       UploadDropzoneProps<TRouter, TEndpoint>
     >;
     return React.createElement(component, {
-      ...props,
+      ...(props as UploadDropzoneComponentProps<TRouter, TEndpoint>),
       useUpload,
-    });
+    } as UploadDropzoneProps<TRouter, TEndpoint>);
   }
 
   return {

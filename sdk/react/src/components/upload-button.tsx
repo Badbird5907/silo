@@ -7,50 +7,70 @@ import type {
   UseUploadResult,
 } from "../types";
 
-export interface UploadButtonProps<
-  TRouter extends AnyFileRouterLike,
-  TEndpoint extends RouteSlug<TRouter>,
-> extends UseUploadOptions<TRouter, TEndpoint> {
+interface UploadButtonBaseProps {
   multiple?: boolean;
   disabled?: boolean;
   input?: unknown;
   awaitTimeoutMs?: number;
   concurrency?: number;
   children?: React.ReactNode;
+}
+
+export interface UploadButtonWithHookProps<
+  TRouter extends AnyFileRouterLike,
+  TEndpoint extends RouteSlug<TRouter>,
+> extends UploadButtonBaseProps,
+    UseUploadOptions<TRouter, TEndpoint> {
+  upload?: never;
   useUpload: (
     options: UseUploadOptions<TRouter, TEndpoint>,
   ) => UseUploadResult<TRouter, TEndpoint>;
 }
 
-export function UploadButton<
+export interface UploadButtonWithExternalUploadProps<
   TRouter extends AnyFileRouterLike,
   TEndpoint extends RouteSlug<TRouter>,
->(props: UploadButtonProps<TRouter, TEndpoint>) {
+> extends UploadButtonBaseProps {
+  upload: UseUploadResult<TRouter, TEndpoint>;
+  endpoint?: never;
+  onUploadBegin?: never;
+  onUploadProgress?: never;
+  onComplete?: never;
+  onError?: never;
+  onUploadAborted?: never;
+  onFileDialogCancel?: never;
+  useUpload: (
+    options: UseUploadOptions<TRouter, TEndpoint>,
+  ) => UseUploadResult<TRouter, TEndpoint>;
+}
+
+export type UploadButtonProps<
+  TRouter extends AnyFileRouterLike,
+  TEndpoint extends RouteSlug<TRouter>,
+> =
+  | UploadButtonWithHookProps<TRouter, TEndpoint>
+  | UploadButtonWithExternalUploadProps<TRouter, TEndpoint>;
+
+interface UploadButtonRootProps<
+  TRouter extends AnyFileRouterLike,
+  TEndpoint extends RouteSlug<TRouter>,
+> extends UploadButtonBaseProps {
+  upload: UseUploadResult<TRouter, TEndpoint>;
+}
+
+function UploadButtonRoot<
+  TRouter extends AnyFileRouterLike,
+  TEndpoint extends RouteSlug<TRouter>,
+>(props: UploadButtonRootProps<TRouter, TEndpoint>) {
   const {
-    useUpload,
-    endpoint,
-    onUploadBegin,
-    onUploadProgress,
-    onComplete,
-    onError,
-    onUploadAborted,
-    onFileDialogCancel,
-    disabled,
+    upload,
     multiple,
+    disabled,
     input,
     awaitTimeoutMs,
     concurrency,
     children,
   } = props;
-  const upload = useUpload({
-    endpoint,
-    onUploadBegin,
-    onUploadProgress,
-    onComplete,
-    onError,
-    onUploadAborted,
-    onFileDialogCancel,
-  });
   const inputRef = React.useRef<HTMLInputElement>(null);
   const isDisabled = disabled === true || upload.isUploading;
   const handleClick = () => inputRef.current?.click();
@@ -101,4 +121,87 @@ export function UploadButton<
       )}
     </>
   );
+}
+
+function UploadButtonWithHook<
+  TRouter extends AnyFileRouterLike,
+  TEndpoint extends RouteSlug<TRouter>,
+>(props: UploadButtonWithHookProps<TRouter, TEndpoint>) {
+  const {
+    useUpload,
+    endpoint,
+    onUploadBegin,
+    onUploadProgress,
+    onComplete,
+    onError,
+    onUploadAborted,
+    onFileDialogCancel,
+    multiple,
+    disabled,
+    input,
+    awaitTimeoutMs,
+    concurrency,
+    children,
+  } = props;
+  const upload = useUpload({
+    endpoint,
+    onUploadBegin,
+    onUploadProgress,
+    onComplete,
+    onError,
+    onUploadAborted,
+    onFileDialogCancel,
+  });
+
+  return (
+    <UploadButtonRoot
+      upload={upload}
+      multiple={multiple}
+      disabled={disabled}
+      input={input}
+      awaitTimeoutMs={awaitTimeoutMs}
+      concurrency={concurrency}
+      children={children}
+    />
+  );
+}
+
+function hasExternalUpload<
+  TRouter extends AnyFileRouterLike,
+  TEndpoint extends RouteSlug<TRouter>,
+>(
+  props: UploadButtonProps<TRouter, TEndpoint>,
+): props is UploadButtonWithExternalUploadProps<TRouter, TEndpoint> {
+  return "upload" in props && props.upload !== undefined;
+}
+
+export function UploadButton<
+  TRouter extends AnyFileRouterLike,
+  TEndpoint extends RouteSlug<TRouter>,
+>(props: UploadButtonProps<TRouter, TEndpoint>) {
+  if (hasExternalUpload(props)) {
+    const {
+      upload,
+      multiple,
+      disabled,
+      input,
+      awaitTimeoutMs,
+      concurrency,
+      children,
+    } = props;
+
+    return (
+      <UploadButtonRoot
+        upload={upload}
+        multiple={multiple}
+        disabled={disabled}
+        input={input}
+        awaitTimeoutMs={awaitTimeoutMs}
+        concurrency={concurrency}
+        children={children}
+      />
+    );
+  }
+
+  return <UploadButtonWithHook {...props} />;
 }

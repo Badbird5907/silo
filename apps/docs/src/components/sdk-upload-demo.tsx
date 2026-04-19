@@ -10,7 +10,7 @@ import {
   UserButton,
 } from "@clerk/nextjs";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, RefreshCcw } from "lucide-react";
+import { Loader2, RefreshCcw, UploadIcon } from "lucide-react";
 
 import { Button } from "@silo-storage/ui/components/button";
 import {
@@ -20,7 +20,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@silo-storage/ui/components/card";
-import { UploadDropzone } from "@/lib/sdk-demo/upload";
+
+import { UploadDropzone, useUpload } from "@/lib/sdk-demo/upload";
 
 interface MyFilesApiResponse {
   data: ListFilesResult;
@@ -115,6 +116,17 @@ export function SdkUploadDemo() {
     uploadError ??
     (myFilesQuery.error instanceof Error ? myFilesQuery.error.message : null);
 
+  const upload = useUpload({
+    endpoint: "imageUploader",
+    onComplete: () => {
+      setUploadError(null);
+      void myFilesQuery.refetch();
+    },
+    onError: (error) => {
+      setUploadError(error.message);
+    },
+  });
+
   return (
     <div className="not-prose grid gap-6">
       <div className="flex items-center justify-between">
@@ -161,16 +173,28 @@ export function SdkUploadDemo() {
 
       <Show when="signed-in">
         <UploadDropzone
-          endpoint="imageUploader"
-          onComplete={() => {
-            setUploadError(null);
-            void myFilesQuery.refetch();
-          }}
-          onError={(error) => {
-            setUploadError(error.message);
-          }}
-        />
+          upload={upload}
+          clickable
+          className="text-fd-muted-foreground data-[dragging=true]:border-primary data-[dragging=true]:bg-primary/10 data-[dragging=true]:text-foreground data-[dragging=true]:ring-primary/40 flex h-36 w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed text-center transition-all duration-150 data-[can-upload=false]:cursor-not-allowed data-[disabled=true]:cursor-not-allowed data-[disabled=true]:opacity-50 data-[dragging=true]:border-solid data-[dragging=true]:shadow-md data-[dragging=true]:ring-2 data-[uploading=true]:pointer-events-none data-[uploading=true]:opacity-60"
+        >
+          {upload.isUploading ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              Uploading...
+              <p className="text-fd-muted-foreground text-sm">
+                {upload.currentUploadingFile?.name} -{" "}
+                {upload.progress.aggregatePercent}%
+              </p>
+            </>
+          ) : (
+            <>
+              <UploadIcon />
+              Drop files here (or click)
+            </>
+          )}
 
+          {listError && <p className="text-sm text-red-500">{listError}</p>}
+        </UploadDropzone>
         <Card>
           <CardHeader>
             <CardTitle>My files</CardTitle>
