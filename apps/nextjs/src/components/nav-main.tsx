@@ -92,7 +92,7 @@ export function NavMain({ items, label = "Platform" }: NavMainProps) {
                       return (
                         <SidebarMenuSubItem key={subItem.title}>
                           <SidebarMenuSubButton asChild isActive={isSubActive}>
-                            <Link href={subItem.url}>
+                            <Link href={subItem.url} prefetch={true}>
                               <span>{subItem.title}</span>
                             </Link>
                           </SidebarMenuSubButton>
