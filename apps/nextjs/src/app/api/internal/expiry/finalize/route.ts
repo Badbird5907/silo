@@ -43,48 +43,68 @@ export async function POST(request: Request) {
   const now = new Date();
 
   try {
-    const candidates = await db
-      .select({ fileId: fileKeys.fileId })
-      .from(fileKeys)
-      .where(
-        and(
-          inArray(fileKeys.fileId, parsed.data.fileIds),
-          eq(fileKeys.status, "completed"),
-          isNotNull(fileKeys.fileId),
-          isNotNull(fileKeys.expiresAt),
-          lte(fileKeys.expiresAt, now),
+    const { deleted, deletedFiles } = await db.transaction(async (tx) => {
+      const candidates = await tx
+        .select({
+          fileKeyId: fileKeys.id,
+          fileId: fileKeys.fileId,
+        })
+        .from(fileKeys)
+        .where(
+          and(
+            inArray(fileKeys.fileId, parsed.data.fileIds),
+            eq(fileKeys.status, "completed"),
+            isNotNull(fileKeys.fileId),
+            isNotNull(fileKeys.expiresAt),
+            lte(fileKeys.expiresAt, now),
+          ),
+        );
+
+      const deletableFileIds = [
+        ...new Set(
+          candidates.map((row) => row.fileId).filter((id): id is string => !!id),
         ),
-      );
+      ];
 
-    const deletableFileIds = [
-      ...new Set(
-        candidates.map((row) => row.fileId).filter((id): id is string => !!id),
-      ),
-    ];
+      if (deletableFileIds.length === 0) {
+        return {
+          deleted: [] as { id: string }[],
+          deletedFiles: [] as {
+            id: string;
+            projectId: string;
+            environmentId: string;
+          }[],
+        };
+      }
 
-    if (deletableFileIds.length === 0) {
-      return new Response(
-        JSON.stringify({ deletedCount: 0, deletedFileIds: [] }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
+      const deletedFiles = await tx
+        .select({
+          id: files.id,
+          projectId: files.projectId,
+          environmentId: files.environmentId,
+        })
+        .from(files)
+        .where(inArray(files.id, deletableFileIds));
 
-    const deletedFiles = await db
-      .select({
-        id: files.id,
-        projectId: files.projectId,
-        environmentId: files.environmentId,
-      })
-      .from(files)
-      .where(inArray(files.id, deletableFileIds));
+      const expiredFileKeyIds = candidates.map((row) => row.fileKeyId);
+      if (expiredFileKeyIds.length > 0) {
+        await tx
+          .update(fileKeys)
+          .set({
+            status: "deleted",
+            deletedAt: now,
+            fileId: null,
+          })
+          .where(inArray(fileKeys.id, expiredFileKeyIds));
+      }
 
-    const deleted = await db
-      .delete(files)
-      .where(inArray(files.id, deletableFileIds))
-      .returning({ id: files.id });
+      const deleted = await tx
+        .delete(files)
+        .where(inArray(files.id, deletableFileIds))
+        .returning({ id: files.id });
+
+      return { deleted, deletedFiles };
+    });
 
     await syncEnvironmentStorageSnapshots(
       db,
