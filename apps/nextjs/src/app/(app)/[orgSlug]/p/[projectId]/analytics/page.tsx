@@ -165,13 +165,40 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
 
   const stats = analyticsQuery.data;
 
-  const chartConfig = {
+  const uploadActivityChartConfig = {
     uploadsCompleted: { label: "Completed", color: "var(--chart-1)" },
     uploadsFailed: { label: "Failed", color: "var(--chart-2)" },
-    downloads: { label: "Downloads", color: "var(--chart-3)" },
-    bytesUploaded: { label: "Uploaded", color: "var(--chart-1)" },
-    bytesDownloaded: { label: "Downloaded", color: "var(--chart-3)" },
-    storageBytes: { label: "Stored", color: "var(--chart-4)" },
+  };
+
+  const secondaryAnalyticsChartConfig = {
+    downloads: {
+      label: "Downloads",
+      theme: {
+        light: "oklch(0.52 0.2 264)",
+        dark: "oklch(0.7 0.14 264)",
+      },
+    },
+    storageBytes: {
+      label: "Stored",
+      theme: {
+        light: "oklch(0.48 0.11 55)",
+        dark: "oklch(0.74 0.11 72)",
+      },
+    },
+    bytesUploaded: {
+      label: "Uploaded",
+      theme: {
+        light: "oklch(0.5 0.14 215)",
+        dark: "oklch(0.72 0.11 215)",
+      },
+    },
+    bytesDownloaded: {
+      label: "Downloaded",
+      theme: {
+        light: "oklch(0.5 0.17 305)",
+        dark: "oklch(0.68 0.13 305)",
+      },
+    },
   };
 
   const dailyData: DailyChartDatum[] =
@@ -182,7 +209,7 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
       downloads: d.downloads,
       bytesUploaded: d.bytesUploaded,
       bytesDownloaded: d.bytesDownloaded,
-      storageBytes: d.storageBytes as number | null,
+      storageBytes: d.storageBytes,
     })) ?? [];
   const hasStorageHistory = dailyData.some((d) => d.storageBytes !== null);
 
@@ -251,7 +278,10 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
               {analyticsQuery.isLoading ? (
                 <Skeleton className="h-[200px] w-full" />
               ) : dailyData.length > 0 ? (
-                <ChartContainer config={chartConfig} className="h-[200px] aspect-auto">
+                <ChartContainer
+                  config={uploadActivityChartConfig}
+                  className="h-[200px] aspect-auto"
+                >
                   <BarChart data={dailyData}>
                     <CartesianGrid
                       strokeDasharray="3 3"
@@ -280,12 +310,12 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
                     />
                     <Bar
                       dataKey="uploadsCompleted"
-                      fill="var(--color-uploadsCompleted)"
+                      fill="oklch(69.6% 0.17 162.48)"
                       radius={[4, 4, 0, 0]}
                     />
                     <Bar
                       dataKey="uploadsFailed"
-                      fill="var(--color-uploadsFailed)"
+                      fill="oklch(64.5% 0.246 16.439)"
                       radius={[4, 4, 0, 0]}
                     />
                   </BarChart>
@@ -309,7 +339,10 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
               {analyticsQuery.isLoading ? (
                 <Skeleton className="h-[200px] w-full" />
               ) : dailyData.length > 0 ? (
-                <ChartContainer config={chartConfig} className="h-[200px] aspect-auto">
+                <ChartContainer
+                  config={secondaryAnalyticsChartConfig}
+                  className="h-[200px] aspect-auto"
+                >
                   <AreaChart data={dailyData}>
                     <CartesianGrid
                       strokeDasharray="3 3"
@@ -364,7 +397,10 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
             {analyticsQuery.isLoading ? (
               <Skeleton className="h-[240px] w-full" />
             ) : hasStorageHistory ? (
-              <ChartContainer config={chartConfig} className="h-[240px] aspect-auto">
+              <ChartContainer
+                config={secondaryAnalyticsChartConfig}
+                className="h-[240px] aspect-auto"
+              >
                 <AreaChart data={dailyData}>
                   <CartesianGrid
                     strokeDasharray="3 3"
@@ -442,7 +478,10 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
             {analyticsQuery.isLoading ? (
               <Skeleton className="h-[200px] w-full" />
             ) : dailyData.length > 0 ? (
-              <ChartContainer config={chartConfig} className="h-[400px] aspect-auto">
+              <ChartContainer
+                config={secondaryAnalyticsChartConfig}
+                className="h-[400px] aspect-auto"
+              >
                 <AreaChart data={dailyData}>
                   <CartesianGrid
                     strokeDasharray="3 3"

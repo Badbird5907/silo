@@ -137,8 +137,8 @@ export function UploadOutcomeRateChart({
   return (
     <ChartContainer
       config={{
-        successRate: { label: "Success rate", color: "var(--chart-1)" },
-        failureRate: { label: "Failure rate", color: "var(--chart-2)" },
+        successRate: { label: "Success rate", color: "#00FF9A" },
+        failureRate: { label: "Failure rate", color: "#FF2002" },
       }}
       className="aspect-auto h-[110px]"
     >
@@ -191,7 +191,7 @@ export function UploadOutcomeRateChart({
           type="monotone"
           dataKey="successRate"
           name="Success rate"
-          stroke="var(--color-successRate)"
+          stroke="oklch(69.6% 0.17 162.48)"
           strokeWidth={2}
           dot={false}
           connectNulls
@@ -200,7 +200,7 @@ export function UploadOutcomeRateChart({
           type="monotone"
           dataKey="failureRate"
           name="Failure rate"
-          stroke="var(--color-failureRate)"
+          stroke="oklch(64.5% 0.246 16.439)"
           strokeWidth={2}
           dot={false}
           connectNulls

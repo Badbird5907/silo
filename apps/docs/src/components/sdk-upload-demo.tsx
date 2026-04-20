@@ -104,10 +104,8 @@ function FileRow({ file }: { file: SiloFileSummary }) {
         </div>
         {url && (
           <Dialog>
-            <DialogTrigger>
-              <Button variant="outline" size="icon-sm">
-                <Eye />
-              </Button>
+            <DialogTrigger render={<Button variant="outline" size="icon-sm" />}>
+              <Eye />
             </DialogTrigger>
             <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
               <DialogHeader>

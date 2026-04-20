@@ -347,7 +347,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
       {/* Main Content Grid */}
       <div className="grid gap-4 lg:grid-cols-5">
         <div className="flex flex-col gap-4 lg:col-span-2">
-          <Card>
+          <Card className="gap-2">
             <CardHeader>
               <CardTitle className="text-base">Quick Actions</CardTitle>
             </CardHeader>
@@ -403,7 +403,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
           </Card>
 
           {/* Environments */}
-          <Card>
+          <Card className="gap-4">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-base">Environments</CardTitle>
@@ -478,8 +478,8 @@ export default function ProjectPage({ params }: ProjectPageProps) {
         </div>
 
         {/* Recent Activity (right column) */}
-        <Card className="lg:col-span-3">
-          <CardHeader className="flex flex-row items-center justify-between">
+        <Card className="lg:col-span-3 gap-2">
+          <CardHeader className="flex flex-row items-center justify-between mb-2">
             <div>
               <CardTitle className="text-base">Recent Activity</CardTitle>
               <CardDescription className="text-xs">
@@ -496,7 +496,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
           <Separator />
           <CardContent className="p-0">
             {recentEventsQuery.isLoading ? (
-              <div className="space-y-0 divide-y">
+              <div className="space-y-0">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <div key={i} className="flex items-center gap-3 px-6 py-3">
                     <Skeleton className="h-9 w-9 rounded-full" />
@@ -519,7 +519,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                 </p>
               </div>
             ) : (
-              <div className="divide-y">
+              <div className="">
                 {recentEvents.slice(0, 8).map((event) => {
                   const Icon = getEventIcon(event.eventType);
                   const colorClass = getEventColor(event.eventType);

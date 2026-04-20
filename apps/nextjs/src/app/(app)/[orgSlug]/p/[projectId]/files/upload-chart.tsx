@@ -134,12 +134,12 @@ export function UploadActivityChart({
         />
         <Bar
           dataKey="uploadsCompleted"
-          fill="var(--color-uploadsCompleted)"
+          fill="oklch(69.6% 0.17 162.48)"
           radius={[2, 2, 0, 0]}
         />
         <Bar
           dataKey="uploadsFailed"
-          fill="var(--color-uploadsFailed)"
+          fill="oklch(64.5% 0.246 16.439)"
           radius={[2, 2, 0, 0]}
         />
       </BarChart>
