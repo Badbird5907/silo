@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Check, Loader2, X } from "lucide-react";
+import { Check, Loader2, Save, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@silo-storage/ui/components/button";
@@ -197,8 +197,10 @@ export function GeneralSettings({
         {canEdit && (
           <div className="flex justify-end">
             <Button onClick={handleSave} disabled={!canSave}>
-              {updateMutation.isPending && (
+              {updateMutation.isPending ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="mr-2 h-4 w-4" />
               )}
               Save Changes
             </Button>

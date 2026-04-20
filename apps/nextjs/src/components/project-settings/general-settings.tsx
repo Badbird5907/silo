@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Copy, Loader2 } from "lucide-react";
+import { Copy, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@silo-storage/ui/components/button";
@@ -361,8 +361,10 @@ export function ProjectGeneralSettings({
               disabled={!hasChanges || updateMutation.isPending}
               className="shrink-0 sm:min-w-36"
             >
-              {updateMutation.isPending && (
+              {updateMutation.isPending ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="mr-2 h-4 w-4" />
               )}
               Save Changes
             </Button>

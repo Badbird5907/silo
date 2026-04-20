@@ -19,17 +19,6 @@ import { Errors } from "../utils/errors";
 
 type ImageContext = Context<{ Bindings: Bindings; Variables: Variables }>;
 
-interface InternalImageSourceMetadata {
-  storageKey: string;
-  mimeType: string;
-  fileSize: number;
-  fileHash: string | null;
-  fileKeyId: string;
-  fileId: string;
-  environmentId: string;
-  accessKey: string;
-}
-
 function isImageMimeType(value: string | null | undefined): boolean {
   return typeof value === "string" && value.toLowerCase().startsWith("image/");
 }
@@ -98,78 +87,10 @@ function buildImageHeaders(input: {
   return headers;
 }
 
-function buildInternalImageSourceHeaders(
-  fileKey: Awaited<ReturnType<typeof getCachedFileKey>>,
-  env: Bindings,
-): Headers {
-  const headers = new Headers({
+function buildInternalImageSourceHeaders(env: Bindings): Headers {
+  return new Headers({
     Authorization: `Bearer ${env.CALLBACK_SECRET}`,
-    "X-Silo-Storage-Key": fileKey.file.storageKey,
-    "X-Silo-Mime-Type": fileKey.file.mimeType,
-    "X-Silo-File-Size": fileKey.file.size.toString(),
-    "X-Silo-File-Key-Id": fileKey.id,
-    "X-Silo-File-Id": fileKey.file.id,
-    "X-Silo-Environment-Id": fileKey.environmentId,
-    "X-Silo-Access-Key": fileKey.accessKey,
   });
-
-  if (fileKey.file.hash) {
-    headers.set("X-Silo-File-Hash", fileKey.file.hash);
-  }
-
-  return headers;
-}
-
-function requireInternalImageSourceMetadata(
-  request: Request,
-  projectId: string,
-  accessKey: string,
-): InternalImageSourceMetadata {
-  const storageKey = request.headers.get("X-Silo-Storage-Key");
-  const mimeType = request.headers.get("X-Silo-Mime-Type");
-  const fileSizeHeader = request.headers.get("X-Silo-File-Size");
-  const fileKeyId = request.headers.get("X-Silo-File-Key-Id");
-  const fileId = request.headers.get("X-Silo-File-Id");
-  const environmentId = request.headers.get("X-Silo-Environment-Id");
-  const forwardedAccessKey = request.headers.get("X-Silo-Access-Key");
-
-  if (
-    !storageKey ||
-    !mimeType ||
-    !fileSizeHeader ||
-    !fileKeyId ||
-    !fileId ||
-    !environmentId ||
-    !forwardedAccessKey
-  ) {
-    throw Errors.invalidRequest(
-      `Missing internal image source metadata for project ${projectId}`,
-    );
-  }
-
-  if (forwardedAccessKey !== accessKey) {
-    throw Errors.invalidRequest("Internal image source access key mismatch");
-  }
-
-  if (!isImageMimeType(mimeType)) {
-    throw Errors.fileNotFound(accessKey);
-  }
-
-  const fileSize = Number.parseInt(fileSizeHeader, 10);
-  if (!Number.isFinite(fileSize) || fileSize < 0) {
-    throw Errors.invalidRequest("Invalid internal image source file size");
-  }
-
-  return {
-    storageKey,
-    mimeType,
-    fileSize,
-    fileHash: request.headers.get("X-Silo-File-Hash"),
-    fileKeyId,
-    fileId,
-    environmentId,
-    accessKey: forwardedAccessKey,
-  };
 }
 
 export async function handleImage(c: ImageContext): Promise<Response> {
@@ -265,7 +186,7 @@ export async function handleImage(c: ImageContext): Promise<Response> {
   sourceUrl.search = "";
 
   const sourceResponse = await fetch(sourceUrl.toString(), {
-    headers: buildInternalImageSourceHeaders(fileKey, c.env),
+    headers: buildInternalImageSourceHeaders(c.env),
     cf: {
       image: {
         fit: "scale-down",
@@ -323,13 +244,11 @@ export async function handleImage(c: ImageContext): Promise<Response> {
     }),
   });
 }
-
 export async function handleInternalImageSource(
   c: ImageContext,
 ): Promise<Response> {
   const accessKey = c.req.param("accessKey");
   const projectId = c.req.param("projectId");
-  const metadata = requireInternalImageSourceMetadata(c.req.raw, projectId, accessKey);
   const currentFileKey = await lookupFileKey(accessKey, projectId, c.env);
 
   if (
@@ -339,17 +258,17 @@ export async function handleInternalImageSource(
     throw Errors.fileNotFound(accessKey);
   }
 
-  const object = await c.env.R2_BUCKET.get(metadata.storageKey);
+  const object = await c.env.R2_BUCKET.get(currentFileKey.file.storageKey);
   if (!object) {
     c.executionCtx.waitUntil(
       reportMissingObject(
         {
           projectId,
-          environmentId: metadata.environmentId,
-          fileKeyId: metadata.fileKeyId,
-          fileId: metadata.fileId,
-          accessKey: metadata.accessKey,
-          storageKey: metadata.storageKey,
+          environmentId: currentFileKey.environmentId,
+          fileKeyId: currentFileKey.id,
+          fileId: currentFileKey.file.id,
+          accessKey: currentFileKey.accessKey,
+          storageKey: currentFileKey.file.storageKey,
         },
         c.env,
       ),
@@ -358,15 +277,16 @@ export async function handleInternalImageSource(
   }
 
   const headers = new Headers();
-  headers.set("Content-Type", metadata.mimeType);
+  headers.set("Content-Type", currentFileKey.file.mimeType);
   headers.set("Cache-Control", "public, max-age=86400");
-  if (metadata.fileHash) {
-    headers.set("ETag", metadata.fileHash);
+  if (currentFileKey.file.hash) {
+    headers.set("ETag", currentFileKey.file.hash);
   }
-  headers.set("Content-Length", metadata.fileSize.toString());
+  headers.set("Content-Length", currentFileKey.file.size.toString());
 
   return new Response(object.body, {
     status: 200,
     headers,
   });
 }
+
