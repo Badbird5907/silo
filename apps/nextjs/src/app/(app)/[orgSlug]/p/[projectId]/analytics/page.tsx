@@ -95,6 +95,39 @@ function formatChartDate(value: string): string {
   });
 }
 
+function AnalyticsStatCardSkeleton() {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <Skeleton className="h-4 w-28" />
+        <Skeleton className="size-4 rounded" />
+      </CardHeader>
+      <CardContent>
+        <Skeleton className="mb-2 h-8 w-24" />
+        <Skeleton className="h-3 w-32" />
+      </CardContent>
+    </Card>
+  );
+}
+
+function AnalyticsChartCardSkeleton({
+  chartClassName,
+}: {
+  chartClassName: string;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <Skeleton className="mb-2 h-5 w-44 max-w-full" />
+        <Skeleton className="h-3 w-full max-w-md" />
+      </CardHeader>
+      <CardContent>
+        <Skeleton className={`w-full rounded-md ${chartClassName}`} />
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function AnalyticsPage({ params }: AnalyticsPageProps) {
   const trpc = useTRPC();
   const { organization } = useOrganization();
@@ -139,19 +172,32 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
 
   if (projectQuery.isLoading || !organizationId) {
     return (
-      <div className="flex flex-1 flex-col gap-4 p-4">
+      <div
+        className="flex flex-1 flex-col gap-4 p-4"
+        aria-busy="true"
+        aria-label="Loading analytics"
+      >
+        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
+          <Skeleton className="h-8 w-40 shrink-0" />
+          <div className="flex w-full justify-end sm:ml-auto sm:w-auto">
+            <Skeleton className="h-10 w-full rounded-md sm:w-[320px]" />
+          </div>
+        </div>
+
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i}>
-              <CardHeader className="pb-2">
-                <Skeleton className="h-4 w-24" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-8 w-16" />
-              </CardContent>
-            </Card>
+            <AnalyticsStatCardSkeleton key={i} />
           ))}
         </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <AnalyticsChartCardSkeleton chartClassName="h-[200px]" />
+          <AnalyticsChartCardSkeleton chartClassName="h-[200px]" />
+        </div>
+
+        <AnalyticsChartCardSkeleton chartClassName="h-[240px]" />
+
+        <AnalyticsChartCardSkeleton chartClassName="h-[400px]" />
       </div>
     );
   }
@@ -276,7 +322,7 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
             </CardHeader>
             <CardContent>
               {analyticsQuery.isLoading ? (
-                <Skeleton className="h-[200px] w-full" />
+                <Skeleton className="h-[200px] w-full rounded-md" />
               ) : dailyData.length > 0 ? (
                 <ChartContainer
                   config={uploadActivityChartConfig}
@@ -337,7 +383,7 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
             </CardHeader>
             <CardContent>
               {analyticsQuery.isLoading ? (
-                <Skeleton className="h-[200px] w-full" />
+                <Skeleton className="h-[200px] w-full rounded-md" />
               ) : dailyData.length > 0 ? (
                 <ChartContainer
                   config={secondaryAnalyticsChartConfig}
@@ -395,7 +441,7 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
           </CardHeader>
           <CardContent>
             {analyticsQuery.isLoading ? (
-              <Skeleton className="h-[240px] w-full" />
+              <Skeleton className="h-[240px] w-full rounded-md" />
             ) : hasStorageHistory ? (
               <ChartContainer
                 config={secondaryAnalyticsChartConfig}
@@ -476,7 +522,7 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
           </CardHeader>
           <CardContent>
             {analyticsQuery.isLoading ? (
-              <Skeleton className="h-[200px] w-full" />
+              <Skeleton className="h-[400px] w-full rounded-md" />
             ) : dailyData.length > 0 ? (
               <ChartContainer
                 config={secondaryAnalyticsChartConfig}

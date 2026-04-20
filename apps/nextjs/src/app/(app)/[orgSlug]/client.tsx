@@ -23,13 +23,49 @@ import { CreateProjectDialog } from "@/components/create-project-dialog";
 import { useOrganization } from "@/hooks/use-organization";
 import { useTRPC } from "@/trpc/react";
 
+function ProjectsListSkeleton() {
+  return (
+    <div className="space-y-4" aria-busy="true" aria-label="Loading projects">
+      <Card className="gap-0 py-0">
+        <CardHeader className="border-b py-5">
+          <Skeleton className="mb-2 h-6 w-40" />
+          <Skeleton className="h-4 w-full max-w-md" />
+        </CardHeader>
+        <CardContent className="border-b py-4">
+          <Skeleton className="h-10 w-full rounded-md" />
+        </CardContent>
+        <div className="divide-y">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex items-center justify-between gap-4 px-6 py-4"
+            >
+              <div className="flex min-w-0 flex-1 items-center gap-3">
+                <Skeleton className="size-8 shrink-0 rounded-md" />
+                <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                  <Skeleton className="h-4 w-36 max-w-[min(100%,12rem)]" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+              </div>
+              <Skeleton className="h-4 w-14 shrink-0 sm:w-16" />
+            </div>
+          ))}
+        </div>
+        <CardFooter className="py-4">
+          <Skeleton className="h-3 w-52 max-w-full" />
+        </CardFooter>
+      </Card>
+    </div>
+  );
+}
+
 export function ProjectsPageClient() {
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
   const trpc = useTRPC();
   const params = useParams<{ orgSlug: string }>();
   const orgSlug = params.orgSlug;
-  const { organization } = useOrganization();
+  const { organization, isLoading: organizationLoading } = useOrganization();
   const organizationId = organization?.id ?? "";
 
   const projectsQuery = useQuery(
@@ -72,6 +108,11 @@ export function ProjectsPageClient() {
     [projects, normalizedSearch],
   );
 
+  const showProjectsSkeleton =
+    organizationLoading ||
+    (Boolean(organizationId) &&
+      (projectsQuery.isPending || projectsQuery.isLoading));
+
   return (
     <>
       <div className="flex flex-1 flex-col gap-6 p-6">
@@ -91,31 +132,8 @@ export function ProjectsPageClient() {
           </Button>
         </div>
 
-        {projectsQuery.isLoading ? (
-          <div className="space-y-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <Skeleton className="h-6 w-32" />
-                <Skeleton className="h-4 w-64" />
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-14 w-full" />
-                <Skeleton className="h-14 w-full" />
-                <Skeleton className="h-14 w-full" />
-              </CardContent>
-            </Card>
-            <div className="grid gap-4 md:grid-cols-2">
-              {Array.from({ length: 2 }).map((_, i) => (
-                <Card key={i}>
-                  <CardContent className="space-y-2 pt-6">
-                    <Skeleton className="h-4 w-28" />
-                    <Skeleton className="h-8 w-14" />
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
+        {showProjectsSkeleton ? (
+          <ProjectsListSkeleton />
         ) : totalProjects === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-6 py-20">
             <div className="from-primary/10 to-primary/5 flex size-20 items-center justify-center rounded-2xl bg-linear-to-br">

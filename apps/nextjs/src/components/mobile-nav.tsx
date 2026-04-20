@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, MenuIcon, Monitor, Moon, Settings, Sun } from "lucide-react";
+import { LogOut, MenuIcon, Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@silo-storage/ui/components/avatar";
@@ -8,7 +8,6 @@ import { Button } from "@silo-storage/ui/components/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -27,7 +26,7 @@ function getInitials(name: string): string {
     .substring(0, 2);
 }
 
-function ThemeMenuItem() {
+export function ThemeMenuItem() {
   const { theme, setTheme } = useTheme();
 
   const cycleTheme = () => {
@@ -123,14 +122,6 @@ export function MobileNav() {
                 </div>
               </div>
             </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem className="gap-2">
-                <Settings className="size-4" />
-                <span>Settings</span>
-              </DropdownMenuItem>
-              <ThemeMenuItem />
-            </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={handleLogout}

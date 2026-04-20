@@ -17,6 +17,8 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
+  SidebarMenu,
+  SidebarMenuItem,
   SidebarRail,
   useSidebar,
 } from "@silo-storage/ui/components/sidebar";
@@ -28,6 +30,7 @@ import {
   SelectValue,
 } from "@silo-storage/ui/components/select";
 import { Button } from "@silo-storage/ui/components/button";
+import { Skeleton } from "@silo-storage/ui/components/skeleton";
 
 import { authClient } from "@/auth/client";
 import { NavMain } from "@/components/nav-main";
@@ -56,6 +59,31 @@ function getMainNavItems(
   ];
 }
 
+function ProjectSwitcherSkeleton() {
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <div
+          className="flex h-12 w-full items-center gap-2 rounded-md p-2"
+          aria-hidden
+        >
+          <Skeleton className="size-8 shrink-0 rounded-lg" />
+          <div className="grid min-w-0 flex-1 gap-1.5">
+            <Skeleton className="h-4 w-40 max-w-full" />
+            <Skeleton className="h-3 w-28 max-w-full" />
+          </div>
+          <Skeleton className="size-4 shrink-0 rounded opacity-70" />
+        </div>
+      </SidebarMenuItem>
+    </SidebarMenu>
+  );
+}
+
+/** Matches SelectTrigger (h-9); “Create dev env” only renders after env list has loaded. */
+function EnvironmentSwitcherSkeleton() {
+  return <Skeleton className="h-9 w-full" />;
+}
+
 function getProjectNavItems(projectBasePath: string): NavItem[] {
   return [
     {
@@ -82,6 +110,12 @@ function getProjectNavItems(projectBasePath: string): NavItem[] {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const [environmentControlsMounted, setEnvironmentControlsMounted] =
+    React.useState(false);
+  React.useEffect(() => {
+    setEnvironmentControlsMounted(true);
+  }, []);
+
   const { state: sidebarState } = useSidebar();
   const pathname = usePathname();
   const router = useRouter();
@@ -104,6 +138,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const environmentsQuery = useQuery(
     trpc.environment.list.queryOptions(
       { organizationId, projectId: currentProjectId ?? "" },
+      { enabled: !!organizationId && !!currentProjectId },
+    ),
+  );
+
+  const currentProjectQuery = useQuery(
+    trpc.project.getById.queryOptions(
+      { id: currentProjectId ?? "", organizationId },
       { enabled: !!organizationId && !!currentProjectId },
     ),
   );
@@ -169,41 +210,71 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   };
 
   const hasOwnDevEnv = React.useMemo(() => {
-    return !environmentsQuery.isLoading && session && environmentsQuery.data?.some((environment) => environment.ownerUserId === session.user.id);
+    return (
+      !environmentsQuery.isLoading &&
+      !!session &&
+      environmentsQuery.data?.some(
+        (environment) => environment.ownerUserId === session.user.id,
+      )
+    );
   }, [environmentsQuery.data, environmentsQuery.isLoading, session]);
+
+  const showProjectSwitcherSkeleton =
+    isInProject &&
+    !!currentProjectId &&
+    !!orgSlug &&
+    (!organization?.id ||
+      (currentProjectQuery.isPending && !currentProjectQuery.isError));
+
+  const showEnvironmentSwitcherSkeleton =
+    !environmentControlsMounted || environmentsQuery.isLoading;
 
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        {isInProject ? <ProjectSwitcher /> : <OrganizationSwitcher />}
+        {isInProject ? (
+          showProjectSwitcherSkeleton ? (
+            <ProjectSwitcherSkeleton />
+          ) : (
+            <ProjectSwitcher />
+          )
+        ) : (
+          <OrganizationSwitcher />
+        )}
         {isInProject && !isSidebarCollapsed && (
           <div className="px-2 pt-2 space-y-2">
-            <Select
-              value={currentEnvironmentSlug ?? "__none__"}
-              onValueChange={handleEnvironmentChange}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select environment" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">All environments</SelectItem>
-                {(environmentsQuery.data ?? []).map((environment) => (
-                  <SelectItem key={environment.id} value={environment.slug}>
-                    {environment.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {!hasOwnDevEnv && (
-              <Button
-                variant="outline"
-                className="w-full"
-                size="sm"
-                onClick={handleCreateMyDevEnvironment}
-                aria-label="Create my dev environment"
-              >
-                Create my dev environment
-              </Button>
+            {showEnvironmentSwitcherSkeleton ? (
+              <EnvironmentSwitcherSkeleton />
+            ) : (
+              <>
+                <Select
+                  value={currentEnvironmentSlug ?? "__none__"}
+                  onValueChange={handleEnvironmentChange}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select environment" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">All environments</SelectItem>
+                    {(environmentsQuery.data ?? []).map((environment) => (
+                      <SelectItem key={environment.id} value={environment.slug}>
+                        {environment.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {!hasOwnDevEnv && (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    size="sm"
+                    onClick={handleCreateMyDevEnvironment}
+                    aria-label="Create my dev environment"
+                  >
+                    Create my dev environment
+                  </Button>
+                )}
+              </>
             )}
           </div>
         )}

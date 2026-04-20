@@ -154,6 +154,95 @@ interface SearchInputProps {
   className?: string;
 }
 
+function FilesChartCardSkeleton() {
+  return (
+    <Card>
+      <CardContent>
+        <div className="mb-2 flex items-start justify-between gap-2">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-8 w-8 shrink-0 rounded-lg" />
+        </div>
+        <Skeleton className="h-[110px] w-full rounded-md" />
+      </CardContent>
+    </Card>
+  );
+}
+
+function FilesTableCardSkeleton() {
+  return (
+    <Card className="min-w-0">
+      <CardHeader>
+        <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center">
+          <div className="flex min-w-0 flex-col-reverse gap-4 md:flex-row md:flex-1">
+            <Skeleton className="h-10 w-full rounded-md md:max-w-md" />
+            <div className="flex flex-wrap items-center gap-2">
+              <Skeleton className="h-6 w-28 rounded-full" />
+              <Skeleton className="h-6 w-24 rounded-full" />
+              <Skeleton className="h-6 w-20 rounded-full" />
+            </div>
+          </div>
+          <div className="grid w-full min-w-0 grid-cols-2 items-center gap-2 md:ml-auto md:flex md:w-auto md:justify-end">
+            <Skeleton className="h-9 w-full rounded-md md:w-28" />
+            <Skeleton className="h-9 w-full rounded-md md:min-w-30" />
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="min-w-0">
+        <div className="overflow-x-auto rounded-md border">
+          <div className="bg-muted/40 flex flex-wrap items-center gap-x-4 gap-y-2 border-b px-4 py-3">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <Skeleton className="size-4 shrink-0 rounded-[2px]" />
+              <Skeleton className="h-3.5 w-8 shrink-0" />
+              <Skeleton className="h-3.5 w-20" />
+            </div>
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+              <Skeleton className="h-3.5 w-14 hidden sm:block" />
+              <Skeleton className="h-5 w-16 rounded-full hidden md:block" />
+              <Skeleton className="h-5 w-14 rounded-full hidden lg:block" />
+              <Skeleton className="h-3.5 w-10 hidden lg:block" />
+              <Skeleton className="h-3.5 w-28 hidden xl:block" />
+              <Skeleton className="h-8 w-8 shrink-0 rounded-md" />
+            </div>
+          </div>
+          <div className="divide-y">
+            {Array.from({ length: 9 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex min-h-12 items-center gap-3 px-4 py-2.5"
+              >
+                <Skeleton className="size-4 shrink-0 rounded-[2px]" />
+                <Skeleton className="size-10 shrink-0 rounded-lg" />
+                <div className="min-w-0 flex-1 space-y-1.5 sm:max-w-[38%]">
+                  <Skeleton className="h-4 w-full max-w-[min(100%,280px)]" />
+                  <Skeleton className="h-3 w-28 max-w-full" />
+                </div>
+                <Skeleton className="h-5 w-16 shrink-0 rounded-full hidden sm:block" />
+                <Skeleton className="h-5 w-20 shrink-0 rounded-full hidden md:block" />
+                <Skeleton className="h-5 w-14 shrink-0 rounded-full hidden lg:block" />
+                <Skeleton className="h-3.5 w-10 shrink-0 hidden xl:block" />
+                <Skeleton className="h-3.5 w-24 shrink-0 hidden xl:block" />
+                <Skeleton className="size-8 shrink-0 rounded-md md:ml-auto" />
+              </div>
+            ))}
+          </div>
+          <div className="bg-background flex flex-col gap-3 border-t px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-4 w-10" />
+              <Skeleton className="h-8 w-[70px] rounded-md" />
+            </div>
+            <Skeleton className="h-4 w-40 max-w-full" />
+            <div className="flex justify-end gap-1">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="size-8 rounded-md" />
+              ))}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 const SearchInput = React.memo(function SearchInput({
   value,
   onDebouncedChange,
@@ -698,12 +787,18 @@ export default function FilesPage({ params }: FilesPageProps) {
 
   if (projectQuery.isLoading || !organizationId) {
     return (
-      <>
-        <div className="flex min-w-0 flex-1 flex-col gap-4 p-4">
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-96 w-full" />
+      <div
+        className="flex min-w-0 flex-1 flex-col gap-4 p-4"
+        aria-busy="true"
+        aria-label="Loading files"
+      >
+        <div className="grid min-w-0 grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <FilesChartCardSkeleton key={i} />
+          ))}
         </div>
-      </>
+        <FilesTableCardSkeleton />
+      </div>
     );
   }
 

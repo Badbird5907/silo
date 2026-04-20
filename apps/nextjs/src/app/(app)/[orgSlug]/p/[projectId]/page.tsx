@@ -138,6 +138,80 @@ function StatCardSkeleton() {
   );
 }
 
+function QuickActionsSkeleton() {
+  return (
+    <Card className="gap-2">
+      <CardHeader>
+        <Skeleton className="h-5 w-32" />
+      </CardHeader>
+      <CardContent className="grid gap-2">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div
+            key={i}
+            className="flex items-center gap-3 rounded-lg border p-3"
+          >
+            <Skeleton className="h-10 w-10 shrink-0 rounded-lg" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-36" />
+              <Skeleton className="h-3 w-48" />
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function EnvironmentsCardSkeleton() {
+  return (
+    <Card className="gap-4">
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div className="space-y-2">
+          <Skeleton className="h-5 w-36" />
+          <Skeleton className="h-3 w-28" />
+        </div>
+        <Skeleton className="h-8 w-8 rounded-md" />
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-14 w-full rounded-lg" />
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function RecentActivityCardSkeleton() {
+  return (
+    <Card className="gap-2 lg:col-span-3">
+      <CardHeader className="mb-2 flex flex-row items-center justify-between">
+        <div className="space-y-2">
+          <Skeleton className="h-5 w-40" />
+          <Skeleton className="h-3 w-48" />
+        </div>
+        <Skeleton className="h-8 w-24 rounded-md" />
+      </CardHeader>
+      <Separator />
+      <CardContent className="p-0">
+        <div className="space-y-0">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 px-6 py-3">
+              <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <Skeleton className="h-4 w-full max-w-[min(100%,240px)]" />
+                <Skeleton className="h-3 w-2/3 max-w-[min(100%,180px)]" />
+              </div>
+              <Skeleton className="h-3 w-12 shrink-0" />
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function ProjectPage({ params }: ProjectPageProps) {
   const trpc = useTRPC();
   const { organization } = useOrganization();
@@ -184,11 +258,18 @@ export default function ProjectPage({ params }: ProjectPageProps) {
 
   if (projectQuery.isLoading || !organizationId) {
     return (
-      <div className="flex flex-1 flex-col gap-6 p-6">
+      <div className="flex flex-1 flex-col gap-4 p-6">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <StatCardSkeleton key={i} />
           ))}
+        </div>
+        <div className="grid gap-4 lg:grid-cols-5">
+          <div className="flex flex-col gap-4 lg:col-span-2">
+            <QuickActionsSkeleton />
+            <EnvironmentsCardSkeleton />
+          </div>
+          <RecentActivityCardSkeleton />
         </div>
       </div>
     );
