@@ -133,7 +133,7 @@ export function ApiKeysList({ projectId, organizationId }: ApiKeysListProps) {
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
           <CardTitle className="flex items-center gap-2">
-            <Key className="h-5 w-5" />
+            <Key className="h-4 w-4" />
             API Keys
           </CardTitle>
           <CardDescription>

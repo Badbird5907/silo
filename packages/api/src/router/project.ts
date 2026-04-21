@@ -3,6 +3,11 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod/v4";
 
 import {
+  buildAuditChanges,
+  buildUserAuditActor,
+  recordAuditEvent,
+} from "../service/audit";
+import {
   checkProjectSlugAvailability,
   createProject,
   deleteProject,
@@ -10,11 +15,6 @@ import {
   listProjects,
   updateProject,
 } from "../service/project";
-import {
-  buildAuditChanges,
-  buildUserAuditActor,
-  recordAuditEvent,
-} from "../service/audit";
 import { organizationProcedure, requirePermission } from "../trpc";
 
 export const projectRouter = {
@@ -115,6 +115,11 @@ export const projectRouter = {
           .min(5)
           .max(43200)
           .optional(),
+        auditLogRetentionDays: z.number().int().min(1).max(3650).optional(),
+        usageEventRetentionDays: z.number().int().min(1).max(3650).optional(),
+        auditLogDownloadPolicy: z
+          .enum(["disabled", "always", "signed_only"])
+          .optional(),
       }),
     )
     .use(requirePermission({ project: ["update"] }))
@@ -143,6 +148,9 @@ export const projectRouter = {
         defaultServeImage: input.defaultServeImage,
         preserveImageExif: input.preserveImageExif,
         pendingUploadFailAfterHours: input.pendingUploadFailAfterMinutes,
+        auditLogRetentionDays: input.auditLogRetentionDays,
+        usageEventRetentionDays: input.usageEventRetentionDays,
+        auditLogDownloadPolicy: input.auditLogDownloadPolicy,
       });
 
       if (updated) {
@@ -153,7 +161,11 @@ export const projectRouter = {
             imageDeliveryPolicy: project.imageDeliveryPolicy,
             defaultServeImage: project.defaultServeImage,
             preserveImageExif: project.preserveImageExif,
-            pendingUploadFailAfterMinutes: project.pendingUploadFailAfterMinutes,
+            pendingUploadFailAfterMinutes:
+              project.pendingUploadFailAfterMinutes,
+            auditLogRetentionDays: project.auditLogRetentionDays,
+            usageEventRetentionDays: project.usageEventRetentionDays,
+            auditLogDownloadPolicy: project.auditLogDownloadPolicy,
           },
           {
             name: updated.name,
@@ -161,7 +173,11 @@ export const projectRouter = {
             imageDeliveryPolicy: updated.imageDeliveryPolicy,
             defaultServeImage: updated.defaultServeImage,
             preserveImageExif: updated.preserveImageExif,
-            pendingUploadFailAfterMinutes: updated.pendingUploadFailAfterMinutes,
+            pendingUploadFailAfterMinutes:
+              updated.pendingUploadFailAfterMinutes,
+            auditLogRetentionDays: updated.auditLogRetentionDays,
+            usageEventRetentionDays: updated.usageEventRetentionDays,
+            auditLogDownloadPolicy: updated.auditLogDownloadPolicy,
           },
         );
 

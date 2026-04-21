@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Copy, Loader2, Save } from "lucide-react";
+import { Cog, Copy, Info, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@silo-storage/ui/components/button";
@@ -35,6 +35,9 @@ interface ProjectGeneralSettingsProps {
     defaultServeImage: boolean;
     preserveImageExif: boolean;
     pendingUploadFailAfterMinutes: number;
+    auditLogRetentionDays: number;
+    usageEventRetentionDays: number;
+    auditLogDownloadPolicy: string;
   };
   organizationId: string;
 }
@@ -49,6 +52,18 @@ function parseImageDeliveryPolicy(
   switch (value) {
     case "public_only":
     case "public_and_private_opt_in":
+      return value;
+    default:
+      return "disabled";
+  }
+}
+
+function parseAuditLogDownloadPolicy(
+  value: string,
+): "disabled" | "always" | "signed_only" {
+  switch (value) {
+    case "always":
+    case "signed_only":
       return value;
     default:
       return "disabled";
@@ -83,6 +98,19 @@ export function ProjectGeneralSettings({
   );
   const [pendingUploadFailAfterMinutes, setPendingUploadFailAfterMinutes] =
     React.useState(project.pendingUploadFailAfterMinutes);
+  const [auditLogRetentionDays, setAuditLogRetentionDays] = React.useState(
+    project.auditLogRetentionDays,
+  );
+  const [usageEventRetentionDays, setUsageEventRetentionDays] = React.useState(
+    project.usageEventRetentionDays,
+  );
+  const initialAuditLogDownloadPolicy = React.useMemo(
+    () => parseAuditLogDownloadPolicy(project.auditLogDownloadPolicy),
+    [project.auditLogDownloadPolicy],
+  );
+  const [auditLogDownloadPolicy, setAuditLogDownloadPolicy] = React.useState(
+    initialAuditLogDownloadPolicy,
+  );
 
   const updateMutation = useMutation(
     trpc.project.update.mutationOptions({
@@ -109,7 +137,10 @@ export function ProjectGeneralSettings({
       imageDeliveryPolicy !== initialImageDeliveryPolicy ||
       defaultServeImage !== project.defaultServeImage ||
       preserveImageExif !== project.preserveImageExif ||
-      pendingUploadFailAfterMinutes !== project.pendingUploadFailAfterMinutes
+      pendingUploadFailAfterMinutes !== project.pendingUploadFailAfterMinutes ||
+      auditLogRetentionDays !== project.auditLogRetentionDays ||
+      usageEventRetentionDays !== project.usageEventRetentionDays ||
+      auditLogDownloadPolicy !== initialAuditLogDownloadPolicy
     ) {
       updateMutation.mutate({
         id: project.id,
@@ -119,6 +150,9 @@ export function ProjectGeneralSettings({
         defaultServeImage,
         preserveImageExif,
         pendingUploadFailAfterMinutes,
+        auditLogRetentionDays,
+        usageEventRetentionDays,
+        auditLogDownloadPolicy,
       });
     }
   };
@@ -134,13 +168,16 @@ export function ProjectGeneralSettings({
     imageDeliveryPolicy !== initialImageDeliveryPolicy ||
     defaultServeImage !== project.defaultServeImage ||
     preserveImageExif !== project.preserveImageExif ||
-    pendingUploadFailAfterMinutes !== project.pendingUploadFailAfterMinutes;
+    pendingUploadFailAfterMinutes !== project.pendingUploadFailAfterMinutes ||
+    auditLogRetentionDays !== project.auditLogRetentionDays ||
+    usageEventRetentionDays !== project.usageEventRetentionDays ||
+    auditLogDownloadPolicy !== initialAuditLogDownloadPolicy;
 
   return (
     <div className="flex w-full flex-col gap-6">
       <Card className="flex-1">
         <CardHeader>
-          <CardTitle>Project Information</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Info className="h-4 w-4" /> Project Information</CardTitle>
           <CardDescription>
             Basic information about your project
           </CardDescription>
@@ -191,13 +228,13 @@ export function ProjectGeneralSettings({
 
       <Card className="flex-1">
         <CardHeader>
-          <CardTitle>Upload Settings</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Cog className="h-4 w-4" /> General Settings</CardTitle>
           <CardDescription>
-            Some settings related to file uploads and access.
+            Some general settings for your project.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid gap-8 lg:grid-cols-2 lg:gap-10">
+          <div className="grid gap-4 lg:grid-cols-2 lg:gap-10">
             <div className="space-y-5">
               <div className="space-y-1">
                 <h3 className="text-sm font-semibold">Upload &amp; access</h3>
@@ -345,6 +382,104 @@ export function ProjectGeneralSettings({
                     Applies to transformed image responses when the chosen
                     output format supports metadata retention.
                   </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-4 lg:col-span-2">
+              <div className="space-y-1 pt-2">
+                <h3 className="text-sm font-semibold">Audit &amp; retention</h3>
+                <p className="text-muted-foreground text-xs">
+                  Control download auditing and how long raw event data is kept.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                <div className="min-w-0 space-y-2">
+                  <Label htmlFor="audit-log-download-policy">
+                    Audit Log Download Policy
+                  </Label>
+                  <Select
+                    value={auditLogDownloadPolicy}
+                    onValueChange={(value) =>
+                      setAuditLogDownloadPolicy(
+                        value as "disabled" | "always" | "signed_only",
+                      )
+                    }
+                  >
+                    <SelectTrigger
+                      id="audit-log-download-policy"
+                      className="w-full"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="disabled">Disabled</SelectItem>
+                      <SelectItem value="always">Always log</SelectItem>
+                      <SelectItem value="signed_only">
+                        Signed URLs only
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-muted-foreground text-xs leading-relaxed">
+                    Controls whether file and image downloads are written to the
+                    audit log.
+                  </p>
+                  {auditLogDownloadPolicy === "always" && (
+                    <p className="text-xs leading-relaxed text-orange-500">
+                      Don't use this setting if files will frequently be accessed.
+                    </p>
+                  )}
+                </div>
+
+                <div className="min-w-0 space-y-2">
+                  <Label htmlFor="audit-log-retention-days">
+                    Audit Log Retention (days)
+                  </Label>
+                  <Input
+                    id="audit-log-retention-days"
+                    type="number"
+                    min={1}
+                    max={3650}
+                    step={1}
+                    value={auditLogRetentionDays}
+                    onChange={(event) => {
+                      const nextValue = Number.parseInt(
+                        event.target.value,
+                        10,
+                      );
+                      if (Number.isNaN(nextValue)) return;
+                      setAuditLogRetentionDays(
+                        Math.min(3650, Math.max(1, nextValue)),
+                      );
+                    }}
+                    className="w-full"
+                  />
+                </div>
+
+                <div className="min-w-0 space-y-2">
+                  <Label htmlFor="usage-event-retention-days">
+                    Usage Event Retention (days)
+                  </Label>
+                  <Input
+                    id="usage-event-retention-days"
+                    type="number"
+                    min={1}
+                    max={3650}
+                    step={1}
+                    value={usageEventRetentionDays}
+                    onChange={(event) => {
+                      const nextValue = Number.parseInt(
+                        event.target.value,
+                        10,
+                      );
+                      if (Number.isNaN(nextValue)) return;
+                      setUsageEventRetentionDays(
+                        Math.min(3650, Math.max(1, nextValue)),
+                      );
+                    }}
+                    className="w-full"
+                  />
                 </div>
               </div>
             </div>

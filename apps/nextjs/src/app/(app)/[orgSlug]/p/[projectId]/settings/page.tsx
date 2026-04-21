@@ -66,17 +66,7 @@ export default function ProjectSettingsPage({
     <>
       <div className="flex flex-1 flex-col gap-6 p-4">
         <ProjectGeneralSettings
-          project={{
-            id: projectQuery.data.id,
-            name: projectQuery.data.name,
-            slug: projectQuery.data.slug,
-            defaultFileAccess: projectQuery.data.defaultFileAccess,
-            imageDeliveryPolicy: projectQuery.data.imageDeliveryPolicy,
-            defaultServeImage: projectQuery.data.defaultServeImage,
-            preserveImageExif: projectQuery.data.preserveImageExif,
-            pendingUploadFailAfterMinutes:
-              projectQuery.data.pendingUploadFailAfterMinutes,
-          }}
+          project={projectQuery.data}
           organizationId={organizationId}
         />
         <EnvironmentsList

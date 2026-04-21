@@ -1,12 +1,24 @@
+import type { Db } from "@silo-storage/db/client";
+import type {
+  AuditActorType,
+  AuditChange,
+  AuditEventCategory,
+  AuditResourceType,
+  AuditStatus,
+} from "@silo-storage/shared";
+
 import { auditEvents } from "@silo-storage/db/schema";
 import {
-    AuditEventCode,
-  usageEventTypeToAuditEventCode
+  AuditEventCode,
+  usageEventTypeToAuditEventCode,
 } from "@silo-storage/shared";
-import type {AuditActorType, AuditChange, AuditEventCategory, AuditResourceType, AuditStatus} from "@silo-storage/shared";
 
-import type { Db } from "@silo-storage/db/client";
 import type { AuthContext } from "../types/auth";
+import {
+  computeRetentionExpiry,
+  getProjectRetentionSettings,
+  shouldRecordDownloadAudit,
+} from "./retention";
 
 const SENSITIVE_FIELD_PATTERN =
   /(secret|token|authorization|api[-_]?key|password|signature|cookie)/i;
@@ -32,14 +44,30 @@ export interface RecordAuditEventInput extends AuditActor {
   changes?: AuditChange[] | null;
   metadata?: Record<string, unknown> | null;
   createdAt?: Date;
+  expiresAt?: Date | null;
+  retentionDays?: number;
 }
 
-type AuditInsertDb = Pick<Db, "insert">;
+type AuditInsertDb = Pick<Db, "insert" | "query">;
 
 export async function recordAuditEvent(
   db: AuditInsertDb,
   input: RecordAuditEventInput,
 ) {
+  const createdAt = input.createdAt ?? new Date();
+  let expiresAt = input.expiresAt;
+
+  if (expiresAt === undefined && input.projectId) {
+    const retentionDays =
+      input.retentionDays ??
+      (await getProjectRetentionSettings(db, input.projectId))
+        ?.auditLogRetentionDays;
+
+    if (retentionDays !== undefined) {
+      expiresAt = computeRetentionExpiry(createdAt, retentionDays);
+    }
+  }
+
   await db.insert(auditEvents).values({
     organizationId: input.organizationId,
     projectId: input.projectId ?? null,
@@ -57,7 +85,8 @@ export async function recordAuditEvent(
     summary: input.summary,
     changes: input.changes ?? null,
     metadata: sanitizeMetadata(input.metadata ?? {}),
-    createdAt: input.createdAt ?? new Date(),
+    createdAt,
+    expiresAt: expiresAt ?? null,
   });
 }
 
@@ -80,8 +109,28 @@ export async function recordUsageAuditEvent(
     resourceLabel?: string | null;
     metadata?: Record<string, unknown> | null;
     createdAt?: Date;
+    isSignedUrl?: boolean;
+    auditLogDownloadPolicy?: "disabled" | "always" | "signed_only";
+    auditRetentionDays?: number;
   },
 ) {
+  if (input.eventType === "download") {
+    const policy =
+      input.auditLogDownloadPolicy ??
+      (await getProjectRetentionSettings(db, input.projectId))
+        ?.auditLogDownloadPolicy ??
+      "disabled";
+
+    if (
+      !shouldRecordDownloadAudit({
+        policy,
+        isSignedUrl: input.isSignedUrl ?? false,
+      })
+    ) {
+      return;
+    }
+  }
+
   const eventCode = usageEventTypeToAuditEventCode(input.eventType);
   const summary = getUsageAuditSummary(input.eventType, input.resourceLabel);
 
@@ -100,9 +149,13 @@ export async function recordUsageAuditEvent(
     metadata: {
       bytes: input.bytes ?? null,
       fileId: input.fileId ?? null,
+      ...(input.eventType === "download"
+        ? { isSignedUrl: input.isSignedUrl ?? false }
+        : {}),
       ...(input.metadata ?? {}),
     },
     createdAt: input.createdAt,
+    retentionDays: input.auditRetentionDays,
   });
 }
 
@@ -131,7 +184,9 @@ export function buildApiKeyAuditActor(input: {
   };
 }
 
-export const buildAuditActorFromAuthResult = (authContext: AuthContext): AuditActor => {
+export const buildAuditActorFromAuthResult = (
+  authContext: AuthContext,
+): AuditActor => {
   if (authContext.type === "apiKey") {
     return buildApiKeyAuditActor({
       keyPrefix: authContext.apiKey.prefix,
@@ -175,8 +230,14 @@ export function buildAuditChanges(
 
     changes.push({
       path: options?.pathPrefix ? `${options.pathPrefix}.${key}` : key,
-      before: sanitizeValue(options?.pathPrefix ? `${options.pathPrefix}.${key}` : key, beforeValue),
-      after: sanitizeValue(options?.pathPrefix ? `${options.pathPrefix}.${key}` : key, afterValue),
+      before: sanitizeValue(
+        options?.pathPrefix ? `${options.pathPrefix}.${key}` : key,
+        beforeValue,
+      ),
+      after: sanitizeValue(
+        options?.pathPrefix ? `${options.pathPrefix}.${key}` : key,
+        afterValue,
+      ),
     });
   }
 
@@ -234,16 +295,18 @@ export function redactHeaderValue(
   return value;
 }
 
-export function redactSensitiveValue(
-  path: string,
-  value: unknown,
-): unknown {
+export function redactSensitiveValue(path: string, value: unknown): unknown {
   return sanitizeValue(path, value);
 }
 
-function sanitizeMetadata(metadata: Record<string, unknown>): Record<string, unknown> {
+function sanitizeMetadata(
+  metadata: Record<string, unknown>,
+): Record<string, unknown> {
   return Object.fromEntries(
-    Object.entries(metadata).map(([key, value]) => [key, sanitizeValue(key, value)]),
+    Object.entries(metadata).map(([key, value]) => [
+      key,
+      sanitizeValue(key, value),
+    ]),
   );
 }
 
@@ -281,7 +344,12 @@ function serializeComparable(value: unknown): string {
 }
 
 function getUsageAuditSummary(
-  eventType: "upload_started" | "upload_completed" | "upload_failed" | "download" | "file_deleted",
+  eventType:
+    | "upload_started"
+    | "upload_completed"
+    | "upload_failed"
+    | "download"
+    | "file_deleted",
   resourceLabel?: string | null,
 ): string {
   const suffix = resourceLabel ? ` for ${resourceLabel}` : "";

@@ -1,3 +1,4 @@
+import type { AuditLogDownloadPolicy } from "@silo-storage/api/service/retention";
 import { z } from "zod";
 
 import {
@@ -5,6 +6,7 @@ import {
   buildSystemAuditActor,
   recordUsageAuditEvent,
 } from "@silo-storage/api/service/audit";
+import { computeRetentionExpiry } from "@silo-storage/api/service/retention";
 import { eq, sql } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import { projects, usageDaily, usageEvents } from "@silo-storage/db/schema";
@@ -24,6 +26,7 @@ const eventSchema = z.object({
   fileId: z.string().optional(),
   apiKeyId: z.string().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
+  isSignedUrl: z.boolean().optional(),
 });
 
 export async function POST(request: Request) {
@@ -57,7 +60,12 @@ export async function POST(request: Request) {
   try {
     const project = await db.query.projects.findFirst({
       where: eq(projects.id, projectId),
-      columns: { parentOrganizationId: true },
+      columns: {
+        parentOrganizationId: true,
+        auditLogDownloadPolicy: true,
+        auditLogRetentionDays: true,
+        usageEventRetentionDays: true,
+      },
     });
 
     if (!project?.parentOrganizationId) {
@@ -68,6 +76,11 @@ export async function POST(request: Request) {
     }
 
     const organizationId = project.parentOrganizationId;
+    const createdAt = new Date();
+    const expiresAt = computeRetentionExpiry(
+      createdAt,
+      project.usageEventRetentionDays,
+    );
 
     await db.insert(usageEvents).values({
       organizationId,
@@ -78,6 +91,8 @@ export async function POST(request: Request) {
       fileId: fileId ?? null,
       apiKeyId: apiKeyId ?? null,
       metadata: metadata ?? null,
+      createdAt,
+      expiresAt,
     });
 
     await recordUsageAuditEvent(db, {
@@ -98,7 +113,15 @@ export async function POST(request: Request) {
           typeof metadata?.fileKeyId === "string" ? metadata.fileKeyId : null,
         fileName:
           typeof metadata?.fileName === "string" ? metadata.fileName : null,
+        ...(eventType === "download"
+          ? { isSignedUrl: parsed.data.isSignedUrl ?? false }
+          : {}),
       },
+      createdAt,
+      isSignedUrl: parsed.data.isSignedUrl ?? false,
+      auditLogDownloadPolicy:
+        project.auditLogDownloadPolicy as AuditLogDownloadPolicy,
+      auditRetentionDays: project.auditLogRetentionDays,
     });
 
     const today = new Date().toISOString().split("T")[0];

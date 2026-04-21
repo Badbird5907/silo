@@ -9,7 +9,7 @@ import {
 } from "@silo-storage/db/schema";
 import { publishMessage } from "@silo-storage/redis";
 import {
-    AuditChange,
+  AuditChange,
   auditEventCodes,
   clearUploadSessionAdapterData,
   createUploadEventEnvelope,
@@ -17,17 +17,19 @@ import {
   normalizeFileKeyMetadata,
 } from "@silo-storage/shared";
 
-import {
-  enqueueAbortMultipartJob,
-  enqueueDeleteObjectJob,
-  enqueueFinalizeFailedFileKeyJob,
-} from "./lifecycleJob";
 import type { AuditActor } from "./audit";
+import type { AuditLogDownloadPolicy } from "./retention";
 import {
   buildSystemAuditActor,
   recordAuditEvent,
   recordUsageAuditEvent,
 } from "./audit";
+import {
+  enqueueAbortMultipartJob,
+  enqueueDeleteObjectJob,
+  enqueueFinalizeFailedFileKeyJob,
+} from "./lifecycleJob";
+import { computeRetentionExpiry } from "./retention";
 import { enqueueUploadWebhookEvent } from "./webhook";
 
 export class UploadFailureError extends Error {
@@ -89,25 +91,45 @@ export async function lookupFileKey(
 async function trackUsageEvent(
   db: Db,
   opts: {
-    eventType: "upload_completed" | "upload_failed" | "download",
-    projectId: string,
-    environmentId: string,
-    bytes?: number,
-    fileId?: string,
-    fileName?: string,
-    actor?: AuditActor,
-  }
+    eventType: "upload_completed" | "upload_failed" | "download";
+    projectId: string;
+    environmentId: string;
+    bytes?: number;
+    fileId?: string;
+    fileName?: string;
+    actor?: AuditActor;
+    isSignedUrl?: boolean;
+  },
 ) {
-  const { eventType, projectId, environmentId, bytes, fileId, fileName, actor } = opts;
+  const {
+    eventType,
+    projectId,
+    environmentId,
+    bytes,
+    fileId,
+    fileName,
+    actor,
+    isSignedUrl,
+  } = opts;
   try {
     const project = await db.query.projects.findFirst({
       where: eq(projects.id, projectId),
-      columns: { parentOrganizationId: true },
+      columns: {
+        parentOrganizationId: true,
+        auditLogDownloadPolicy: true,
+        auditLogRetentionDays: true,
+        usageEventRetentionDays: true,
+      },
     });
 
     if (!project?.parentOrganizationId) return;
 
     const organizationId = project.parentOrganizationId;
+    const createdAt = new Date();
+    const expiresAt = computeRetentionExpiry(
+      createdAt,
+      project.usageEventRetentionDays,
+    );
 
     await db.insert(usageEvents).values({
       organizationId,
@@ -116,6 +138,8 @@ async function trackUsageEvent(
       eventType,
       bytes: bytes ?? null,
       fileId: fileId ?? null,
+      createdAt,
+      expiresAt,
     });
 
     await recordUsageAuditEvent(db, {
@@ -127,6 +151,11 @@ async function trackUsageEvent(
       fileId,
       resourceLabel: fileName ?? null,
       actor,
+      createdAt,
+      isSignedUrl,
+      auditLogDownloadPolicy:
+        project.auditLogDownloadPolicy as AuditLogDownloadPolicy,
+      auditRetentionDays: project.auditLogRetentionDays,
     });
 
     const today = new Date().toISOString().substring(0, 10);
@@ -422,10 +451,7 @@ export async function deleteFileKey(
       return { status: "deleted_without_cleanup" };
     }
 
-    await tx
-      .update(fileKeys)
-      .set(nextBase)
-      .where(eq(fileKeys.id, fileKey.id));
+    await tx.update(fileKeys).set(nextBase).where(eq(fileKeys.id, fileKey.id));
 
     await enqueueDeleteObjectJob(tx, {
       projectId: opts.projectId,
@@ -556,23 +582,23 @@ export async function updateFileKeyAccess(
       .where(eq(fileKeys.id, opts.fileKeyId))
       .returning();
 
-      await recordAuditEvent(tx, {
-        organizationId: parentOrganizationId,
-        projectId: opts.projectId,
-        environmentId: opts.environmentId,
-        eventCode: auditEventCodes.fileKeyAccessUpdated,
-        eventCategory: "lifecycle",
-        resourceType: "file_key",
-        resourceId: fileKey.id,
-        resourceLabel: fileKey.fileName,
-        status: "success",
-        summary: `File key access updated for ${fileKey.fileName}`,
-        changes,
-        ...(opts.actor ?? buildSystemAuditActor()),
-        metadata: {
-          fileKeyId: fileKey.id,
-        },
-      });
+    await recordAuditEvent(tx, {
+      organizationId: parentOrganizationId,
+      projectId: opts.projectId,
+      environmentId: opts.environmentId,
+      eventCode: auditEventCodes.fileKeyAccessUpdated,
+      eventCategory: "lifecycle",
+      resourceType: "file_key",
+      resourceId: fileKey.id,
+      resourceLabel: fileKey.fileName,
+      status: "success",
+      summary: `File key access updated for ${fileKey.fileName}`,
+      changes,
+      ...(opts.actor ?? buildSystemAuditActor()),
+      metadata: {
+        fileKeyId: fileKey.id,
+      },
+    });
     return upd;
   });
 

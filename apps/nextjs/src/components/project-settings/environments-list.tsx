@@ -234,7 +234,7 @@ export function EnvironmentsList({
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle className="flex items-center gap-2">
-              <Layers className="h-5 w-5" />
+              <Layers className="h-4 w-4" />
               Environments
             </CardTitle>
             <CardDescription>

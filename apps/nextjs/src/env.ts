@@ -16,8 +16,8 @@ export const env = createEnv({
   /**
    * Specify your server-side environment variables schema here.
    * This way you can ensure the app isn't built with invalid env vars.
-  */
- server: {
+   */
+  server: {
     POSTGRES_URL: z.url(),
     POSTGRES_URL_DIRECT: z.url().optional(),
     WORKER_URL: z.url(),
@@ -25,6 +25,7 @@ export const env = createEnv({
     PROJECT_ROUTE_MODE: z.enum(["subdomain", "path"]).default("subdomain"),
     SIGNING_SECRET: z.string().min(32),
     CALLBACK_SECRET: z.string().min(32),
+    CRON_SECRET: z.string().min(16).optional(),
     WEBHOOK_DELIVERY_ENABLED: z.boolean().default(true),
     DEV_UPLOAD_SSE_ENABLED: z.boolean().default(true),
   },
@@ -41,7 +42,8 @@ export const env = createEnv({
    */
   experimental__runtimeEnv: {
     ...process.env,
-    DISABLE_ORG_CREATION: process.env.NEXT_PUBLIC_DISABLE_ORG_CREATION === "true",
+    DISABLE_ORG_CREATION:
+      process.env.NEXT_PUBLIC_DISABLE_ORG_CREATION === "true",
     SILO_CDN: process.env.NEXT_PUBLIC_SILO_CDN,
   },
   skipValidation:

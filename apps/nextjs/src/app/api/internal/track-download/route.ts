@@ -1,9 +1,11 @@
+import type { AuditLogDownloadPolicy } from "@silo-storage/api/service/retention";
 import { z } from "zod";
 
 import {
   buildSystemAuditActor,
   recordUsageAuditEvent,
 } from "@silo-storage/api/service/audit";
+import { computeRetentionExpiry } from "@silo-storage/api/service/retention";
 import { eq, sql } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import { projects, usageDaily, usageEvents } from "@silo-storage/db/schema";
@@ -17,6 +19,7 @@ const schema = z.object({
   fileKeyId: z.string(),
   fileName: z.string(),
   bytes: z.number(),
+  isSignedUrl: z.boolean().optional(),
 });
 
 export async function POST(request: Request) {
@@ -37,12 +40,18 @@ export async function POST(request: Request) {
     );
   }
 
-  const { projectId, environmentId, fileId, fileKeyId, fileName, bytes } = parsed.data;
+  const { projectId, environmentId, fileId, fileKeyId, fileName, bytes } =
+    parsed.data;
 
   try {
     const project = await db.query.projects.findFirst({
       where: eq(projects.id, projectId),
-      columns: { parentOrganizationId: true },
+      columns: {
+        parentOrganizationId: true,
+        auditLogDownloadPolicy: true,
+        auditLogRetentionDays: true,
+        usageEventRetentionDays: true,
+      },
     });
 
     if (!project?.parentOrganizationId) {
@@ -53,6 +62,11 @@ export async function POST(request: Request) {
     }
 
     const organizationId = project.parentOrganizationId;
+    const createdAt = new Date();
+    const expiresAt = computeRetentionExpiry(
+      createdAt,
+      project.usageEventRetentionDays,
+    );
 
     await db.insert(usageEvents).values({
       organizationId,
@@ -61,6 +75,8 @@ export async function POST(request: Request) {
       eventType: "download",
       bytes,
       fileId,
+      createdAt,
+      expiresAt,
     });
 
     await recordUsageAuditEvent(db, {
@@ -73,6 +89,14 @@ export async function POST(request: Request) {
       actor: buildSystemAuditActor("System"),
       resourceLabel: fileName,
       resourceId: fileKeyId,
+      createdAt,
+      isSignedUrl: parsed.data.isSignedUrl ?? false,
+      auditLogDownloadPolicy:
+        project.auditLogDownloadPolicy as AuditLogDownloadPolicy,
+      auditRetentionDays: project.auditLogRetentionDays,
+      metadata: {
+        fileKeyId,
+      },
     });
 
     const today = new Date().toISOString().split("T")[0];

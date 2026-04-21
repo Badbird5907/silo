@@ -1,5 +1,21 @@
+import type { AuditLogDownloadPolicy } from "@silo-storage/api/service/retention";
 import { z } from "zod";
 
+import {
+  buildApiKeyAuditActor,
+  buildSystemAuditActor,
+  recordUsageAuditEvent,
+} from "@silo-storage/api/service/audit";
+import {
+  markUploadAsFailed,
+  UploadFailureError,
+} from "@silo-storage/api/service/fileKey";
+import {
+  enqueueDeleteObjectJob,
+  runLifecycleJobBatch,
+} from "@silo-storage/api/service/lifecycleJob";
+import { computeRetentionExpiry } from "@silo-storage/api/service/retention";
+import { enqueueUploadWebhookEvent } from "@silo-storage/api/service/webhook";
 import { eq, sql } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import {
@@ -20,10 +36,6 @@ import {
 import { isCallbackAuthorized } from "@/lib/internal/callback-auth";
 import { setCompletionRecord } from "@/lib/upload/completion";
 import { completeFileKeyFromCallback } from "@/lib/upload/register";
-import { buildApiKeyAuditActor, buildSystemAuditActor, recordUsageAuditEvent } from "@silo-storage/api/service/audit";
-import { enqueueDeleteObjectJob, runLifecycleJobBatch } from "@silo-storage/api/service/lifecycleJob";
-import { enqueueUploadWebhookEvent } from "@silo-storage/api/service/webhook";
-import { markUploadAsFailed, UploadFailureError } from "@silo-storage/api/service/fileKey";
 
 const schema = z.union([
   z.object({
@@ -35,7 +47,11 @@ const schema = z.union([
         fileKeyId: z.string(),
         accessKey: z.string(),
         fileName: z.string(),
-        claimedSize: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+        claimedSize: z
+          .number()
+          .int()
+          .nonnegative()
+          .max(Number.MAX_SAFE_INTEGER),
         claimedHash: z.string().nullable(),
         claimedMimeType: z.string().nullable(),
         actualHash: z.string().nullable(),
@@ -52,9 +68,12 @@ const schema = z.union([
         isPublic: z.boolean().optional(),
         metadata: z.record(z.string(), z.unknown()).optional(),
       })
-      .refine((value) => Boolean(value.storage?.objectKey ?? value.adapterKey), {
-        message: "storage.objectKey or adapterKey is required",
-      }),
+      .refine(
+        (value) => Boolean(value.storage?.objectKey ?? value.adapterKey),
+        {
+          message: "storage.objectKey or adapterKey is required",
+        },
+      ),
   }),
   z.object({
     contractVersion: z.literal(1).optional(),
@@ -93,12 +112,22 @@ async function trackUsageEvent(
   try {
     const project = await db.query.projects.findFirst({
       where: eq(projects.id, projectId),
-      columns: { parentOrganizationId: true },
+      columns: {
+        parentOrganizationId: true,
+        auditLogDownloadPolicy: true,
+        auditLogRetentionDays: true,
+        usageEventRetentionDays: true,
+      },
     });
 
     if (!project?.parentOrganizationId) return;
 
     const organizationId = project.parentOrganizationId;
+    const createdAt = new Date();
+    const expiresAt = computeRetentionExpiry(
+      createdAt,
+      project.usageEventRetentionDays,
+    );
     const apiKey = apiKeyId
       ? await db.query.apiKeys.findFirst({
           where: eq(apiKeys.id, apiKeyId),
@@ -118,6 +147,8 @@ async function trackUsageEvent(
         bytes: bytes ?? null,
         fileId: resolvedFileId ?? null,
         apiKeyId: apiKeyId ?? null,
+        createdAt,
+        expiresAt,
       });
 
     try {
@@ -165,6 +196,10 @@ async function trackUsageEvent(
         keyName: apiKey?.name ?? null,
         keyPrefix: apiKey?.keyPrefix ?? null,
       },
+      createdAt,
+      auditLogDownloadPolicy:
+        project.auditLogDownloadPolicy as AuditLogDownloadPolicy,
+      auditRetentionDays: project.auditLogRetentionDays,
     });
 
     const today = new Date().toISOString().substring(0, 10);
@@ -498,7 +533,10 @@ export async function POST(request: Request) {
       const file = completion.file;
       const fileKey = completion.fileKey;
 
-      if (completion.alreadyCompleted && file.storageKey !== resolvedStorageKey) {
+      if (
+        completion.alreadyCompleted &&
+        file.storageKey !== resolvedStorageKey
+      ) {
         try {
           await scheduleAdapterKeyCleanup({
             projectId: data.projectId,
@@ -586,7 +624,7 @@ export async function POST(request: Request) {
       if (!completion.alreadyCompleted) {
         const callbackApiKeyId = getCallbackApiKeyId(fileKey.callbackMetadata);
 
-        void trackUsageEvent(
+        await trackUsageEvent(
           "upload_completed",
           data.projectId,
           data.environmentId,

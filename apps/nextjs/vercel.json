@@ -1,6 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "turbo run build && pnpm --filter @silo-storage/db migrate",
+  "crons": [
+    {
+      "path": "/api/cron/retention",
+      "schedule": "0 3 * * *"
+    }
+  ],
   "functions": {
     "src/app/api/internal/webhooks/dispatch/route.ts": {
       "maxDuration": 60,

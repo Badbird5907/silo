@@ -2,12 +2,9 @@ import type { Context } from "hono";
 
 import type { Bindings, Variables } from "../types/bindings";
 import { verifyDownloadSignature } from "../middleware/auth";
+import { reportMissingObject, trackDownload } from "../services/callback";
 import { trackDownloadStream } from "../services/download-stream";
 import { getCachedFileKey } from "../services/file-key-cache";
-import {
-  reportMissingObject,
-  trackDownload,
-} from "../services/callback";
 import { Errors } from "../utils/errors";
 
 /**
@@ -66,6 +63,7 @@ export async function handleDownload(
 
   const signature = c.req.query("sig");
   const expiresAt = c.req.query("expiresAt");
+  const isSignedUrl = Boolean(signature && expiresAt);
 
   if (expiresAt) {
     // check key expiry early
@@ -207,6 +205,7 @@ export async function handleDownload(
           fileKeyId: fileKey.id,
           fileName: fileKey.fileName,
           bytes,
+          isSignedUrl,
         },
         c.env,
       );

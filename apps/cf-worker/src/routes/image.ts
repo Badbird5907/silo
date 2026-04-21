@@ -2,8 +2,8 @@ import type { Context } from "hono";
 
 import {
   normalizeImageFormat,
-  normalizeImageWidth,
   normalizeImageQuality,
+  normalizeImageWidth,
 } from "@silo-storage/shared";
 
 import type { Bindings, Variables } from "../types/bindings";
@@ -100,6 +100,7 @@ export async function handleImage(c: ImageContext): Promise<Response> {
   const preserveImageExif = c.get("preserveImageExif");
   const signature = c.req.query("sig");
   const expiresAt = c.req.query("expiresAt");
+  const isSignedUrl = Boolean(signature && expiresAt);
 
   if (expiresAt) {
     const now = Math.floor(Date.now() / 1000);
@@ -114,7 +115,9 @@ export async function handleImage(c: ImageContext): Promise<Response> {
   try {
     width = normalizeImageWidth(c.req.query("w"));
     quality = normalizeImageQuality(c.req.query("q"));
-    requestedFormat = normalizeImageFormat(c.req.query("fmt") ?? c.req.header("format"));
+    requestedFormat = normalizeImageFormat(
+      c.req.query("fmt") ?? c.req.header("format"),
+    );
   } catch (error) {
     throw Errors.invalidRequest(
       error instanceof Error ? error.message : "Invalid image transform params",
@@ -232,6 +235,7 @@ export async function handleImage(c: ImageContext): Promise<Response> {
           fileKeyId: fileKey.id,
           fileName: fileKey.fileName,
           bytes,
+          isSignedUrl,
         },
         c.env,
       );
@@ -291,4 +295,3 @@ export async function handleInternalImageSource(
     headers,
   });
 }
-

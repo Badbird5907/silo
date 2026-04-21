@@ -62,7 +62,7 @@ export const resourceLifecycleState = pgEnum("resource_lifecycle_state", [
 
 export const auditLogDownloadPolicy = pgEnum("audit_log_download_policy", [
   "disabled",
-  "all",
+  "always",
   "signed_only", // only log downloads with signed URLs (assuming they are private + no serve)
 ]);
 
@@ -87,7 +87,7 @@ export const projects = pgTable("projects", {
     .notNull()
     .default(24 * 60),
   auditLogRetentionDays: integer("audit_log_retention_days").default(90).notNull(),
-  auditLogDownloads: boolean("audit_log_downloads").notNull().default(false), // don't log downloads by default
+  auditLogDownloadPolicy: auditLogDownloadPolicy("audit_log_download_policy").notNull().default("disabled"), // don't log downloads by default
   usageEventRetentionDays: integer("usage_event_retention_days").default(90).notNull(),
   parentOrganizationId: text("parent_organization_id").references(
     () => auth.organizations.id,

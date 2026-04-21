@@ -117,6 +117,9 @@ export async function updateProject(
     preserveImageExif?: boolean;
     pendingUploadFailAfterMinutes?: number;
     pendingUploadFailAfterHours?: number;
+    auditLogRetentionDays?: number;
+    usageEventRetentionDays?: number;
+    auditLogDownloadPolicy?: "disabled" | "always" | "signed_only";
   },
 ) {
   const updates: Partial<typeof projects.$inferInsert> = {};
@@ -133,6 +136,12 @@ export async function updateProject(
     input.pendingUploadFailAfterMinutes ?? input.pendingUploadFailAfterHours;
   if (pendingUploadFailAfterMinutes !== undefined)
     updates.pendingUploadFailAfterMinutes = pendingUploadFailAfterMinutes;
+  if (input.auditLogRetentionDays !== undefined)
+    updates.auditLogRetentionDays = input.auditLogRetentionDays;
+  if (input.usageEventRetentionDays !== undefined)
+    updates.usageEventRetentionDays = input.usageEventRetentionDays;
+  if (input.auditLogDownloadPolicy !== undefined)
+    updates.auditLogDownloadPolicy = input.auditLogDownloadPolicy;
 
   if (Object.keys(updates).length === 0) {
     return db.query.projects.findFirst({

@@ -22,6 +22,7 @@
     "./service/fileKey": "./src/service/fileKey.ts",
     "./service/lifecycleJob": "./src/service/lifecycleJob.ts",
     "./service/project": "./src/service/project.ts",
+    "./service/retention": "./src/service/retention.ts",
     "./service/webhook": "./src/service/webhook.ts",
     "./trpc": "./src/trpc.ts",
     "./types/auth": "./src/types/auth.ts"

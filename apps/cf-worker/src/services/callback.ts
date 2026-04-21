@@ -1,5 +1,4 @@
 import type { Bindings } from "../types/bindings";
-import { buildNextJsInternalHeaders } from "../lib/nextjs-internal";
 import type {
   FileKeyInfo,
   SignatureVerificationRequest,
@@ -7,6 +6,7 @@ import type {
   UploadCallbackData,
   UploadCallbackResponse,
 } from "../types/project";
+import { buildNextJsInternalHeaders } from "../lib/nextjs-internal";
 import {
   errorResponseSchema,
   fileKeyInfoSchema,
@@ -252,6 +252,7 @@ export interface TrackDownloadData {
   fileKeyId: string;
   fileName: string;
   bytes: number;
+  isSignedUrl: boolean;
 }
 
 export interface ReportMissingObjectData {

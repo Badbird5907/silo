@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@silo
 import { useOrganizationPermission } from "@/hooks/use-organization-permission";
 import { Button } from "@silo-storage/ui/components/button";
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
+import { AlertTriangle, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useMutation } from "@tanstack/react-query";
 import { useTRPC } from "@/trpc/react";
@@ -41,7 +41,7 @@ export function DangerZone({ projectId, organizationId, orgSlug }: { projectId: 
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
           <CardTitle className="flex items-center gap-2">
-            Danger Zone
+            <AlertTriangle className="h-4 w-4" /> Danger Zone
           </CardTitle>
           <CardDescription>
             Irreversible actions for this project
