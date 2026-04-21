@@ -229,6 +229,8 @@ export async function handleImage(c: ImageContext): Promise<Response> {
           projectId,
           environmentId: fileKey.environmentId,
           fileId: fileKey.file.id,
+          fileKeyId: fileKey.id,
+          fileName: fileKey.fileName,
           bytes,
         },
         c.env,

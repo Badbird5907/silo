@@ -130,6 +130,101 @@ function copyToClipboard(text: string, label: string) {
 type AccessValue = "public" | "private";
 type ServeImageValue = "enabled" | "disabled";
 
+function FileDetailRowSkeleton() {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center gap-2">
+        <Skeleton className="h-4 w-4 shrink-0 rounded" />
+        <Skeleton className="h-4 w-20" />
+      </div>
+      <Skeleton className="h-5 w-24 shrink-0" />
+    </div>
+  );
+}
+
+function FileDetailPageSkeleton() {
+  return (
+    <div
+      className="flex flex-1 flex-col gap-4 p-4"
+      aria-busy="true"
+      aria-label="Loading file details"
+    >
+      <Skeleton className="h-4 w-36" />
+      <div className="flex items-center gap-4">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <Skeleton className="hidden h-12 w-12 shrink-0 rounded-lg md:block" />
+          <div className="min-w-0 space-y-2">
+            <Skeleton className="h-7 w-full max-w-md" />
+            <Skeleton className="h-4 w-56 max-w-full" />
+          </div>
+        </div>
+        <Skeleton className="h-9 w-30 shrink-0 rounded-md" />
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-5 w-40" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <FileDetailRowSkeleton key={i} />
+            ))}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-5 w-32" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-9 w-full rounded-md" />
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-9 w-full rounded-md" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <Skeleton className="mb-2 h-5 w-36" />
+          <Skeleton className="h-4 w-full max-w-sm" />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-4 w-24" />
+            </div>
+            <Skeleton className="h-9 w-[180px] shrink-0 rounded-md" />
+          </div>
+          <Skeleton className="h-3 w-full max-w-lg" />
+        </CardContent>
+      </Card>
+
+      <Card className="border-red-200 dark:border-red-900">
+        <CardHeader>
+          <Skeleton className="mb-2 h-5 w-28" />
+          <Skeleton className="h-4 w-64 max-w-full" />
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-2">
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-4 w-full max-w-sm" />
+            </div>
+            <Skeleton className="h-9 w-32 shrink-0 rounded-md" />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function FileDetailPage({ params }: FileDetailPageProps) {
   const trpc = useTRPC();
   const router = useRouter();
@@ -140,7 +235,7 @@ export default function FileDetailPage({ params }: FileDetailPageProps) {
     orgSlug,
     environment: environmentSlug,
   } = use(params);
-  const { organization } = useOrganization();
+  const { organization, isLoading: organizationLoading } = useOrganization();
   const organizationId = organization?.id ?? "";
 
   const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
@@ -280,16 +375,16 @@ export default function FileDetailPage({ params }: FileDetailPageProps) {
     });
   };
 
-  if (projectQuery.isLoading || fileKeyQuery.isLoading || !organizationId) {
-    return (
-      <>
-        <div className="flex flex-1 flex-col gap-4 p-4">
-          <Skeleton className="h-48 w-full" />
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-32 w-full" />
-        </div>
-      </>
-    );
+  const showPageSkeleton =
+    organizationLoading ||
+    (Boolean(organizationId) &&
+      (projectQuery.isPending ||
+        projectQuery.isLoading ||
+        fileKeyQuery.isPending ||
+        fileKeyQuery.isLoading));
+
+  if (showPageSkeleton) {
+    return <FileDetailPageSkeleton />;
   }
 
   if (projectQuery.error || !projectQuery.data) {

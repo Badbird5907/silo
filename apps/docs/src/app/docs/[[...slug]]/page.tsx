@@ -11,7 +11,6 @@ import {
 
 import { getMDXComponents } from "@/components/mdx";
 import { source } from "@/lib/source";
-import { cn } from "@/lib/utils";
 
 interface DocPageData {
   title: string;

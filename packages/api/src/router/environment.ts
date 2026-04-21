@@ -16,6 +16,13 @@ import {
   updateEnvironmentCallbackHeaders,
   updateEnvironmentWebhookConfig,
 } from "../service/environment";
+import {
+  buildAuditChanges,
+  buildHeaderAuditChanges,
+  buildUserAuditActor,
+  normalizeUrlValue,
+  recordAuditEvent,
+} from "../service/audit";
 import { organizationProcedure, requirePermission } from "../trpc";
 
 /** Validate that a project belongs to the caller's organization. */
@@ -122,13 +129,45 @@ export const environmentRouter = {
     .mutation(async ({ ctx, input }) => {
       await validateProjectAccess(ctx.db, input.projectId, ctx.organizationId);
 
-      return createEnvironment(ctx.db, {
+      const created = await createEnvironment(ctx.db, {
         projectId: input.projectId,
         name: input.name,
         type: input.type,
         ownerUserId: input.ownerUserId,
         slug: input.slug,
       });
+
+      if (!created) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to create environment",
+        });
+      }
+
+      await recordAuditEvent(ctx.db, {
+        organizationId: ctx.organizationId,
+        projectId: created.projectId,
+        environmentId: created.id,
+        ...buildUserAuditActor({
+          userId: ctx.session.user.id,
+          memberId: ctx.membership.id,
+          name: ctx.session.user.name,
+          email: ctx.session.user.email,
+        }),
+        eventCode: "environment.created",
+        eventCategory: "configuration",
+        resourceType: "environment",
+        resourceId: created.id,
+        resourceLabel: created.name,
+        summary: "Environment created",
+        metadata: {
+          type: created.type,
+          slug: created.slug,
+          ownerUserId: created.ownerUserId,
+        },
+      });
+
+      return created;
     }),
 
   createPersonal: organizationProcedure
@@ -141,12 +180,45 @@ export const environmentRouter = {
     .use(requirePermission({ personalEnvironment: ["create"] }))
     .mutation(async ({ ctx, input }) => {
       await validateProjectAccess(ctx.db, input.projectId, ctx.organizationId);
-      return createPersonalDevelopmentEnvironment(ctx.db, {
+      const created = await createPersonalDevelopmentEnvironment(ctx.db, {
         projectId: input.projectId,
         userId: ctx.session.user.id,
         preferredName: input.preferredName,
         userName: ctx.session.user.name,
       });
+
+      if (!created) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to create environment",
+        });
+      }
+
+      await recordAuditEvent(ctx.db, {
+        organizationId: ctx.organizationId,
+        projectId: created.projectId,
+        environmentId: created.id,
+        ...buildUserAuditActor({
+          userId: ctx.session.user.id,
+          memberId: ctx.membership.id,
+          name: ctx.session.user.name,
+          email: ctx.session.user.email,
+        }),
+        eventCode: "environment.created",
+        eventCategory: "configuration",
+        resourceType: "environment",
+        resourceId: created.id,
+        resourceLabel: created.name,
+        summary: "Environment created",
+        metadata: {
+          type: created.type,
+          slug: created.slug,
+          ownerUserId: created.ownerUserId,
+          personalDevelopment: true,
+        },
+      });
+
+      return created;
     }),
 
   update: organizationProcedure
@@ -159,13 +231,54 @@ export const environmentRouter = {
     )
     .use(requirePermission({ environment: ["update"] }))
     .mutation(async ({ ctx, input }) => {
-      await validateEnvironmentAccess(ctx.db, input.id, ctx.organizationId);
+      const environment = await validateEnvironmentAccess(
+        ctx.db,
+        input.id,
+        ctx.organizationId,
+      );
 
       const updated = await updateEnvironment(ctx.db, {
         id: input.id,
         name: input.name,
         type: input.type,
       });
+
+      if (updated) {
+        const changes = buildAuditChanges(
+          {
+            name: environment.name,
+            type: environment.type,
+            slug: environment.slug,
+          },
+          {
+            name: updated.name,
+            type: updated.type,
+            slug: updated.slug,
+          },
+        );
+
+        if (changes.length > 0) {
+          await recordAuditEvent(ctx.db, {
+            organizationId: ctx.organizationId,
+            projectId: updated.projectId ?? null,
+            environmentId: updated.id,
+            ...buildUserAuditActor({
+              userId: ctx.session.user.id,
+              memberId: ctx.membership.id,
+              name: ctx.session.user.name,
+              email: ctx.session.user.email,
+            }),
+            eventCode: "environment.updated",
+            eventCategory: "configuration",
+            resourceType: "environment",
+            resourceId: updated.id,
+            resourceLabel: updated.name,
+            summary: "Environment updated",
+            changes,
+          });
+        }
+      }
+
       return updated ? toPublicEnvironment(updated) : updated;
     }),
 
@@ -180,7 +293,11 @@ export const environmentRouter = {
     )
     .use(requirePermission({ environment: ["update"] }))
     .mutation(async ({ ctx, input }) => {
-      await validateEnvironmentAccess(ctx.db, input.id, ctx.organizationId);
+      const environment = await validateEnvironmentAccess(
+        ctx.db,
+        input.id,
+        ctx.organizationId,
+      );
       const updated = await updateEnvironmentWebhookConfig(ctx.db, {
         environmentId: input.id,
         enabled: input.enabled,
@@ -195,6 +312,40 @@ export const environmentRouter = {
         });
       }
 
+      const changes = buildAuditChanges(
+        {
+          webhookEnabled: environment.webhookEnabled,
+          webhookUrl: normalizeUrlValue(environment.webhookUrl),
+          webhookEvents: environment.webhookEvents,
+        },
+        {
+          webhookEnabled: updated.webhookEnabled,
+          webhookUrl: normalizeUrlValue(updated.webhookUrl),
+          webhookEvents: updated.webhookEvents,
+        },
+      );
+
+      if (changes.length > 0) {
+        await recordAuditEvent(ctx.db, {
+          organizationId: ctx.organizationId,
+          projectId: updated.projectId ?? null,
+          environmentId: updated.id,
+          ...buildUserAuditActor({
+            userId: ctx.session.user.id,
+            memberId: ctx.membership.id,
+            name: ctx.session.user.name,
+            email: ctx.session.user.email,
+          }),
+          eventCode: "environment.webhook.updated",
+          eventCategory: "configuration",
+          resourceType: "environment",
+          resourceId: updated.id,
+          resourceLabel: updated.name,
+          summary: "Webhook settings updated",
+          changes,
+        });
+      }
+
       return toPublicEnvironment(updated);
     }),
 
@@ -202,7 +353,11 @@ export const environmentRouter = {
     .input(z.object({ id: z.string() }))
     .use(requirePermission({ environment: ["update"] }))
     .mutation(async ({ ctx, input }) => {
-      await validateEnvironmentAccess(ctx.db, input.id, ctx.organizationId);
+      const environment = await validateEnvironmentAccess(
+        ctx.db,
+        input.id,
+        ctx.organizationId,
+      );
       const result = await rotateEnvironmentWebhookSecret(ctx.db, input.id);
 
       if (!result.environment) {
@@ -211,6 +366,27 @@ export const environmentRouter = {
           message: "Environment not found",
         });
       }
+
+      await recordAuditEvent(ctx.db, {
+        organizationId: ctx.organizationId,
+        projectId: result.environment.projectId ?? null,
+        environmentId: result.environment.id,
+        ...buildUserAuditActor({
+          userId: ctx.session.user.id,
+          memberId: ctx.membership.id,
+          name: ctx.session.user.name,
+          email: ctx.session.user.email,
+        }),
+        eventCode: "environment.webhook_secret.rotated",
+        eventCategory: "security",
+        resourceType: "environment",
+        resourceId: result.environment.id,
+        resourceLabel: result.environment.name,
+        summary: "Webhook secret rotated",
+        metadata: {
+          previousSecretSet: !!environment.webhookSecret,
+        },
+      });
 
       return {
         ...toPublicEnvironment(result.environment),
@@ -222,7 +398,11 @@ export const environmentRouter = {
     .input(z.object({ id: z.string(), headers: z.record(z.string(), z.string()) }))
     .use(requirePermission({ environment: ["update"] }))
     .mutation(async ({ ctx, input }) => {
-      await validateEnvironmentAccess(ctx.db, input.id, ctx.organizationId);
+      const environment = await validateEnvironmentAccess(
+        ctx.db,
+        input.id,
+        ctx.organizationId,
+      );
       const updated = await updateEnvironmentCallbackHeaders(
         ctx.db,
         input.id,
@@ -234,6 +414,33 @@ export const environmentRouter = {
           message: "Environment not found",
         });
       }
+
+      const changes = buildHeaderAuditChanges(
+        environment.callbackHeaders,
+        updated.callbackHeaders,
+      );
+
+      if (changes.length > 0) {
+        await recordAuditEvent(ctx.db, {
+          organizationId: ctx.organizationId,
+          projectId: updated.projectId ?? null,
+          environmentId: updated.id,
+          ...buildUserAuditActor({
+            userId: ctx.session.user.id,
+            memberId: ctx.membership.id,
+            name: ctx.session.user.name,
+            email: ctx.session.user.email,
+          }),
+          eventCode: "environment.callback_headers.updated",
+          eventCategory: "security",
+          resourceType: "environment",
+          resourceId: updated.id,
+          resourceLabel: updated.name,
+          summary: "Callback headers updated",
+          changes,
+        });
+      }
+
       return toPublicEnvironment(updated);
     }),
 
@@ -253,6 +460,32 @@ export const environmentRouter = {
         });
       }
 
-      return deleteEnvironment(ctx.db, input.id, environment.projectId);
+      const deleted = await deleteEnvironment(ctx.db, input.id, environment.projectId);
+
+      if (deleted) {
+        await recordAuditEvent(ctx.db, {
+          organizationId: ctx.organizationId,
+          projectId: environment.projectId,
+          environmentId: input.id,
+          ...buildUserAuditActor({
+            userId: ctx.session.user.id,
+            memberId: ctx.membership.id,
+            name: ctx.session.user.name,
+            email: ctx.session.user.email,
+          }),
+          eventCode: "environment.deleted",
+          eventCategory: "lifecycle",
+          resourceType: "environment",
+          resourceId: input.id,
+          resourceLabel: environment.name,
+          summary: "Environment deleted",
+          metadata: {
+            slug: environment.slug,
+            type: environment.type,
+          },
+        });
+      }
+
+      return deleted;
     }),
 } satisfies TRPCRouterRecord;

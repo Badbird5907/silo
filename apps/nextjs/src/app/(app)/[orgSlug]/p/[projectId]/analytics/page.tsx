@@ -286,7 +286,7 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
           <StatCard
             title="Total Storage"
             value={formatBytes(stats?.storage.totalBytes ?? 0)}
-            description={`${stats?.storage.fileCount ?? 0} files`}
+            description="Current stored bytes"
             icon={HardDriveIcon}
           />
           <StatCard

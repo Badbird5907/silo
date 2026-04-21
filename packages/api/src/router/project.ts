@@ -10,6 +10,11 @@ import {
   listProjects,
   updateProject,
 } from "../service/project";
+import {
+  buildAuditChanges,
+  buildUserAuditActor,
+  recordAuditEvent,
+} from "../service/audit";
 import { organizationProcedure, requirePermission } from "../trpc";
 
 export const projectRouter = {
@@ -130,7 +135,7 @@ export const projectRouter = {
         });
       }
 
-      return updateProject(ctx.db, {
+      const updated = await updateProject(ctx.db, {
         id: input.id,
         name: input.name,
         defaultFileAccess: input.defaultFileAccess,
@@ -139,6 +144,52 @@ export const projectRouter = {
         preserveImageExif: input.preserveImageExif,
         pendingUploadFailAfterHours: input.pendingUploadFailAfterMinutes,
       });
+
+      if (updated) {
+        const changes = buildAuditChanges(
+          {
+            name: project.name,
+            defaultFileAccess: project.defaultFileAccess,
+            imageDeliveryPolicy: project.imageDeliveryPolicy,
+            defaultServeImage: project.defaultServeImage,
+            preserveImageExif: project.preserveImageExif,
+            pendingUploadFailAfterMinutes: project.pendingUploadFailAfterMinutes,
+          },
+          {
+            name: updated.name,
+            defaultFileAccess: updated.defaultFileAccess,
+            imageDeliveryPolicy: updated.imageDeliveryPolicy,
+            defaultServeImage: updated.defaultServeImage,
+            preserveImageExif: updated.preserveImageExif,
+            pendingUploadFailAfterMinutes: updated.pendingUploadFailAfterMinutes,
+          },
+        );
+
+        if (changes.length > 0) {
+          await recordAuditEvent(ctx.db, {
+            organizationId: ctx.organizationId,
+            projectId: updated.id,
+            ...buildUserAuditActor({
+              userId: ctx.session.user.id,
+              memberId: ctx.membership.id,
+              name: ctx.session.user.name,
+              email: ctx.session.user.email,
+            }),
+            eventCode: "project.settings.updated",
+            eventCategory: "configuration",
+            resourceType: "project",
+            resourceId: updated.id,
+            resourceLabel: updated.name,
+            summary: "Project settings updated",
+            changes,
+            metadata: {
+              slug: updated.slug,
+            },
+          });
+        }
+      }
+
+      return updated;
     }),
 
   delete: organizationProcedure
@@ -158,6 +209,30 @@ export const projectRouter = {
           message: "You don't have access to this project",
         });
       }
-      return deleteProject(input.id);
+      const deleted = await deleteProject(input.id);
+
+      if (deleted) {
+        await recordAuditEvent(ctx.db, {
+          organizationId: ctx.organizationId,
+          projectId: input.id,
+          ...buildUserAuditActor({
+            userId: ctx.session.user.id,
+            memberId: ctx.membership.id,
+            name: ctx.session.user.name,
+            email: ctx.session.user.email,
+          }),
+          eventCode: "project.deleted",
+          eventCategory: "lifecycle",
+          resourceType: "project",
+          resourceId: input.id,
+          resourceLabel: project.name,
+          summary: "Project deleted",
+          metadata: {
+            slug: project.slug,
+          },
+        });
+      }
+
+      return deleted;
     }),
 } satisfies TRPCRouterRecord;

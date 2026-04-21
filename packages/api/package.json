@@ -2,12 +2,29 @@
   "name": "@silo-storage/api",
   "private": true,
   "type": "module",
+  "autoexport": true,
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./src/index.ts"
-    },
-    "./services": "./src/service/index.ts"
+    ".": "./src/index.ts",
+    "./env": "./src/env.ts",
+    "./root": "./src/root.ts",
+    "./router/analytics": "./src/router/analytics.ts",
+    "./router/apiKey": "./src/router/apiKey.ts",
+    "./router/audit": "./src/router/audit.ts",
+    "./router/auth": "./src/router/auth.ts",
+    "./router/environment": "./src/router/environment.ts",
+    "./router/file": "./src/router/file.ts",
+    "./router/fileKey": "./src/router/fileKey.ts",
+    "./router/organization": "./src/router/organization.ts",
+    "./router/project": "./src/router/project.ts",
+    "./service/analytics": "./src/service/analytics.ts",
+    "./service/audit": "./src/service/audit.ts",
+    "./service/environment": "./src/service/environment.ts",
+    "./service/fileKey": "./src/service/fileKey.ts",
+    "./service/lifecycleJob": "./src/service/lifecycleJob.ts",
+    "./service/project": "./src/service/project.ts",
+    "./service/webhook": "./src/service/webhook.ts",
+    "./trpc": "./src/trpc.ts",
+    "./types/auth": "./src/types/auth.ts"
   },
   "license": "MIT",
   "scripts": {

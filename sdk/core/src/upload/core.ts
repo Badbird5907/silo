@@ -1,6 +1,7 @@
 import type { z } from "zod";
 import { nanoid } from "nanoid";
 
+import type { UpdateFileAccessInput, UpdateFileAccessResult } from "./access";
 import type { UpdateFileExpiryInput, UpdateFileExpiryResult } from "./expiry";
 import type { CreateSiloCoreFromTokenInput } from "./token";
 import type {
@@ -27,6 +28,10 @@ import {
   generateSignedDownloadUrl,
   generateSignedUploadUrlWithSecret,
 } from "../signing";
+import {
+  createUpdateFileAccessRequestBody,
+  updateFileAccessResultSchema,
+} from "./access";
 import {
   applyFileExpiryToRegisterBody,
   createUpdateFileExpiryRequestBody,
@@ -202,6 +207,33 @@ export function createSiloCore(config: UploadCoreConfig) {
     }
 
     return parseApiResponse(response, updateFileExpiryResultSchema);
+  }
+
+  async function updateFileAccess(
+    input: UpdateFileAccessInput,
+  ): Promise<UpdateFileAccessResult> {
+    const body = createUpdateFileAccessRequestBody(input, config.environmentId);
+
+    const response = await fetchImpl(
+      `${baseUrl}/api/v1/files/${encodeURIComponent(input.fileKeyId)}/access`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${config.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      },
+    );
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(
+        `Update file access request failed (${response.status}): ${text || response.statusText}`,
+      );
+    }
+
+    return parseApiResponse(response, updateFileAccessResultSchema);
   }
 
   async function registerUploadBatch(
@@ -678,6 +710,7 @@ export function createSiloCore(config: UploadCoreConfig) {
     getFile,
     generateDownloadUrl,
     generateImageUrl,
+    updateFileAccess,
     updateFileExpiry,
     config,
   };

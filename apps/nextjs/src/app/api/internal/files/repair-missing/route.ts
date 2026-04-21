@@ -1,14 +1,11 @@
 import { z } from "zod";
 
-import {
-  enqueueLifecycleJob,
-  runLifecycleJobBatch,
-} from "@silo-storage/api/services";
 import { and, eq } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import { fileKeys } from "@silo-storage/db/schema";
 
 import { isCallbackAuthorized } from "@/lib/internal/callback-auth";
+import { enqueueLifecycleJob, runLifecycleJobBatch } from "@silo-storage/api/service/lifecycleJob";
 
 const bodySchema = z.object({
   projectId: z.string().min(1),

@@ -5,6 +5,7 @@ import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
+  Activity,
   BarChart3,
   Files,
   FolderKanban,
@@ -102,6 +103,11 @@ function getProjectNavItems(projectBasePath: string): NavItem[] {
       icon: BarChart3,
     },
     {
+      title: "Audit Log",
+      url: `${projectBasePath}/audit`,
+      icon: Activity,
+    },
+    {
       title: "Settings",
       url: `${projectBasePath}/settings`,
       icon: Settings,
@@ -110,10 +116,10 @@ function getProjectNavItems(projectBasePath: string): NavItem[] {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const [environmentControlsMounted, setEnvironmentControlsMounted] =
-    React.useState(false);
+  /** Session and other client-only signals must not change the tree between SSR and the first client paint. */
+  const [hasMounted, setHasMounted] = React.useState(false);
   React.useEffect(() => {
-    setEnvironmentControlsMounted(true);
+    setHasMounted(true);
   }, []);
 
   const { state: sidebarState } = useSidebar();
@@ -227,7 +233,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       (currentProjectQuery.isPending && !currentProjectQuery.isError));
 
   const showEnvironmentSwitcherSkeleton =
-    !environmentControlsMounted || environmentsQuery.isLoading;
+    !hasMounted || environmentsQuery.isLoading;
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -283,7 +289,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavMain items={navItems} label={navLabel} />
       </SidebarContent>
       <SidebarFooter>
-        {user && <NavUser user={user} onLogout={handleLogout} />}
+        {hasMounted && user && (
+          <NavUser user={user} onLogout={handleLogout} />
+        )}
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

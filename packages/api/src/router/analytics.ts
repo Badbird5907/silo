@@ -395,6 +395,8 @@ export const analyticsRouter = {
         startDate: z.string().optional(),
         endDate: z.string().optional(),
         environmentId: z.string().optional(),
+        includeStoredFiles: z.boolean().optional(),
+        includeFileCount: z.boolean().optional(),
       }),
     )
     .use(requirePermission({ analytics: ["read"] }))
@@ -431,6 +433,12 @@ export const analyticsRouter = {
       const startDate =
         input.startDate ?? thirtyDaysAgo.toISOString().slice(0, 10);
       const endDate = input.endDate ?? now.toISOString().slice(0, 10);
+      const fileFilters = and(
+        eq(files.projectId, input.projectId),
+        ...(input.environmentId
+          ? [eq(files.environmentId, input.environmentId)]
+          : []),
+      );
 
       const [
         dailyCounterStats,
@@ -438,11 +446,14 @@ export const analyticsRouter = {
         dailyStoredFilesStats,
         totals,
         storageResult,
+        fileCountResult,
       ] =
         await Promise.all([
           getProjectDailyCounters(ctx.db, input, startDate, endDate),
           getProjectStorageTimeline(ctx.db, input, startDate, endDate),
-          getStoredFilesTimeline(ctx.db, input, startDate, endDate),
+          input.includeStoredFiles
+            ? getStoredFilesTimeline(ctx.db, input, startDate, endDate)
+            : Promise.resolve([]),
           ctx.db
             .select({
               totalUploadsStarted: sum(usageDaily.uploadsStarted),
@@ -466,21 +477,23 @@ export const analyticsRouter = {
           ctx.db
             .select({
               totalBytes: sum(files.size),
-              fileCount: sql<number>`count(*)::int`,
             })
             .from(files)
-            .where(
-              and(
-                eq(files.projectId, input.projectId),
-                ...(input.environmentId
-                  ? [eq(files.environmentId, input.environmentId)]
-                  : []),
-              ),
-            ),
+            .where(fileFilters),
+          input.includeFileCount
+            ? ctx.db
+                .select({
+                  fileCount: sql<number>`count(*)::int`,
+                })
+                .from(files)
+                .where(fileFilters)
+            : Promise.resolve([]),
         ]);
 
       const totalStorage = storageResult[0]?.totalBytes ?? 0;
-      const fileCount = storageResult[0]?.fileCount ?? 0;
+      const fileCount = input.includeFileCount
+        ? (fileCountResult[0]?.fileCount ?? 0)
+        : null;
       const backfilledCounterStats = backfillCounterData(
         dailyCounterStats.map((row) => ({
           date: row.date,
@@ -498,7 +511,9 @@ export const analyticsRouter = {
       const dailyStatsWithBackfill = backfilledCounterStats.map((row, index) => ({
         ...row,
         storageBytes: dailyStorageStats[index]?.storageBytes ?? null,
-        storedFiles: dailyStoredFilesStats[index]?.storedFiles ?? 0,
+        ...(input.includeStoredFiles
+          ? { storedFiles: dailyStoredFilesStats[index]?.storedFiles ?? 0 }
+          : {}),
       }));
 
       return {

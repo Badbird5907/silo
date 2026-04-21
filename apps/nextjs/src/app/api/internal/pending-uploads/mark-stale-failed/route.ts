@@ -1,15 +1,12 @@
 import { z } from "zod";
 
-import {
-  markUploadAsFailed,
-  runLifecycleJobBatch,
-  UploadFailureError,
-} from "@silo-storage/api/services";
 import { and, asc, eq, sql } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import { fileKeys, projects } from "@silo-storage/db/schema";
 
 import { isCallbackAuthorized } from "@/lib/internal/callback-auth";
+import { markUploadAsFailed, UploadFailureError } from "@silo-storage/api/service/fileKey";
+import { runLifecycleJobBatch } from "@silo-storage/api/service/lifecycleJob";
 
 const bodySchema = z.object({
   limit: z.number().int().positive().max(500).default(100).optional(),
@@ -80,7 +77,6 @@ export async function POST(request: Request) {
           if (
             error.code === "ALREADY_COMPLETED" ||
             error.code === "ALREADY_FAILED" ||
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
             error.code === "NOT_FOUND"
           ) {
             skipped += 1;

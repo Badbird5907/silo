@@ -249,6 +249,8 @@ export interface TrackDownloadData {
   projectId: string;
   environmentId: string;
   fileId: string;
+  fileKeyId: string;
+  fileName: string;
   bytes: number;
 }
 

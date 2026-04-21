@@ -63,6 +63,7 @@ export function StoredFilesChart({
         environmentId,
         startDate,
         endDate,
+        includeStoredFiles: true,
       },
       { enabled: !!organizationId && !!projectId },
     ),

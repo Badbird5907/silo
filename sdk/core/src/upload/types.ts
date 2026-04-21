@@ -42,8 +42,7 @@ export interface GenerateUrlOverrideBase {
   projectSlug?: string;
 }
 
-export interface GenerateDownloadUrlOverrides
-  extends GenerateUrlOverrideBase {}
+export type GenerateDownloadUrlOverrides = GenerateUrlOverrideBase;
 
 export interface GenerateImageUrlInput {
   accessKey: string;

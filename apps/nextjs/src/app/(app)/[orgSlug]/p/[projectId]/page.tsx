@@ -7,9 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
   ArrowUpRight,
-  CheckCircle2,
   ChevronRight,
-  Clock,
   DownloadIcon,
   FileIcon,
   FolderIcon,
@@ -18,7 +16,6 @@ import {
   TrendingUpIcon,
   Upload,
   UploadIcon,
-  XCircle,
 } from "lucide-react";
 
 import { Badge } from "@silo-storage/ui/components/badge";
@@ -34,6 +31,14 @@ import { Separator } from "@silo-storage/ui/components/separator";
 import { Skeleton } from "@silo-storage/ui/components/skeleton";
 
 import { useOrganization } from "@/hooks/use-organization";
+import {
+  formatBytes,
+  formatRelativeTime,
+  getAuditEventBgColor,
+  getAuditEventColor,
+  getAuditEventIcon,
+  getAuditEventLabel,
+} from "@/lib/audit";
 import { useTRPC } from "@/trpc/react";
 
 interface ProjectPageProps {
@@ -42,88 +47,6 @@ interface ProjectPageProps {
     projectId: string;
     environment?: string;
   }>;
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
-}
-
-function formatRelativeTime(date: Date): string {
-  const now = new Date();
-  const diff = now.getTime() - new Date(date).getTime();
-  const seconds = Math.floor(diff / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-
-  if (days > 0) return `${days}d ago`;
-  if (hours > 0) return `${hours}h ago`;
-  if (minutes > 0) return `${minutes}m ago`;
-  return "Just now";
-}
-
-function getEventIcon(eventType: string) {
-  switch (eventType) {
-    case "upload_started":
-      return Clock;
-    case "upload_completed":
-      return CheckCircle2;
-    case "upload_failed":
-      return XCircle;
-    case "download":
-      return DownloadIcon;
-    default:
-      return FileIcon;
-  }
-}
-
-function getEventColor(eventType: string) {
-  switch (eventType) {
-    case "upload_started":
-      return "text-yellow-500";
-    case "upload_completed":
-      return "text-green-500";
-    case "upload_failed":
-      return "text-red-500";
-    case "download":
-      return "text-blue-500";
-    default:
-      return "text-muted-foreground";
-  }
-}
-
-function getEventBgColor(eventType: string) {
-  switch (eventType) {
-    case "upload_started":
-      return "bg-yellow-500/10";
-    case "upload_completed":
-      return "bg-green-500/10";
-    case "upload_failed":
-      return "bg-red-500/10";
-    case "download":
-      return "bg-blue-500/10";
-    default:
-      return "bg-muted";
-  }
-}
-
-function getEventLabel(eventType: string) {
-  switch (eventType) {
-    case "upload_started":
-      return "Upload started";
-    case "upload_completed":
-      return "Upload completed";
-    case "upload_failed":
-      return "Upload failed";
-    case "download":
-      return "Downloaded";
-    default:
-      return eventType;
-  }
 }
 
 function StatCardSkeleton() {
@@ -236,16 +159,26 @@ export default function ProjectPage({ params }: ProjectPageProps) {
     (env) => env.slug === environmentSlug,
   );
   const selectedEnvironmentId = selectedEnvironment?.id;
+  const analyticsInput: Parameters<
+    typeof trpc.analytics.getProjectStats.queryOptions
+  >[0] & {
+    includeFileCount: true;
+  } = {
+    projectId,
+    organizationId,
+    environmentId: selectedEnvironmentId,
+    includeFileCount: true,
+  };
 
   const analyticsQuery = useQuery(
     trpc.analytics.getProjectStats.queryOptions(
-      { projectId, organizationId, environmentId: selectedEnvironmentId },
+      analyticsInput,
       { enabled: !!organizationId && !!projectId },
     ),
   );
 
   const recentEventsQuery = useQuery(
-    trpc.analytics.getRecentEvents.queryOptions(
+    trpc.audit.recent.queryOptions(
       {
         projectId,
         organizationId,
@@ -281,6 +214,24 @@ export default function ProjectPage({ params }: ProjectPageProps) {
   if (environmentSlug && !environmentsQuery.isLoading && !selectedEnvironment) {
     notFound();
   }
+  if (!analyticsQuery.data) {
+    return (
+      <div className="flex flex-1 flex-col gap-4 p-6">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <StatCardSkeleton key={i} />
+          ))}
+        </div>
+        <div className="grid gap-4 lg:grid-cols-5">
+          <div className="flex flex-col gap-4 lg:col-span-2">
+            <QuickActionsSkeleton />
+            <EnvironmentsCardSkeleton />
+          </div>
+          <RecentActivityCardSkeleton />
+        </div>
+      </div>
+    );
+  }
 
   const stats = analyticsQuery.data;
   const environments = environmentsQuery.data ?? [];
@@ -289,9 +240,9 @@ export default function ProjectPage({ params }: ProjectPageProps) {
     ? `/${orgSlug}/p/${projectId}/e/${selectedEnvironment.slug}`
     : `/${orgSlug}/p/${projectId}`;
 
-  const totalBytes = stats?.storage.totalBytes ?? 0;
-  const uploadBytes = stats?.totals.bytesUploaded ?? 0;
-  const downloadBytes = stats?.totals.bytesDownloaded ?? 0;
+  const totalBytes = stats.storage.totalBytes;
+  const uploadBytes = stats.totals.bytesUploaded;
+  const downloadBytes = stats.totals.bytesDownloaded;
   const totalTransferred = uploadBytes + downloadBytes;
   const uploadPercent =
     totalTransferred > 0 ? (uploadBytes / totalTransferred) * 100 : 0;
@@ -309,18 +260,14 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                 <HardDriveIcon className="h-4 w-4" />
               </div>
             </div>
-            {analyticsQuery.isLoading ? (
-              <Skeleton className="mt-3 h-8 w-20" />
-            ) : (
-              <>
-                <p className="mt-3 text-3xl font-bold tracking-tight">
-                  {formatBytes(totalBytes)}
-                </p>
-                <p className="text-muted-foreground mt-1 text-sm">
-                  {stats?.storage.fileCount ?? 0} files stored
-                </p>
-              </>
-            )}
+            <>
+              <p className="mt-3 text-3xl font-bold tracking-tight">
+                {formatBytes(totalBytes)}
+              </p>
+              <p className="text-muted-foreground mt-1 text-sm">
+                {stats.storage.fileCount} files stored
+              </p>
+            </>
           </CardContent>
         </Card>
 
@@ -334,25 +281,21 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                 <UploadIcon className="h-4 w-4" />
               </div>
             </div>
-            {analyticsQuery.isLoading ? (
-              <Skeleton className="mt-3 h-8 w-16" />
-            ) : (
-              <>
-                <p className="mt-3 text-3xl font-bold tracking-tight">
-                  {stats?.totals.uploadsCompleted ?? 0}
-                </p>
-                <div className="mt-1 flex items-center gap-2 text-sm">
-                  {(stats?.totals.uploadsFailed ?? 0) > 0 ? (
-                    <span className="text-red-400">
-                      {stats?.totals.uploadsFailed} failed
-                    </span>
-                  ) : (
-                    <span className="text-green-500">All successful</span>
-                  )}
-                  <span className="text-muted-foreground">/ 30 days</span>
-                </div>
-              </>
-            )}
+            <>
+              <p className="mt-3 text-3xl font-bold tracking-tight">
+                {stats.totals.uploadsCompleted}
+              </p>
+              <div className="mt-1 flex items-center gap-2 text-sm">
+                {stats.totals.uploadsFailed > 0 ? (
+                  <span className="text-red-400">
+                    {stats.totals.uploadsFailed} failed
+                  </span>
+                ) : (
+                  <span className="text-green-500">All successful</span>
+                )}
+                <span className="text-muted-foreground">/ 30 days</span>
+              </div>
+            </>
           </CardContent>
         </Card>
 
@@ -366,18 +309,14 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                 <DownloadIcon className="h-4 w-4" />
               </div>
             </div>
-            {analyticsQuery.isLoading ? (
-              <Skeleton className="mt-3 h-8 w-16" />
-            ) : (
-              <>
-                <p className="mt-3 text-3xl font-bold tracking-tight">
-                  {stats?.totals.downloads ?? 0}
-                </p>
-                <p className="text-muted-foreground mt-1 text-sm">
-                  Last 30 days
-                </p>
-              </>
-            )}
+            <>
+              <p className="mt-3 text-3xl font-bold tracking-tight">
+                {stats.totals.downloads}
+              </p>
+              <p className="text-muted-foreground mt-1 text-sm">
+                Last 30 days
+              </p>
+            </>
           </CardContent>
         </Card>
 
@@ -391,36 +330,35 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                 <TrendingUpIcon className="h-4 w-4" />
               </div>
             </div>
-            {analyticsQuery.isLoading ? (
-              <Skeleton className="mt-3 h-8 w-20" />
-            ) : (
-              <>
-                <p className="mt-3 text-3xl font-bold tracking-tight">
-                  {formatBytes(totalTransferred)}
-                </p>
-                {totalTransferred > 0 && (
-                  <div className="mt-2">
-                    <div className="mb-1 flex justify-between text-xs">
-                      <span className="text-green-500">
-                        {formatBytes(uploadBytes)} up
-                      </span>
-                      <span className="text-blue-500">
-                        {formatBytes(downloadBytes)} down
-                      </span>
-                    </div>
-                    <div className="bg-blue-500 h-1.5 overflow-hidden rounded-full">
-                      <div className="h-full bg-green-500" style={{ width: `${Math.max(uploadPercent, 5)}%` }} />
-                      {/* <div className="h-full rounded-full bg-blue-500" style={{ width: `${Math.max(100 - uploadPercent, 5)}%` }} /> */}
-                    </div>
+            <>
+              <p className="mt-3 text-3xl font-bold tracking-tight">
+                {formatBytes(totalTransferred)}
+              </p>
+              {totalTransferred > 0 && (
+                <div className="mt-2">
+                  <div className="mb-1 flex justify-between text-xs">
+                    <span className="text-green-500">
+                      {formatBytes(uploadBytes)} up
+                    </span>
+                    <span className="text-blue-500">
+                      {formatBytes(downloadBytes)} down
+                    </span>
                   </div>
-                )}
-                {totalTransferred === 0 && (
-                  <p className="text-muted-foreground mt-1 text-sm">
-                    Last 30 days
-                  </p>
-                )}
-              </>
-            )}
+                  <div className="bg-blue-500 h-1.5 overflow-hidden rounded-full">
+                    <div
+                      className="h-full bg-green-500"
+                      style={{ width: `${Math.max(uploadPercent, 5)}%` }}
+                    />
+                    {/* <div className="h-full rounded-full bg-blue-500" style={{ width: `${Math.max(100 - uploadPercent, 5)}%` }} /> */}
+                  </div>
+                </div>
+              )}
+              {totalTransferred === 0 && (
+                <p className="text-muted-foreground mt-1 text-sm">
+                  Last 30 days
+                </p>
+              )}
+            </>
           </CardContent>
         </Card>
       </div>
@@ -564,11 +502,11 @@ export default function ProjectPage({ params }: ProjectPageProps) {
             <div>
               <CardTitle className="text-base">Recent Activity</CardTitle>
               <CardDescription className="text-xs">
-                Latest uploads and downloads
+                Latest operational events
               </CardDescription>
             </div>
             <Button variant="outline" size="sm" asChild>
-              <Link href={`${projectBasePath}/analytics`}>
+              <Link href={`${projectBasePath}/audit`}>
                 View All
                 <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
               </Link>
@@ -602,12 +540,17 @@ export default function ProjectPage({ params }: ProjectPageProps) {
             ) : (
               <div className="">
                 {recentEvents.slice(0, 8).map((event) => {
-                  const Icon = getEventIcon(event.eventType);
-                  const colorClass = getEventColor(event.eventType);
-                  const bgColorClass = getEventBgColor(event.eventType);
-                  const fileKey = event.file?.fileKeys[0];
-                  const fileName = fileKey?.fileName;
-                  const fileKeyId = fileKey?.id;
+                  const Icon = getAuditEventIcon(event.eventCode);
+                  const colorClass = getAuditEventColor(event.eventCode);
+                  const bgColorClass = getAuditEventBgColor(event.eventCode);
+                  const fileName =
+                    typeof event.metadata.fileName === "string"
+                      ? event.metadata.fileName
+                      : null;
+                  const fileKeyId =
+                    typeof event.metadata.fileKeyId === "string"
+                      ? event.metadata.fileKeyId
+                      : null;
                   const isClickable = !!fileKeyId;
 
                   const content = (
@@ -623,11 +566,11 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium">
-                          {fileName ?? getEventLabel(event.eventType)}
+                          {fileName ?? getAuditEventLabel(event.eventCode)}
                         </p>
                         <div className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-xs">
-                          <span>{getEventLabel(event.eventType)}</span>
-                          {event.environment.name && (
+                          <span>{getAuditEventLabel(event.eventCode)}</span>
+                          {event.environment?.name && (
                             <>
                               <span className="text-muted-foreground/40">
                                 /
@@ -635,12 +578,12 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                               <span>{event.environment.name}</span>
                             </>
                           )}
-                          {event.bytes != null && (
+                          {typeof event.metadata.bytes === "number" && (
                             <>
                               <span className="text-muted-foreground/40">
                                 /
                               </span>
-                              <span>{formatBytes(event.bytes)}</span>
+                              <span>{formatBytes(event.metadata.bytes)}</span>
                             </>
                           )}
                         </div>

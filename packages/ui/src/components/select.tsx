@@ -1,10 +1,112 @@
 "use client";
 
-import type * as React from "react";
+import * as React from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 
+import { Input } from "@silo-storage/ui/components/input";
 import { cn } from "@silo-storage/ui/lib/utils";
+
+interface SelectChildProps {
+  children?: React.ReactNode;
+  textValue?: string;
+}
+
+function getSearchText(node: React.ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") {
+    return String(node);
+  }
+
+  if (Array.isArray(node)) {
+    return node.map(getSearchText).join(" ");
+  }
+
+  if (React.isValidElement<{ children?: React.ReactNode }>(node)) {
+    return getSearchText(node.props.children);
+  }
+
+  return "";
+}
+
+function filterSelectChildren(
+  children: React.ReactNode,
+  query: string,
+): { children: React.ReactNode[]; hasMatch: boolean } {
+  const normalizedQuery = query.trim().toLowerCase();
+  const items = React.Children.toArray(children);
+
+  if (!normalizedQuery) {
+    return { children: items, hasMatch: items.length > 0 };
+  }
+
+  const filteredChildren: React.ReactNode[] = [];
+  const pendingDecorators: React.ReactNode[] = [];
+  let hasMatch = false;
+
+  for (const child of items) {
+    if (!React.isValidElement<SelectChildProps>(child)) {
+      continue;
+    }
+
+    if (child.type === React.Fragment) {
+      const result = filterSelectChildren(child.props.children, normalizedQuery);
+
+      if (result.hasMatch) {
+        filteredChildren.push(...pendingDecorators.splice(0));
+        filteredChildren.push(
+          <React.Fragment key={child.key}>{result.children}</React.Fragment>,
+        );
+        hasMatch = true;
+      }
+
+      continue;
+    }
+
+    if (
+      child.type === SelectLabel ||
+      child.type === SelectSeparator ||
+      child.type === SelectPrimitive.Label ||
+      child.type === SelectPrimitive.Separator
+    ) {
+      pendingDecorators.push(child);
+      continue;
+    }
+
+    if (child.type === SelectGroup || child.type === SelectPrimitive.Group) {
+      const result = filterSelectChildren(child.props.children, normalizedQuery);
+
+      if (result.hasMatch) {
+        filteredChildren.push(...pendingDecorators.splice(0));
+        filteredChildren.push(
+          React.cloneElement(child, undefined, result.children),
+        );
+        hasMatch = true;
+      }
+
+      continue;
+    }
+
+    if (child.type === SelectItem || child.type === SelectPrimitive.Item) {
+      const itemText =
+        typeof child.props.textValue === "string"
+          ? child.props.textValue
+          : getSearchText(child.props.children);
+
+      if (itemText.toLowerCase().includes(normalizedQuery)) {
+        filteredChildren.push(...pendingDecorators.splice(0));
+        filteredChildren.push(child);
+        hasMatch = true;
+      }
+
+      continue;
+    }
+
+    filteredChildren.push(...pendingDecorators.splice(0));
+    filteredChildren.push(child);
+  }
+
+  return { children: filteredChildren, hasMatch };
+}
 
 function Select({
   ...props
@@ -55,8 +157,37 @@ function SelectContent({
   className,
   children,
   position = "popper",
+  searchable = false,
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.Content>) {
+}: React.ComponentProps<typeof SelectPrimitive.Content> & {
+  searchable?: boolean;
+}) {
+  const [query, setQuery] = React.useState("");
+  const searchInputRef = React.useRef<HTMLInputElement | null>(null);
+  const { children: filteredChildren, hasMatch } = React.useMemo(
+    () => filterSelectChildren(children, query),
+    [children, query],
+  );
+
+  React.useEffect(() => {
+    if (!searchable) {
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => {
+      const input = searchInputRef.current;
+      if (!input || document.activeElement === input) {
+        return;
+      }
+
+      input.focus();
+      const cursorPosition = input.value.length;
+      input.setSelectionRange(cursorPosition, cursorPosition);
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [query, searchable]);
+
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
@@ -71,6 +202,23 @@ function SelectContent({
         {...props}
       >
         <SelectScrollUpButton />
+        {searchable && (
+          <div className="border-b p-1">
+            <Input
+              ref={searchInputRef}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDownCapture={(event) => {
+                if (event.key !== "Escape") {
+                  event.stopPropagation();
+                }
+              }}
+              placeholder="Search..."
+              autoFocus
+              className="h-8"
+            />
+          </div>
+        )}
         <SelectPrimitive.Viewport
           className={cn(
             "p-1",
@@ -78,7 +226,13 @@ function SelectContent({
               "h-(--radix-select-trigger-height) w-full min-w-(--radix-select-trigger-width) scroll-my-1",
           )}
         >
-          {children}
+          {hasMatch ? (
+            filteredChildren
+          ) : (
+            <div className="text-muted-foreground px-2 py-1.5 text-sm">
+              No results found.
+            </div>
+          )}
         </SelectPrimitive.Viewport>
         <SelectScrollDownButton />
       </SelectPrimitive.Content>

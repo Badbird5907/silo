@@ -5,9 +5,9 @@ import { and, eq } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import { fileKeys } from "@silo-storage/db/schema";
 import { asyncWaitForMessage } from "@silo-storage/redis";
-import { signWebhookPayload } from "@silo-storage/api/services";
 
 import { env } from "@/env";
+import { signWebhookPayload } from "@silo-storage/api/service/webhook";
 
 function toSseFrame(event: "connected" | "chunk" | "keepalive" | "error", payload: unknown) {
   return `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;

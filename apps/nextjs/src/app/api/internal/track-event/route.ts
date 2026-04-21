@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+import {
+  buildApiKeyAuditActor,
+  buildSystemAuditActor,
+  recordUsageAuditEvent,
+} from "@silo-storage/api/service/audit";
 import { eq, sql } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import { projects, usageDaily, usageEvents } from "@silo-storage/db/schema";
@@ -73,6 +78,27 @@ export async function POST(request: Request) {
       fileId: fileId ?? null,
       apiKeyId: apiKeyId ?? null,
       metadata: metadata ?? null,
+    });
+
+    await recordUsageAuditEvent(db, {
+      organizationId,
+      projectId,
+      environmentId,
+      eventType,
+      bytes,
+      fileId,
+      actor: apiKeyId
+        ? buildApiKeyAuditActor({})
+        : buildSystemAuditActor("Internal"),
+      resourceLabel:
+        typeof metadata?.fileName === "string" ? metadata.fileName : null,
+      metadata: {
+        apiKeyId: apiKeyId ?? null,
+        fileKeyId:
+          typeof metadata?.fileKeyId === "string" ? metadata.fileKeyId : null,
+        fileName:
+          typeof metadata?.fileName === "string" ? metadata.fileName : null,
+      },
     });
 
     const today = new Date().toISOString().split("T")[0];

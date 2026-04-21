@@ -3,7 +3,7 @@ import { z } from "zod";
 import {
   requeueDeadLifecycleJobs,
   runLifecycleJobBatch,
-} from "@silo-storage/api/services";
+} from "@silo-storage/api/service/lifecycleJob";
 import { db } from "@silo-storage/db/client";
 
 import { isCallbackAuthorized } from "@/lib/internal/callback-auth";

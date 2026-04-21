@@ -14,6 +14,10 @@ import {
 import { deriveSigningSecretFromHash } from "@silo-storage/shared/signing";
 import { env } from "../env";
 
+import {
+  buildUserAuditActor,
+  recordAuditEvent,
+} from "../service/audit";
 import { organizationProcedure, requirePermission } from "../trpc";
 
 function encodeSiloToken(payload: {
@@ -218,6 +222,30 @@ export const apiKeyRouter = {
         ps: project.slug,
       });
 
+      await recordAuditEvent(ctx.db, {
+        organizationId: ctx.organizationId,
+        projectId: input.projectId,
+        environmentId: input.environmentId,
+        ...buildUserAuditActor({
+          userId: ctx.session.user.id,
+          memberId: ctx.membership.id,
+          name: ctx.session.user.name,
+          email: ctx.session.user.email,
+        }),
+        eventCode: "api_key.created",
+        eventCategory: "security",
+        resourceType: "api_key",
+        resourceId: newKey.id,
+        resourceLabel: newKey.name,
+        summary: "API key created",
+        metadata: {
+          keyPrefix: newKey.keyPrefix,
+          environmentId: input.environmentId,
+          environmentName: environment.name,
+          expiresAt: newKey.expiresAt?.toISOString() ?? null,
+        },
+      });
+
       return {
         id: newKey.id,
         name: newKey.name,
@@ -241,6 +269,14 @@ export const apiKeyRouter = {
           eq(apiKeys.id, input.id),
           eq(apiKeys.organizationId, ctx.organizationId),
         ),
+        with: {
+          environment: {
+            columns: {
+              id: true,
+              name: true,
+            },
+          },
+        },
       });
 
       if (!apiKey) {
@@ -251,6 +287,29 @@ export const apiKeyRouter = {
       }
 
       await ctx.db.delete(apiKeys).where(eq(apiKeys.id, input.id));
+
+      await recordAuditEvent(ctx.db, {
+        organizationId: ctx.organizationId,
+        projectId: apiKey.projectId,
+        environmentId: apiKey.environmentId,
+        ...buildUserAuditActor({
+          userId: ctx.session.user.id,
+          memberId: ctx.membership.id,
+          name: ctx.session.user.name,
+          email: ctx.session.user.email,
+        }),
+        eventCode: "api_key.deleted",
+        eventCategory: "security",
+        resourceType: "api_key",
+        resourceId: apiKey.id,
+        resourceLabel: apiKey.name,
+        summary: "API key deleted",
+        metadata: {
+          keyPrefix: apiKey.keyPrefix,
+          environmentId: apiKey.environmentId,
+          environmentName: apiKey.environment.name,
+        },
+      });
 
       return { success: true };
     }),

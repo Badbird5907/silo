@@ -1,11 +1,11 @@
 import { z } from "zod";
 
 import { and, eq, inArray, isNotNull, lte } from "@silo-storage/db";
-import { syncEnvironmentStorageSnapshots } from "@silo-storage/api/services";
 import { db } from "@silo-storage/db/client";
 import { fileKeys, files } from "@silo-storage/db/schema";
 
 import { isCallbackAuthorized } from "@/lib/internal/callback-auth";
+import { syncEnvironmentStorageSnapshots } from "@silo-storage/api/service/analytics";
 
 const bodySchema = z.object({
   fileIds: z.array(z.string().min(1)).min(1).max(1000),

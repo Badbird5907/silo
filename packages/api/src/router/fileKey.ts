@@ -25,9 +25,11 @@ import {
 import {
   deleteFileKey,
   markUploadAsFailed,
-  runLifecycleJobBatch,
+  updateFileKeyAccess,
   UploadFailureError,
-} from "../service";
+} from "../service/fileKey";
+import { buildUserAuditActor } from "../service/audit";
+import { runLifecycleJobBatch } from "../service/lifecycleJob";
 import { organizationProcedure, requirePermission } from "../trpc";
 
 const sortFieldSchema = z.enum(["createdAt", "size", "mimeType", "fileName"]);
@@ -402,6 +404,7 @@ export const fileKeyRouter = {
       z.object({
         id: z.string(),
         projectId: z.string(),
+        environmentId: z.string(),
         isPublic: z.boolean(),
         serveImage: z.boolean().optional(),
       }),
@@ -419,55 +422,49 @@ export const fileKeyRouter = {
         });
       }
 
-      const fileKey = await ctx.db.query.fileKeys.findFirst({
+      const environment = await ctx.db.query.projectEnvironments.findFirst({
         where: and(
-          eq(fileKeys.id, input.id),
-          eq(fileKeys.projectId, input.projectId),
+          eq(projectEnvironments.id, input.environmentId),
+          eq(projectEnvironments.projectId, input.projectId),
         ),
-        with: {
-          file: {
-            columns: {
-              mimeType: true,
-            },
-          },
-        },
+      });
+      if (!environment) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Environment not found",
+        });
+      }
+
+      if (environment.projectId !== input.projectId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Environment does not belong to this project",
+        });
+      }
+
+      const result = await updateFileKeyAccess(ctx.db, {
+        projectId: input.projectId,
+        fileKeyId: input.id,
+        environmentId: environment.id,
+        isPublic: input.isPublic,
+        serveImage: input.serveImage,
       });
 
-      if (!fileKey) {
+      if (result.status === "not_found") {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "FileKey not found",
         });
       }
 
-      if (typeof input.serveImage === "boolean") {
-        const mimeType = fileKey.file?.mimeType ?? fileKey.claimedMimeType;
-        const isImageFile =
-          typeof mimeType === "string" && mimeType.startsWith("image/");
-
-        if (!isImageFile) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "serveImage can only be updated for image files",
-          });
-        }
+      if (result.status === "serve_image_invalid") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: result.message,
+        });
       }
 
-      const updatePayload: { isPublic: boolean; serveImage?: boolean } = {
-        isPublic: input.isPublic,
-      };
-
-      if (typeof input.serveImage === "boolean") {
-        updatePayload.serveImage = input.serveImage;
-      }
-
-      const [updated] = await ctx.db
-        .update(fileKeys)
-        .set(updatePayload)
-        .where(eq(fileKeys.id, input.id))
-        .returning();
-
-      return updated;
+      return result.fileKey;
     }),
 
   delete: organizationProcedure
@@ -507,6 +504,15 @@ export const fileKeyRouter = {
       const transitionResult = await deleteFileKey(ctx.db, {
         projectId: input.projectId,
         fileKeyId: input.id,
+        audit: {
+          organizationId: ctx.organizationId,
+          actor: buildUserAuditActor({
+            userId: ctx.session.user.id,
+            memberId: ctx.membership.id,
+            name: ctx.session.user.name,
+            email: ctx.session.user.email,
+          }),
+        },
       });
 
       if (transitionResult.status === "not_found") {
@@ -645,11 +651,21 @@ export const fileKeyRouter = {
       let succeeded = 0;
       let failed = 0;
       let requiresCleanupDrain = false;
+      const actor = buildUserAuditActor({
+        userId: ctx.session.user.id,
+        memberId: ctx.membership.id,
+        name: ctx.session.user.name,
+        email: ctx.session.user.email,
+      });
 
       for (const fk of matchedFileKeys) {
         const result = await deleteFileKey(ctx.db, {
           projectId: input.projectId,
           fileKeyId: fk.id,
+          audit: {
+            organizationId: ctx.organizationId,
+            actor,
+          },
         });
 
         if (result.status === "already_deleted") {

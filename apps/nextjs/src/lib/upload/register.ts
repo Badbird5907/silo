@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { syncEnvironmentStorageSnapshot } from "@silo-storage/api/services";
 import { and, eq, sql } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import {
@@ -10,6 +9,7 @@ import {
   projects,
 } from "@silo-storage/db/schema";
 import { clearUploadSessionAdapterData } from "@silo-storage/shared";
+import { syncEnvironmentStorageSnapshot } from "@silo-storage/api/service/analytics";
 
 const unknownRecordSchema = z.record(z.string(), z.unknown());
 

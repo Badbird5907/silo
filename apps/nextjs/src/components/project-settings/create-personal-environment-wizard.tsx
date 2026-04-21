@@ -105,7 +105,7 @@ export function CreatePersonalEnvironmentWizard({
           queryKey: trpc.environment.list.queryKey(),
         });
         if (shouldCreateApiKey) {
-          if (!environment?.id) {
+          if (!environment.id) {
             toast.error("Environment was created but no environment id was returned");
             return;
           }

@@ -156,10 +156,6 @@ export async function POST(request: Request) {
       },
     });
 
-    if (!newFileKey) {
-      throw new Error("Failed to create file key record");
-    }
-
     const isDevelopment = env.NODE_ENV === "development";
     const protocol = isDevelopment ? "http" : "https";
 

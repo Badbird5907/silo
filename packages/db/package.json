@@ -18,6 +18,7 @@
     "generate": "pnpm with-env drizzle-kit generate",
     "migrate": "pnpm with-env drizzle-kit migrate",
     "studio": "pnpm with-env drizzle-kit studio",
+    "backfill:audit-events": "pnpm with-env tsx backfill-audit-events.ts",
     "backfill:storage-snapshots": "pnpm with-env tsx backfill-storage-snapshots.ts",
     "seed:analytics": "pnpm with-env tsx seed-analytics.ts",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false",

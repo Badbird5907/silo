@@ -11,12 +11,12 @@ import {
   webhookAttempt,
   shouldRetryAttempt,
   signWebhookPayload,
-} from "@silo-storage/api/services";
+} from "@silo-storage/api/service/webhook";
 import { eq } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import { apiKeys, projectEnvironments } from "@silo-storage/db/schema";
 import { handleCallback } from "@vercel/queue";
-import { queuedWebhookMessageSchema } from "@silo-storage/api/services";
+import { queuedWebhookMessageSchema } from "@silo-storage/api/service/webhook";
 
 import { env } from "@/env";
 

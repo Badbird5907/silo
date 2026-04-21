@@ -10,6 +10,7 @@ import {
 } from "@silo-storage/db/schema";
 
 import { auth } from "@/auth/server";
+import type { AuthContext } from "@silo-storage/api/types/auth";
 
 type Project = typeof projects.$inferSelect;
 type ProjectEnvironment = typeof projectEnvironments.$inferSelect;
@@ -55,14 +56,6 @@ export function extractApiKeyFromRequest(request: Request): string | null {
   return null;
 }
 
-export interface AuthContext {
-  type: "apiKey" | "session";
-  organizationId: string;
-  projectId?: string;
-  rawApiKey?: string;
-  apiKeyId?: string;
-  userId?: string;
-}
 
 export async function authenticateRequest(
   request: Request,
@@ -94,8 +87,12 @@ export async function authenticateRequest(
         type: "apiKey",
         organizationId: key.organizationId,
         projectId: key.projectId,
-        rawApiKey: apiKey,
-        apiKeyId: key.id,
+        apiKey: {
+          rawKey: apiKey,
+          prefix: key.keyPrefix,
+          name: key.name,
+          id: key.id,
+        },
       };
     } catch (error) {
       console.error("Error validating API key:", error);
@@ -143,6 +140,9 @@ export async function authenticateRequest(
     type: "session",
     organizationId,
     userId: session.user.id,
+    memberId: membership.id,
+    name: session.user.name,
+    email: session.user.email,
   };
 }
 

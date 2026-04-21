@@ -3,7 +3,7 @@ import { z } from "zod";
 import {
   deleteEnvironment,
   updateEnvironment,
-} from "@silo-storage/api/services";
+} from "@silo-storage/api/service/environment";
 import { db } from "@silo-storage/db/client";
 
 import {

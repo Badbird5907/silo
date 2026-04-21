@@ -1,10 +1,6 @@
 import { z } from "zod";
 
-import {
-  deleteFileKey,
-  lookupFileKey,
-  runLifecycleJobBatch,
-} from "@silo-storage/api/services";
+import { runLifecycleJobBatch } from "@silo-storage/api/service/lifecycleJob";
 import { db } from "@silo-storage/db/client";
 
 import {
@@ -13,6 +9,8 @@ import {
   validateEnvironmentAccess,
   validateProjectAccess,
 } from "@/lib/api-key-middleware";
+import { buildAuditActorFromAuthResult } from "@silo-storage/api/service/audit";
+import { deleteFileKey, lookupFileKey } from "@silo-storage/api/service/fileKey";
 
 const schema = z
   .object({
@@ -103,6 +101,10 @@ export async function POST(request: Request) {
       projectId,
       environmentId,
       fileKeyId: fileKey.id,
+      audit: {
+        organizationId: authResult.organizationId,
+        actor: buildAuditActorFromAuthResult(authResult),
+      },
     });
 
     const transitionResult: DeleteTransitionResult =

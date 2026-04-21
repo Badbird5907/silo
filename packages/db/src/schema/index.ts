@@ -60,6 +60,12 @@ export const resourceLifecycleState = pgEnum("resource_lifecycle_state", [
   "deleting",
 ]);
 
+export const auditLogDownloadPolicy = pgEnum("audit_log_download_policy", [
+  "disabled",
+  "all",
+  "signed_only", // only log downloads with signed URLs (assuming they are private + no serve)
+]);
+
 export const projects = pgTable("projects", {
   id: text("id")
     .primaryKey()
@@ -80,6 +86,9 @@ export const projects = pgTable("projects", {
   pendingUploadFailAfterMinutes: integer("pending_upload_fail_after_minutes")
     .notNull()
     .default(24 * 60),
+  auditLogRetentionDays: integer("audit_log_retention_days").default(90).notNull(),
+  auditLogDownloads: boolean("audit_log_downloads").notNull().default(false), // don't log downloads by default
+  usageEventRetentionDays: integer("usage_event_retention_days").default(90).notNull(),
   parentOrganizationId: text("parent_organization_id").references(
     () => auth.organizations.id,
     { onDelete: "cascade" },
@@ -422,6 +431,33 @@ export const usageEventTypes = pgEnum("usage_event_types", [
   "download",
 ]);
 
+export const auditActorTypes = pgEnum("audit_actor_types", [
+  "user",
+  "api_key",
+  "system",
+]);
+
+export const auditEventCategories = pgEnum("audit_event_categories", [
+  "operational",
+  "configuration",
+  "security",
+  "lifecycle",
+]);
+
+export const auditResourceTypes = pgEnum("audit_resource_types", [
+  "project",
+  "environment",
+  "api_key",
+  "file",
+  "file_key",
+  "organization",
+  "member",
+  "invitation",
+  "system",
+]);
+
+export const auditStatuses = pgEnum("audit_statuses", ["success", "failure"]);
+
 export const webhookAttemptStatus = pgEnum("webhook_attempt_status", [
   "success",
   "retry",
@@ -484,6 +520,79 @@ export const callbackAttempts = pgTable(
   ],
 );
 
+export const auditEvents = pgTable(
+  "audit_events",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => nanoid()),
+    organizationId: text("organization_id")
+      .references(() => auth.organizations.id, { onDelete: "cascade" })
+      .notNull(),
+    projectId: text("project_id").references(() => projects.id, {
+      onDelete: "set null",
+    }),
+    environmentId: text("environment_id").references(
+      () => projectEnvironments.id,
+      {
+        onDelete: "set null",
+      },
+    ),
+    actorType: auditActorTypes("actor_type").notNull(),
+    actorUserId: text("actor_user_id").references(() => auth.users.id, {
+      onDelete: "set null",
+    }),
+    actorMemberId: text("actor_member_id").references(() => auth.members.id, {
+      onDelete: "set null",
+    }),
+    actorLabel: text("actor_label"),
+    eventCode: text("event_code").notNull(),
+    eventCategory: auditEventCategories("event_category").notNull(),
+    resourceId: text("resource_id"),
+    resourceType: auditResourceTypes("resource_type").notNull(),
+    resourceLabel: text("resource_label"),
+    status: auditStatuses("status").notNull().default("success"),
+    summary: text("summary").notNull(),
+    changes: jsonb("changes").$type<
+      { path: string; before: unknown; after: unknown }[]
+    >(),
+    metadata: jsonb("metadata")
+      .notNull()
+      .default("{}")
+      .$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    expiresAt: timestamp("expires_at"),
+  },
+  (table) => [
+    index("audit_events_org_project_created_at_idx").on(
+      table.organizationId,
+      table.projectId,
+      table.createdAt,
+    ),
+    index("audit_events_org_project_env_created_at_idx").on(
+      table.organizationId,
+      table.projectId,
+      table.environmentId,
+      table.createdAt,
+    ),
+    index("audit_events_org_category_created_at_idx").on(
+      table.organizationId,
+      table.eventCategory,
+      table.createdAt,
+    ),
+    index("audit_events_org_actor_user_created_at_idx").on(
+      table.organizationId,
+      table.actorUserId,
+      table.createdAt,
+    ),
+    index("audit_events_org_event_code_created_at_idx").on(
+      table.organizationId,
+      table.eventCode,
+      table.createdAt,
+    ),
+  ],
+);
+
 // Analytics: Raw usage events
 export const usageEvents = pgTable("usage_events", {
   id: text("id")
@@ -506,6 +615,7 @@ export const usageEvents = pgTable("usage_events", {
   }),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at"),
 });
 
 export const usageDaily = pgTable(
@@ -572,6 +682,29 @@ export const usageEventsRelations = relations(usageEvents, ({ one }) => ({
   apiKey: one(apiKeys, {
     fields: [usageEvents.apiKeyId],
     references: [apiKeys.id],
+  }),
+}));
+
+export const auditEventsRelations = relations(auditEvents, ({ one }) => ({
+  organization: one(auth.organizations, {
+    fields: [auditEvents.organizationId],
+    references: [auth.organizations.id],
+  }),
+  project: one(projects, {
+    fields: [auditEvents.projectId],
+    references: [projects.id],
+  }),
+  environment: one(projectEnvironments, {
+    fields: [auditEvents.environmentId],
+    references: [projectEnvironments.id],
+  }),
+  actorUser: one(auth.users, {
+    fields: [auditEvents.actorUserId],
+    references: [auth.users.id],
+  }),
+  actorMember: one(auth.members, {
+    fields: [auditEvents.actorMemberId],
+    references: [auth.members.id],
   }),
 }));
 

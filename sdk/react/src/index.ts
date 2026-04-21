@@ -134,7 +134,7 @@ export function createSiloReact<TRouter extends AnyFileRouterLike>(
       UploadButtonProps<TRouter, TEndpoint>
     >;
     return React.createElement(component, {
-      ...(props as UploadButtonComponentProps<TRouter, TEndpoint>),
+      ...(props),
       useUpload,
     } as UploadButtonProps<TRouter, TEndpoint>);
   }
@@ -152,7 +152,7 @@ export function createSiloReact<TRouter extends AnyFileRouterLike>(
       UploadDropzoneProps<TRouter, TEndpoint>
     >;
     return React.createElement(component, {
-      ...(props as UploadDropzoneComponentProps<TRouter, TEndpoint>),
+      ...(props),
       useUpload,
     } as UploadDropzoneProps<TRouter, TEndpoint>);
   }

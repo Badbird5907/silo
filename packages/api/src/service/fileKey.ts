@@ -9,6 +9,8 @@ import {
 } from "@silo-storage/db/schema";
 import { publishMessage } from "@silo-storage/redis";
 import {
+    AuditChange,
+  auditEventCodes,
   clearUploadSessionAdapterData,
   createUploadEventEnvelope,
   getUploadSessionAdapterData,
@@ -20,6 +22,12 @@ import {
   enqueueDeleteObjectJob,
   enqueueFinalizeFailedFileKeyJob,
 } from "./lifecycleJob";
+import type { AuditActor } from "./audit";
+import {
+  buildSystemAuditActor,
+  recordAuditEvent,
+  recordUsageAuditEvent,
+} from "./audit";
 import { enqueueUploadWebhookEvent } from "./webhook";
 
 export class UploadFailureError extends Error {
@@ -80,12 +88,17 @@ export async function lookupFileKey(
 
 async function trackUsageEvent(
   db: Db,
-  eventType: "upload_completed" | "upload_failed" | "download",
-  projectId: string,
-  environmentId: string,
-  bytes?: number,
-  fileId?: string,
+  opts: {
+    eventType: "upload_completed" | "upload_failed" | "download",
+    projectId: string,
+    environmentId: string,
+    bytes?: number,
+    fileId?: string,
+    fileName?: string,
+    actor?: AuditActor,
+  }
 ) {
+  const { eventType, projectId, environmentId, bytes, fileId, fileName, actor } = opts;
   try {
     const project = await db.query.projects.findFirst({
       where: eq(projects.id, projectId),
@@ -103,6 +116,17 @@ async function trackUsageEvent(
       eventType,
       bytes: bytes ?? null,
       fileId: fileId ?? null,
+    });
+
+    await recordUsageAuditEvent(db, {
+      organizationId,
+      projectId,
+      environmentId,
+      eventType,
+      bytes,
+      fileId,
+      resourceLabel: fileName ?? null,
+      actor,
     });
 
     const today = new Date().toISOString().substring(0, 10);
@@ -165,9 +189,10 @@ export async function markUploadAsFailed(
     environmentId: string;
     fileKeyId: string;
     error?: string;
+    actor?: AuditActor;
   },
 ) {
-  const updated = await db.transaction(async (tx) => {
+  const [updated, fileKey] = await db.transaction(async (tx) => {
     const fileKey = await tx.query.fileKeys.findFirst({
       where: and(
         eq(fileKeys.id, opts.fileKeyId),
@@ -264,7 +289,7 @@ export async function markUploadAsFailed(
       throw new Error("Failed to update file key status");
     }
 
-    return next;
+    return [next, fileKey];
   });
 
   // this is the message
@@ -300,7 +325,14 @@ export async function markUploadAsFailed(
   }
 
   // track usage analytics
-  void trackUsageEvent(db, "upload_failed", opts.projectId, opts.environmentId);
+  // void trackUsageEvent(db, "upload_failed", opts.projectId, opts.environmentId, undefined, undefined, fileKey.fileName);
+  void trackUsageEvent(db, {
+    eventType: "upload_failed",
+    projectId: opts.projectId,
+    environmentId: opts.environmentId,
+    fileName: fileKey.fileName,
+    actor: opts.actor,
+  });
 
   return updated;
 }
@@ -328,6 +360,10 @@ export async function deleteFileKey(
     projectId: string;
     fileKeyId: string;
     environmentId?: string;
+    audit: {
+      organizationId: string;
+      actor?: AuditActor;
+    };
   },
 ): Promise<DeleteFileKeyResult> {
   return db.transaction(async (tx) => {
@@ -367,6 +403,22 @@ export async function deleteFileKey(
         .set(nextBase)
         .where(eq(fileKeys.id, fileKey.id));
 
+      await recordUsageAuditEvent(tx, {
+        organizationId: opts.audit.organizationId,
+        projectId: opts.projectId,
+        environmentId: fileKey.environmentId,
+        ...(opts.audit.actor ?? buildSystemAuditActor()),
+        eventType: "file_deleted",
+        resourceLabel: fileKey.fileName,
+        metadata: {
+          fileKeyId: fileKey.id,
+          fileId: null,
+          accessKey: fileKey.accessKey,
+          previousStatus: fileKey.status,
+          cleanupScheduled: false,
+        },
+      });
+
       return { status: "deleted_without_cleanup" };
     }
 
@@ -392,10 +444,141 @@ export async function deleteFileKey(
       priority: 100,
     });
 
+    await recordUsageAuditEvent(tx, {
+      organizationId: opts.audit.organizationId,
+      projectId: opts.projectId,
+      environmentId: fileKey.environmentId,
+      ...(opts.audit.actor ?? buildSystemAuditActor()),
+      eventType: "file_deleted",
+      resourceLabel: fileKey.fileName,
+      metadata: {
+        fileKeyId: fileKey.id,
+        fileId: fileKey.file.id,
+        accessKey: fileKey.accessKey,
+        previousStatus: fileKey.status,
+        storageKey: fileKey.file.storageKey,
+        cleanupScheduled: true,
+      },
+    });
+
     return {
       status: "deleted_with_cleanup",
       fileId: fileKey.file.id,
       storageKey: fileKey.file.storageKey,
     };
   });
+}
+
+export type UpdateFileKeyAccessResult =
+  | { status: "not_found" }
+  | { status: "serve_image_invalid"; message: string }
+  | { status: "success"; fileKey: typeof fileKeys.$inferSelect };
+
+/**
+ * Updates `isPublic` and optionally `serveImage` on a file key.
+ */
+export async function updateFileKeyAccess(
+  db: Db,
+  opts: {
+    projectId: string;
+    fileKeyId: string;
+    isPublic: boolean;
+    environmentId: string;
+    serveImage?: boolean;
+    actor?: AuditActor;
+  },
+): Promise<UpdateFileKeyAccessResult> {
+  const fileKey = await db.query.fileKeys.findFirst({
+    where: and(
+      eq(fileKeys.id, opts.fileKeyId),
+      eq(fileKeys.projectId, opts.projectId),
+      eq(fileKeys.environmentId, opts.environmentId),
+    ),
+    with: {
+      file: {
+        columns: {
+          mimeType: true,
+        },
+      },
+    },
+  });
+  const project = await db.query.projects.findFirst({
+    where: eq(projects.id, opts.projectId),
+    columns: { parentOrganizationId: true },
+  });
+  const parentOrganizationId = project?.parentOrganizationId;
+
+  if (!fileKey || !parentOrganizationId) {
+    return { status: "not_found" };
+  }
+
+  if (typeof opts.serveImage === "boolean") {
+    const mimeType = fileKey.file?.mimeType ?? fileKey.claimedMimeType;
+    const isImageFile =
+      typeof mimeType === "string" && mimeType.startsWith("image/");
+
+    if (!isImageFile) {
+      return {
+        status: "serve_image_invalid",
+        message: "serveImage can only be updated for image files",
+      };
+    }
+  }
+
+  const updatePayload: { isPublic: boolean; serveImage?: boolean } = {
+    isPublic: opts.isPublic,
+  };
+
+  if (typeof opts.serveImage === "boolean") {
+    updatePayload.serveImage = opts.serveImage;
+  }
+
+  const changes: AuditChange[] = [];
+  if (fileKey.isPublic !== opts.isPublic) {
+    changes.push({
+      path: "isPublic",
+      before: fileKey.isPublic,
+      after: opts.isPublic,
+    });
+  }
+  if (fileKey.serveImage !== opts.serveImage) {
+    changes.push({
+      path: "serveImage",
+      before: fileKey.serveImage,
+      after: opts.serveImage,
+    });
+  }
+
+  const updated = await db.transaction(async (tx) => {
+    const [upd] = await tx
+      .update(fileKeys)
+      .set(updatePayload)
+      .where(eq(fileKeys.id, opts.fileKeyId))
+      .returning();
+
+      await recordAuditEvent(tx, {
+        organizationId: parentOrganizationId,
+        projectId: opts.projectId,
+        environmentId: opts.environmentId,
+        eventCode: auditEventCodes.fileKeyAccessUpdated,
+        eventCategory: "lifecycle",
+        resourceType: "file_key",
+        resourceId: fileKey.id,
+        resourceLabel: fileKey.fileName,
+        status: "success",
+        summary: `File key access updated for ${fileKey.fileName}`,
+        changes,
+        ...(opts.actor ?? buildSystemAuditActor()),
+        metadata: {
+          fileKeyId: fileKey.id,
+        },
+      });
+    return upd;
+  });
+
+  if (!updated) {
+    return { status: "not_found" };
+  }
+
+  return { status: "success", fileKey: updated };
 }

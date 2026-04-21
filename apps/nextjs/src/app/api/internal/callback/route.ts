@@ -1,15 +1,9 @@
 import { z } from "zod";
 
-import {
-  enqueueDeleteObjectJob,
-  enqueueUploadWebhookEvent,
-  markUploadAsFailed,
-  runLifecycleJobBatch,
-  UploadFailureError,
-} from "@silo-storage/api/services";
 import { eq, sql } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import {
+  apiKeys,
   fileKeys,
   fileLifecycleJobs,
   projectEnvironments,
@@ -26,6 +20,10 @@ import {
 import { isCallbackAuthorized } from "@/lib/internal/callback-auth";
 import { setCompletionRecord } from "@/lib/upload/completion";
 import { completeFileKeyFromCallback } from "@/lib/upload/register";
+import { buildApiKeyAuditActor, buildSystemAuditActor, recordUsageAuditEvent } from "@silo-storage/api/service/audit";
+import { enqueueDeleteObjectJob, runLifecycleJobBatch } from "@silo-storage/api/service/lifecycleJob";
+import { enqueueUploadWebhookEvent } from "@silo-storage/api/service/webhook";
+import { markUploadAsFailed, UploadFailureError } from "@silo-storage/api/service/fileKey";
 
 const schema = z.union([
   z.object({
@@ -70,12 +68,27 @@ const schema = z.union([
   }),
 ]);
 
+function getCallbackApiKeyId(callbackMetadata: unknown): string | undefined {
+  if (
+    !callbackMetadata ||
+    typeof callbackMetadata !== "object" ||
+    Array.isArray(callbackMetadata)
+  ) {
+    return undefined;
+  }
+
+  const value = (callbackMetadata as Record<string, unknown>).apiKeyId;
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
 async function trackUsageEvent(
   eventType: "upload_completed" | "upload_failed" | "download",
   projectId: string,
   environmentId: string,
   bytes?: number,
   fileId?: string,
+  apiKeyId?: string,
+  fileName?: string,
 ) {
   try {
     const project = await db.query.projects.findFirst({
@@ -86,6 +99,15 @@ async function trackUsageEvent(
     if (!project?.parentOrganizationId) return;
 
     const organizationId = project.parentOrganizationId;
+    const apiKey = apiKeyId
+      ? await db.query.apiKeys.findFirst({
+          where: eq(apiKeys.id, apiKeyId),
+          columns: {
+            name: true,
+            keyPrefix: true,
+          },
+        })
+      : null;
 
     const insertUsageEvent = async (resolvedFileId?: string) =>
       db.insert(usageEvents).values({
@@ -95,6 +117,7 @@ async function trackUsageEvent(
         eventType,
         bytes: bytes ?? null,
         fileId: resolvedFileId ?? null,
+        apiKeyId: apiKeyId ?? null,
       });
 
     try {
@@ -122,6 +145,27 @@ async function trackUsageEvent(
       );
       await insertUsageEvent(undefined);
     }
+
+    await recordUsageAuditEvent(db, {
+      organizationId,
+      projectId,
+      environmentId,
+      eventType,
+      bytes,
+      fileId,
+      resourceLabel: fileName ?? null,
+      actor: apiKeyId
+        ? buildApiKeyAuditActor({
+            keyName: apiKey?.name,
+            keyPrefix: apiKey?.keyPrefix,
+          })
+        : buildSystemAuditActor("System"),
+      metadata: {
+        fileName: fileName ?? null,
+        keyName: apiKey?.name ?? null,
+        keyPrefix: apiKey?.keyPrefix ?? null,
+      },
+    });
 
     const today = new Date().toISOString().substring(0, 10);
 
@@ -540,12 +584,16 @@ export async function POST(request: Request) {
       }
 
       if (!completion.alreadyCompleted) {
+        const callbackApiKeyId = getCallbackApiKeyId(fileKey.callbackMetadata);
+
         void trackUsageEvent(
           "upload_completed",
           data.projectId,
           data.environmentId,
           data.actualSize,
           file.id,
+          callbackApiKeyId,
+          fileKey.fileName,
         );
       }
 

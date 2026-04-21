@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+import {
+  buildSystemAuditActor,
+  recordUsageAuditEvent,
+} from "@silo-storage/api/service/audit";
 import { eq, sql } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import { projects, usageDaily, usageEvents } from "@silo-storage/db/schema";
@@ -10,6 +14,8 @@ const schema = z.object({
   projectId: z.string(),
   environmentId: z.string(),
   fileId: z.string(),
+  fileKeyId: z.string(),
+  fileName: z.string(),
   bytes: z.number(),
 });
 
@@ -31,7 +37,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { projectId, environmentId, fileId, bytes } = parsed.data;
+  const { projectId, environmentId, fileId, fileKeyId, fileName, bytes } = parsed.data;
 
   try {
     const project = await db.query.projects.findFirst({
@@ -55,6 +61,18 @@ export async function POST(request: Request) {
       eventType: "download",
       bytes,
       fileId,
+    });
+
+    await recordUsageAuditEvent(db, {
+      organizationId,
+      projectId,
+      environmentId,
+      eventType: "download",
+      bytes,
+      fileId,
+      actor: buildSystemAuditActor("System"),
+      resourceLabel: fileName,
+      resourceId: fileKeyId,
     });
 
     const today = new Date().toISOString().split("T")[0];
