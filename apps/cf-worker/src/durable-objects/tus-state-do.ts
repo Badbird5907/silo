@@ -671,6 +671,7 @@ export class TusStateDO {
     await sendUploadCallback(
       {
         contractVersion: 1,
+        clientIp: metadata?.clientIp ?? null,
         type: "upload-failed",
         data: {
           environmentId: effectiveEnvironmentId ?? "unknown",
@@ -824,6 +825,7 @@ export class TusStateDO {
       await sendUploadCallback(
         {
           contractVersion: 1,
+          clientIp: metadata.clientIp ?? null,
           type: "upload-failed",
           data: {
             environmentId: metadata.environmentId,
@@ -854,6 +856,7 @@ export class TusStateDO {
       await sendUploadCallback(
         {
           contractVersion: 1,
+          clientIp: metadata.clientIp ?? null,
           type: "upload-failed",
           data: {
             environmentId: metadata.environmentId,
@@ -894,6 +897,7 @@ export class TusStateDO {
       await sendUploadCallback(
         {
           contractVersion: 1,
+          clientIp: metadata.clientIp ?? null,
           type: "upload-failed",
           data: {
             environmentId: metadata.environmentId,
@@ -926,6 +930,7 @@ export class TusStateDO {
       await sendUploadCallback(
         {
           contractVersion: 1,
+          clientIp: metadata.clientIp ?? null,
           type: "upload-failed",
           data: {
             environmentId: metadata.environmentId,
@@ -1000,6 +1005,7 @@ export class TusStateDO {
         return sendUploadCallback(
           {
             contractVersion: 1,
+            clientIp: metadata.clientIp ?? null,
             type: "upload-completed",
             data: {
               environmentId: metadata.environmentId,

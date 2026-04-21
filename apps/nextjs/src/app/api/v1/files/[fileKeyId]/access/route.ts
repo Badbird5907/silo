@@ -1,7 +1,9 @@
 import { z } from "zod";
 
+import { buildAuditActorFromAuthResult } from "@silo-storage/api/service/audit";
 import { updateFileKeyAccess } from "@silo-storage/api/service/fileKey";
 import { db } from "@silo-storage/db/client";
+import { getClientIpFromHeaders } from "@silo-storage/shared";
 
 import {
   authenticateRequest,
@@ -10,7 +12,6 @@ import {
   validateEnvironmentAccess,
   validateProjectAccess,
 } from "@/lib/api-key-middleware";
-import { buildAuditActorFromAuthResult } from "@silo-storage/api/service/audit";
 
 const bodySchema = z.object({
   projectId: z.string().min(1),
@@ -25,6 +26,7 @@ export async function PATCH(
   { params }: { params: Promise<{ fileKeyId: string }> },
 ) {
   const { fileKeyId } = await params;
+  const clientIp = getClientIpFromHeaders(request.headers);
 
   const authResult = await authenticateRequest(request);
   if (authResult instanceof Response) return authResult;
@@ -64,7 +66,8 @@ export async function PATCH(
       isPublic: input.isPublic,
       serveImage: input.serveImage,
       environmentId: input.environmentId,
-      actor: buildAuditActorFromAuthResult(authResult)
+      actor: buildAuditActorFromAuthResult(authResult),
+      clientIp,
     });
 
     if (result.status === "not_found") {

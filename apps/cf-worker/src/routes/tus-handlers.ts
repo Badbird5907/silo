@@ -1,5 +1,7 @@
 import type { Context } from "hono";
 
+import { getClientIpFromHeaders } from "@silo-storage/shared";
+
 import type { Bindings, Variables } from "../types/bindings";
 import type { TusUploadMetadata } from "../types/tus";
 import { isAllowedMimeType } from "../lib/file-types";
@@ -95,6 +97,7 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
   }
 
   const projectId = c.get("projectId");
+  const clientIp = getClientIpFromHeaders(c.req.raw.headers);
   const uploadLengthHeader = c.req.header(UPLOAD_LENGTH_HEADER);
   const deferLength = c.req.header(UPLOAD_DEFER_LENGTH_HEADER);
   const uploadMetadataHeader = c.req.header(UPLOAD_METADATA_HEADER);
@@ -225,6 +228,7 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
       claimedSize: verificationResult.size,
       createdAt: new Date().toISOString(),
       expiresAt: generateExpirationDate(c.env),
+      clientIp,
       metadata,
       rawMetadata: uploadMetadataHeader ?? "",
       callbackDeliveredAt: null,
@@ -289,6 +293,7 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
         await sendUploadCallback(
           {
             contractVersion: 1,
+            clientIp,
             type: "upload-completed",
             data: {
               environmentId,
@@ -329,6 +334,7 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
           await sendUploadCallback(
             {
               contractVersion: 1,
+              clientIp,
               type: "upload-failed",
               data: {
                 environmentId,

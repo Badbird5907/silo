@@ -86,9 +86,15 @@ export const projects = pgTable("projects", {
   pendingUploadFailAfterMinutes: integer("pending_upload_fail_after_minutes")
     .notNull()
     .default(24 * 60),
-  auditLogRetentionDays: integer("audit_log_retention_days").default(90).notNull(),
-  auditLogDownloadPolicy: auditLogDownloadPolicy("audit_log_download_policy").notNull().default("disabled"), // don't log downloads by default
-  usageEventRetentionDays: integer("usage_event_retention_days").default(90).notNull(),
+  auditLogRetentionDays: integer("audit_log_retention_days")
+    .default(90)
+    .notNull(),
+  auditLogDownloadPolicy: auditLogDownloadPolicy("audit_log_download_policy")
+    .notNull()
+    .default("disabled"), // don't log downloads by default
+  usageEventRetentionDays: integer("usage_event_retention_days")
+    .default(90)
+    .notNull(),
   parentOrganizationId: text("parent_organization_id").references(
     () => auth.organizations.id,
     { onDelete: "cascade" },
@@ -551,11 +557,13 @@ export const auditEvents = pgTable(
     resourceId: text("resource_id"),
     resourceType: auditResourceTypes("resource_type").notNull(),
     resourceLabel: text("resource_label"),
+    clientIp: text("client_ip"),
     status: auditStatuses("status").notNull().default("success"),
     summary: text("summary").notNull(),
-    changes: jsonb("changes").$type<
-      { path: string; before: unknown; after: unknown }[]
-    >(),
+    changes:
+      jsonb("changes").$type<
+        { path: string; before: unknown; after: unknown }[]
+      >(),
     metadata: jsonb("metadata")
       .notNull()
       .default("{}")
@@ -573,6 +581,12 @@ export const auditEvents = pgTable(
       table.organizationId,
       table.projectId,
       table.environmentId,
+      table.createdAt,
+    ),
+    index("audit_events_org_project_client_ip_created_at_idx").on(
+      table.organizationId,
+      table.projectId,
+      table.clientIp,
       table.createdAt,
     ),
     index("audit_events_org_category_created_at_idx").on(

@@ -17,6 +17,7 @@ export interface TusUploadMetadata {
   claimedSize?: number;
   createdAt: string;
   expiresAt: string;
+  clientIp?: string | null;
   metadata: Record<string, string>;
   rawMetadata?: string;
   callbackDeliveredAt?: string | null;

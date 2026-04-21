@@ -1,5 +1,7 @@
 import type { Context } from "hono";
 
+import { getClientIpFromHeaders } from "@silo-storage/shared";
+
 import type { Bindings, Variables } from "../types/bindings";
 import { verifyDownloadSignature } from "../middleware/auth";
 import { reportMissingObject, trackDownload } from "../services/callback";
@@ -60,6 +62,7 @@ export async function handleDownload(
 ): Promise<Response> {
   const accessKey = c.req.param("accessKey");
   const projectId = c.get("projectId");
+  const clientIp = getClientIpFromHeaders(c.req.raw.headers);
 
   const signature = c.req.query("sig");
   const expiresAt = c.req.query("expiresAt");
@@ -206,6 +209,7 @@ export async function handleDownload(
           fileName: fileKey.fileName,
           bytes,
           isSignedUrl,
+          clientIp,
         },
         c.env,
       );

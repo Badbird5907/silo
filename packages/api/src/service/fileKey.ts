@@ -1,4 +1,5 @@
 import type { Db } from "@silo-storage/db/client";
+import type { AuditChange } from "@silo-storage/shared";
 
 import { and, eq, sql } from "@silo-storage/db";
 import {
@@ -8,7 +9,6 @@ import {
   usageEvents,
 } from "@silo-storage/db/schema";
 import { publishMessage } from "@silo-storage/redis";
-import type { AuditChange } from "@silo-storage/shared";
 import {
   auditEventCodes,
   clearUploadSessionAdapterData,
@@ -98,6 +98,7 @@ async function trackUsageEvent(
     fileId?: string;
     fileName?: string;
     actor?: AuditActor;
+    clientIp?: string | null;
     isSignedUrl?: boolean;
     recordAuditEvent?: boolean;
   },
@@ -110,6 +111,7 @@ async function trackUsageEvent(
     fileId,
     fileName,
     actor,
+    clientIp,
     isSignedUrl,
     recordAuditEvent = true,
   } = opts;
@@ -154,11 +156,12 @@ async function trackUsageEvent(
         fileId,
         resourceLabel: fileName ?? null,
         actor,
+        clientIp,
         createdAt,
         isSignedUrl,
         auditLogDownloadPolicy:
           project.auditLogDownloadPolicy as AuditLogDownloadPolicy,
-          auditRetentionDays: project.auditLogRetentionDays,
+        auditRetentionDays: project.auditLogRetentionDays,
       });
     }
 
@@ -223,6 +226,7 @@ export async function markUploadAsFailed(
     fileKeyId: string;
     error?: string;
     actor?: AuditActor;
+    clientIp?: string | null;
     recordAuditEvent?: boolean;
   },
 ) {
@@ -366,6 +370,7 @@ export async function markUploadAsFailed(
     environmentId: opts.environmentId,
     fileName: fileKey.fileName,
     actor: opts.actor,
+    clientIp: opts.clientIp,
     recordAuditEvent: opts.recordAuditEvent,
   });
 
@@ -398,6 +403,7 @@ export async function deleteFileKey(
     audit: {
       organizationId: string;
       actor?: AuditActor;
+      clientIp?: string | null;
       recordAuditEvent?: boolean;
     };
   },
@@ -447,6 +453,7 @@ export async function deleteFileKey(
           ...(opts.audit.actor ?? buildSystemAuditActor()),
           eventType: "file_deleted",
           resourceLabel: fileKey.fileName,
+          clientIp: opts.audit.clientIp ?? null,
           metadata: {
             fileKeyId: fileKey.id,
             fileId: null,
@@ -487,6 +494,7 @@ export async function deleteFileKey(
         ...(opts.audit.actor ?? buildSystemAuditActor()),
         eventType: "file_deleted",
         resourceLabel: fileKey.fileName,
+        clientIp: opts.audit.clientIp ?? null,
         metadata: {
           fileKeyId: fileKey.id,
           fileId: fileKey.file.id,
@@ -523,6 +531,7 @@ export async function updateFileKeyAccess(
     environmentId: string;
     serveImage?: boolean;
     actor?: AuditActor;
+    clientIp?: string | null;
   },
 ): Promise<UpdateFileKeyAccessResult> {
   const fileKey = await db.query.fileKeys.findFirst({
@@ -602,6 +611,7 @@ export async function updateFileKeyAccess(
       resourceType: "file_key",
       resourceId: fileKey.id,
       resourceLabel: fileKey.fileName,
+      clientIp: opts.clientIp ?? null,
       status: "success",
       summary: `File key access updated for ${fileKey.fileName}`,
       changes,

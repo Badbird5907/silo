@@ -1,6 +1,14 @@
 import { z } from "zod";
 
+import { buildAuditActorFromAuthResult } from "@silo-storage/api/service/audit";
+import {
+  lookupFileKey,
+  markUploadAsFailed,
+  UploadFailureError,
+} from "@silo-storage/api/service/fileKey";
+import { runLifecycleJobBatch } from "@silo-storage/api/service/lifecycleJob";
 import { db } from "@silo-storage/db/client";
+import { getClientIpFromHeaders } from "@silo-storage/shared";
 
 import {
   authenticateRequest,
@@ -8,9 +16,6 @@ import {
   validateEnvironmentAccess,
   validateProjectAccess,
 } from "@/lib/api-key-middleware";
-import { lookupFileKey, markUploadAsFailed, UploadFailureError } from "@silo-storage/api/service/fileKey";
-import { runLifecycleJobBatch } from "@silo-storage/api/service/lifecycleJob";
-import { buildAuditActorFromAuthResult } from "@silo-storage/api/service/audit";
 
 const schema = z
   .object({
@@ -26,6 +31,7 @@ const schema = z
 export async function POST(request: Request) {
   const authResult = await authenticateRequest(request);
   if (authResult instanceof Response) return authResult;
+  const clientIp = getClientIpFromHeaders(request.headers);
 
   let body: unknown;
   try {
@@ -78,6 +84,7 @@ export async function POST(request: Request) {
       fileKeyId: fileKey.id,
       error: "Upload marked as failed via API",
       actor: buildAuditActorFromAuthResult(authResult),
+      clientIp,
     });
 
     const drainResult = await runLifecycleJobBatch(db, {

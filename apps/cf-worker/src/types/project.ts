@@ -78,6 +78,7 @@ export const fileKeyInfoSchema = z.object({
 
 export interface UploadCallbackData {
   contractVersion?: 1;
+  clientIp?: string | null;
   type: "upload-completed" | "upload-failed";
   data:
     | {

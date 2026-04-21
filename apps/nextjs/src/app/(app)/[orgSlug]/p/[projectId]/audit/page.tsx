@@ -19,6 +19,7 @@ import {
   auditResourceTypes,
 } from "@silo-storage/shared";
 import { Badge } from "@silo-storage/ui/components/badge";
+import { Button } from "@silo-storage/ui/components/button";
 import {
   Card,
   CardContent,
@@ -26,7 +27,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@silo-storage/ui/components/card";
-import { Button } from "@silo-storage/ui/components/button";
 import { DataTable } from "@silo-storage/ui/components/data-table";
 import { DateRangePicker } from "@silo-storage/ui/components/date-range-picker";
 import {
@@ -153,13 +153,17 @@ export default function AuditPage({ params }: AuditPageProps) {
   const endDateParam = searchParams.get("end");
   const urlSearchQuery = searchParams.get("q") ?? "";
   const urlActorQuery = searchParams.get("actor") ?? "";
+  const urlClientIpQuery = searchParams.get("ip") ?? "";
 
   const lastAppliedSearchQueryRef = React.useRef(urlSearchQuery);
   const lastAppliedActorQueryRef = React.useRef(urlActorQuery);
+  const lastAppliedClientIpQueryRef = React.useRef(urlClientIpQuery);
   const [searchQuery, setSearchQuery] = React.useState(urlSearchQuery);
   const [actorQuery, setActorQuery] = React.useState(urlActorQuery);
+  const [clientIpQuery, setClientIpQuery] = React.useState(urlClientIpQuery);
   const [debouncedSearch] = useDebounce(searchQuery, 400);
   const [debouncedActor] = useDebounce(actorQuery, 400);
+  const [debouncedClientIp] = useDebounce(clientIpQuery, 400);
   const [selectedEvent, setSelectedEvent] =
     React.useState<AuditEventRow | null>(null);
 
@@ -176,6 +180,13 @@ export default function AuditPage({ params }: AuditPageProps) {
       setActorQuery(urlActorQuery);
     }
   }, [urlActorQuery]);
+
+  React.useEffect(() => {
+    if (urlClientIpQuery !== lastAppliedClientIpQueryRef.current) {
+      lastAppliedClientIpQueryRef.current = urlClientIpQuery;
+      setClientIpQuery(urlClientIpQuery);
+    }
+  }, [urlClientIpQuery]);
 
   const updateQueryParams = React.useCallback(
     (updates: Record<string, string | null>) => {
@@ -229,6 +240,16 @@ export default function AuditPage({ params }: AuditPageProps) {
     }
   }, [debouncedActor, updateQueryParams, urlActorQuery]);
 
+  React.useEffect(() => {
+    if (debouncedClientIp !== urlClientIpQuery) {
+      lastAppliedClientIpQueryRef.current = debouncedClientIp;
+      updateQueryParams({
+        ip: debouncedClientIp || null,
+        page: "1",
+      });
+    }
+  }, [debouncedClientIp, updateQueryParams, urlClientIpQuery]);
+
   const projectQuery = useQuery(
     trpc.project.getById.queryOptions(
       { id: projectId, organizationId },
@@ -258,8 +279,7 @@ export default function AuditPage({ params }: AuditPageProps) {
     environments.some((environment) => environment.id === environmentFilter)
       ? environmentFilter
       : undefined;
-  const effectiveEnvironmentId =
-    selectedEnvironmentId ?? filteredEnvironmentId;
+  const effectiveEnvironmentId = selectedEnvironmentId ?? filteredEnvironmentId;
 
   const dateRange = React.useMemo(() => {
     const from = parseDate(startDateParam);
@@ -283,6 +303,7 @@ export default function AuditPage({ params }: AuditPageProps) {
         pageSize,
         search: debouncedSearch || undefined,
         actor: debouncedActor ? { label: debouncedActor } : undefined,
+        clientIp: debouncedClientIp || undefined,
         eventCategory:
           category !== "all"
             ? (category as (typeof auditEventCategories)[number])
@@ -317,7 +338,9 @@ export default function AuditPage({ params }: AuditPageProps) {
       return;
     }
 
-    if (!environments.some((environment) => environment.id === environmentFilter)) {
+    if (
+      !environments.some((environment) => environment.id === environmentFilter)
+    ) {
       updateQueryParams({ env: null, page: "1" });
     }
   }, [
@@ -358,6 +381,7 @@ export default function AuditPage({ params }: AuditPageProps) {
   const hasActiveFilters = [
     searchParams.get("q"),
     searchParams.get("actor"),
+    searchParams.get("ip"),
     searchParams.get("category"),
     searchParams.get("event"),
     searchParams.get("resource"),
@@ -532,7 +556,7 @@ export default function AuditPage({ params }: AuditPageProps) {
               environment, or date.
             </CardDescription>
           </div>
-          <div className="flex w-full flex-col md:flex-row gap-2 sm:items-center sm:justify-between lg:w-auto lg:items-end">
+          <div className="flex w-full flex-col gap-2 sm:items-center sm:justify-between md:flex-row lg:w-auto lg:items-end">
             {hasActiveFilters ? (
               <Button
                 type="button"
@@ -543,6 +567,7 @@ export default function AuditPage({ params }: AuditPageProps) {
                   updateQueryParams({
                     q: null,
                     actor: null,
+                    ip: null,
                     category: null,
                     event: null,
                     resource: null,
@@ -578,12 +603,12 @@ export default function AuditPage({ params }: AuditPageProps) {
         </CardHeader>
         <CardContent className="min-w-0 space-y-4">
           {auditErrorMessage ? (
-            <div className="rounded-md border border-destructive/50 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            <div className="border-destructive/50 bg-destructive/5 text-destructive rounded-md border px-3 py-2 text-sm">
               Failed to load audit events. {auditErrorMessage}
             </div>
           ) : null}
 
-          <div className="grid gap-3 lg:grid-cols-7">
+          <div className="grid gap-3 lg:grid-cols-8">
             <Input
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
@@ -594,6 +619,12 @@ export default function AuditPage({ params }: AuditPageProps) {
               value={actorQuery}
               onChange={(event) => setActorQuery(event.target.value)}
               placeholder="Filter by actor"
+              className="col-span-2 md:col-span-1"
+            />
+            <Input
+              value={clientIpQuery}
+              onChange={(event) => setClientIpQuery(event.target.value)}
+              placeholder="Client IP (exact match)"
               className="col-span-2 md:col-span-1"
             />
             <Select
@@ -682,7 +713,7 @@ export default function AuditPage({ params }: AuditPageProps) {
                 </SelectContent>
               </Select>
             ) : (
-              <div className="flex items-center rounded-md border bg-muted/50 px-3 text-sm text-muted-foreground cursor-not-allowed truncate">
+              <div className="bg-muted/50 text-muted-foreground flex cursor-not-allowed items-center truncate rounded-md border px-3 text-sm">
                 {selectedEnvironment.name}
               </div>
             )}
@@ -773,6 +804,12 @@ export default function AuditPage({ params }: AuditPageProps) {
                 <div>
                   <div className="text-muted-foreground text-xs">Status</div>
                   <div className="font-medium">{selectedEvent.status}</div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground text-xs">Client IP</div>
+                  <div className="font-medium">
+                    {selectedEvent.clientIp ?? "—"}
+                  </div>
                 </div>
               </div>
 

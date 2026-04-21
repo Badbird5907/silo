@@ -185,6 +185,7 @@ export const projectRouter = {
           await recordAuditEvent(ctx.db, {
             organizationId: ctx.organizationId,
             projectId: updated.id,
+            clientIp: ctx.clientIp,
             ...buildUserAuditActor({
               userId: ctx.session.user.id,
               memberId: ctx.membership.id,
@@ -231,6 +232,7 @@ export const projectRouter = {
         await recordAuditEvent(ctx.db, {
           organizationId: ctx.organizationId,
           projectId: input.id,
+          clientIp: ctx.clientIp,
           ...buildUserAuditActor({
             userId: ctx.session.user.id,
             memberId: ctx.membership.id,

@@ -3,8 +3,15 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod/v4";
 
 import { and, eq } from "@silo-storage/db";
-import {  projects } from "@silo-storage/db/schema";
+import { projects } from "@silo-storage/db/schema";
 
+import {
+  buildAuditChanges,
+  buildHeaderAuditChanges,
+  buildUserAuditActor,
+  normalizeUrlValue,
+  recordAuditEvent,
+} from "../service/audit";
 import {
   createEnvironment,
   createPersonalDevelopmentEnvironment,
@@ -16,13 +23,6 @@ import {
   updateEnvironmentCallbackHeaders,
   updateEnvironmentWebhookConfig,
 } from "../service/environment";
-import {
-  buildAuditChanges,
-  buildHeaderAuditChanges,
-  buildUserAuditActor,
-  normalizeUrlValue,
-  recordAuditEvent,
-} from "../service/audit";
 import { organizationProcedure, requirePermission } from "../trpc";
 
 /** Validate that a project belongs to the caller's organization. */
@@ -148,6 +148,7 @@ export const environmentRouter = {
         organizationId: ctx.organizationId,
         projectId: created.projectId,
         environmentId: created.id,
+        clientIp: ctx.clientIp,
         ...buildUserAuditActor({
           userId: ctx.session.user.id,
           memberId: ctx.membership.id,
@@ -198,6 +199,7 @@ export const environmentRouter = {
         organizationId: ctx.organizationId,
         projectId: created.projectId,
         environmentId: created.id,
+        clientIp: ctx.clientIp,
         ...buildUserAuditActor({
           userId: ctx.session.user.id,
           memberId: ctx.membership.id,
@@ -262,6 +264,7 @@ export const environmentRouter = {
             organizationId: ctx.organizationId,
             projectId: updated.projectId ?? null,
             environmentId: updated.id,
+            clientIp: ctx.clientIp,
             ...buildUserAuditActor({
               userId: ctx.session.user.id,
               memberId: ctx.membership.id,
@@ -330,6 +333,7 @@ export const environmentRouter = {
           organizationId: ctx.organizationId,
           projectId: updated.projectId ?? null,
           environmentId: updated.id,
+          clientIp: ctx.clientIp,
           ...buildUserAuditActor({
             userId: ctx.session.user.id,
             memberId: ctx.membership.id,
@@ -371,6 +375,7 @@ export const environmentRouter = {
         organizationId: ctx.organizationId,
         projectId: result.environment.projectId ?? null,
         environmentId: result.environment.id,
+        clientIp: ctx.clientIp,
         ...buildUserAuditActor({
           userId: ctx.session.user.id,
           memberId: ctx.membership.id,
@@ -393,9 +398,11 @@ export const environmentRouter = {
         webhookSecret: result.secret,
       };
     }),
-  
+
   updateCallbackHeaders: organizationProcedure
-    .input(z.object({ id: z.string(), headers: z.record(z.string(), z.string()) }))
+    .input(
+      z.object({ id: z.string(), headers: z.record(z.string(), z.string()) }),
+    )
     .use(requirePermission({ environment: ["update"] }))
     .mutation(async ({ ctx, input }) => {
       const environment = await validateEnvironmentAccess(
@@ -425,6 +432,7 @@ export const environmentRouter = {
           organizationId: ctx.organizationId,
           projectId: updated.projectId ?? null,
           environmentId: updated.id,
+          clientIp: ctx.clientIp,
           ...buildUserAuditActor({
             userId: ctx.session.user.id,
             memberId: ctx.membership.id,
@@ -460,13 +468,18 @@ export const environmentRouter = {
         });
       }
 
-      const deleted = await deleteEnvironment(ctx.db, input.id, environment.projectId);
+      const deleted = await deleteEnvironment(
+        ctx.db,
+        input.id,
+        environment.projectId,
+      );
 
       if (deleted) {
         await recordAuditEvent(ctx.db, {
           organizationId: ctx.organizationId,
           projectId: environment.projectId,
           environmentId: input.id,
+          clientIp: ctx.clientIp,
           ...buildUserAuditActor({
             userId: ctx.session.user.id,
             memberId: ctx.membership.id,

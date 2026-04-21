@@ -1,17 +1,8 @@
+import type { Db } from "@silo-storage/db/client";
 import type { TRPCRouterRecord } from "@trpc/server";
 import type { SQL } from "drizzle-orm";
-import type { Db } from "@silo-storage/db/client";
 import { TRPCError } from "@trpc/server";
-import {
-  and,
-  count,
-  desc,
-  eq,
-  gte,
-  ilike,
-  lt,
-  or,
-} from "drizzle-orm";
+import { and, count, desc, eq, gte, ilike, lt, or } from "drizzle-orm";
 import { z } from "zod/v4";
 
 import {
@@ -23,11 +14,27 @@ import {
   auditEventCategories,
   auditEventCodeOptions,
   auditResourceTypes,
+  normalizeClientIp,
 } from "@silo-storage/shared";
 
 import { organizationProcedure, requirePermission } from "../trpc";
 
 const dateParamSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const clientIpParamSchema = z
+  .string()
+  .trim()
+  .transform((value, ctx) => {
+    const normalized = normalizeClientIp(value);
+    if (!normalized) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Invalid client IP",
+      });
+      return z.NEVER;
+    }
+
+    return normalized;
+  });
 
 async function validateProjectAccess(
   db: Db,
@@ -84,11 +91,17 @@ export const auditRouter = {
         page: z.number().min(1).default(1),
         pageSize: z.number().min(1).max(100).default(20),
         search: z.string().trim().min(1).optional(),
-        actor: z.object({
-          userId: z.string()
-        }).or(z.object({
-          label: z.string()
-        })).optional(),
+        actor: z
+          .object({
+            userId: z.string(),
+          })
+          .or(
+            z.object({
+              label: z.string(),
+            }),
+          )
+          .optional(),
+        clientIp: clientIpParamSchema.optional(),
         eventCategory: z.enum(auditEventCategories).optional(),
         eventCode: z.enum(auditEventCodeOptions).optional(),
         resourceType: z.enum(auditResourceTypes).optional(),
@@ -101,7 +114,11 @@ export const auditRouter = {
       await validateProjectAccess(ctx.db, input.projectId, ctx.organizationId);
 
       if (input.environmentId) {
-        await validateEnvironmentAccess(ctx.db, input.projectId, input.environmentId);
+        await validateEnvironmentAccess(
+          ctx.db,
+          input.projectId,
+          input.environmentId,
+        );
       }
 
       const conditions: SQL<unknown>[] = [
@@ -133,7 +150,13 @@ export const auditRouter = {
         conditions.push(eq(auditEvents.actorUserId, input.actor.userId));
       }
       if (input.actor && "label" in input.actor) {
-        conditions.push(ilike(auditEvents.actorLabel, `%${input.actor.label}%`));
+        conditions.push(
+          ilike(auditEvents.actorLabel, `%${input.actor.label}%`),
+        );
+      }
+
+      if (input.clientIp) {
+        conditions.push(eq(auditEvents.clientIp, input.clientIp));
       }
 
       if (input.eventCategory) {
@@ -149,11 +172,15 @@ export const auditRouter = {
       }
 
       if (input.startDate) {
-        conditions.push(gte(auditEvents.createdAt, toStartOfDay(input.startDate)));
+        conditions.push(
+          gte(auditEvents.createdAt, toStartOfDay(input.startDate)),
+        );
       }
 
       if (input.endDate) {
-        conditions.push(lt(auditEvents.createdAt, toStartOfNextDay(input.endDate)));
+        conditions.push(
+          lt(auditEvents.createdAt, toStartOfNextDay(input.endDate)),
+        );
       }
 
       const whereClause = and(...conditions);
@@ -178,6 +205,7 @@ export const auditRouter = {
           resourceType: auditEvents.resourceType,
           resourceId: auditEvents.resourceId,
           resourceLabel: auditEvents.resourceLabel,
+          clientIp: auditEvents.clientIp,
           status: auditEvents.status,
           summary: auditEvents.summary,
           changes: auditEvents.changes,
@@ -214,6 +242,7 @@ export const auditRouter = {
             id: row.resourceId,
             label: row.resourceLabel,
           },
+          clientIp: row.clientIp,
           status: row.status,
           summary: row.summary,
           changes: row.changes ?? [],
@@ -253,7 +282,11 @@ export const auditRouter = {
       await validateProjectAccess(ctx.db, input.projectId, ctx.organizationId);
 
       if (input.environmentId) {
-        await validateEnvironmentAccess(ctx.db, input.projectId, input.environmentId);
+        await validateEnvironmentAccess(
+          ctx.db,
+          input.projectId,
+          input.environmentId,
+        );
       }
 
       const conditions: SQL<unknown>[] = [

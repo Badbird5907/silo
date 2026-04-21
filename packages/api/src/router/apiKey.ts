@@ -12,12 +12,9 @@ import {
   users,
 } from "@silo-storage/db/schema";
 import { deriveSigningSecretFromHash } from "@silo-storage/shared/signing";
-import { env } from "../env";
 
-import {
-  buildUserAuditActor,
-  recordAuditEvent,
-} from "../service/audit";
+import { env } from "../env";
+import { buildUserAuditActor, recordAuditEvent } from "../service/audit";
 import { organizationProcedure, requirePermission } from "../trpc";
 
 function encodeSiloToken(payload: {
@@ -226,6 +223,7 @@ export const apiKeyRouter = {
         organizationId: ctx.organizationId,
         projectId: input.projectId,
         environmentId: input.environmentId,
+        clientIp: ctx.clientIp,
         ...buildUserAuditActor({
           userId: ctx.session.user.id,
           memberId: ctx.membership.id,
@@ -292,6 +290,7 @@ export const apiKeyRouter = {
         organizationId: ctx.organizationId,
         projectId: apiKey.projectId,
         environmentId: apiKey.environmentId,
+        clientIp: ctx.clientIp,
         ...buildUserAuditActor({
           userId: ctx.session.user.id,
           memberId: ctx.membership.id,

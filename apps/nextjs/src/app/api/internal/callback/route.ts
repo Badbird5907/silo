@@ -40,6 +40,7 @@ import { completeFileKeyFromCallback } from "@/lib/upload/register";
 const schema = z.union([
   z.object({
     contractVersion: z.literal(1).optional(),
+    clientIp: z.string().nullable().optional(),
     type: z.literal("upload-completed"),
     data: z
       .object({
@@ -77,6 +78,7 @@ const schema = z.union([
   }),
   z.object({
     contractVersion: z.literal(1).optional(),
+    clientIp: z.string().nullable().optional(),
     type: z.literal("upload-failed"),
     data: z.object({
       environmentId: z.string(),
@@ -108,6 +110,7 @@ async function trackUsageEvent(
   fileId?: string,
   apiKeyId?: string,
   fileName?: string,
+  clientIp?: string | null,
 ) {
   try {
     const project = await db.query.projects.findFirst({
@@ -197,6 +200,7 @@ async function trackUsageEvent(
         keyPrefix: apiKey?.keyPrefix ?? null,
       },
       createdAt,
+      clientIp: clientIp ?? null,
       auditLogDownloadPolicy:
         project.auditLogDownloadPolicy as AuditLogDownloadPolicy,
       auditRetentionDays: project.auditLogRetentionDays,
@@ -632,6 +636,7 @@ export async function POST(request: Request) {
           file.id,
           callbackApiKeyId,
           fileKey.fileName,
+          parsed.data.clientIp ?? null,
         );
       }
 
@@ -659,6 +664,7 @@ export async function POST(request: Request) {
         environmentId: data.environmentId,
         fileKeyId: data.fileKeyId,
         error: data.error,
+        clientIp: parsed.data.clientIp ?? null,
       });
 
       return new Response(JSON.stringify({ success: true, status: "failed" }), {

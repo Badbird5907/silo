@@ -6,17 +6,18 @@
  * tl;dr - this is where all the tRPC server stuff is created and plugged in.
  * The pieces you will need to use are documented accordingly near the end
  */
+import type { Auth, PermissionCheck, Session } from "@silo-storage/auth";
 import type { Redis } from "@upstash/redis";
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { z, ZodError } from "zod/v4";
 
-import type { Auth, PermissionCheck, Session } from "@silo-storage/auth";
 import { roleHasPermissions } from "@silo-storage/auth";
 import { and, eq } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import { members, organizations } from "@silo-storage/db/schema";
 import { redis } from "@silo-storage/redis";
+import { getClientIpFromHeaders } from "@silo-storage/shared";
 
 /**
  * 1. CONTEXT
@@ -39,6 +40,7 @@ export async function createTRPCContext(opts: {
   session: Session | null;
   db: typeof db;
   redis: Redis;
+  clientIp: string | null;
 }> {
   const authApi = opts.auth.api;
   const session = await authApi.getSession({
@@ -49,6 +51,7 @@ export async function createTRPCContext(opts: {
     session,
     db,
     redis,
+    clientIp: getClientIpFromHeaders(opts.headers),
   };
 }
 
@@ -194,9 +197,8 @@ export function requirePermission(
   message?: string,
 ) {
   return t.middleware(({ ctx, next }) => {
-    const membership = (
-      ctx as typeof ctx & { membership?: { role: string } }
-    ).membership;
+    const membership = (ctx as typeof ctx & { membership?: { role: string } })
+      .membership;
 
     if (!membership) {
       throw new TRPCError({

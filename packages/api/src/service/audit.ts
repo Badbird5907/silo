@@ -3,15 +3,13 @@ import type {
   AuditActorType,
   AuditChange,
   AuditEventCategory,
+  AuditEventCode,
   AuditResourceType,
   AuditStatus,
-
-  AuditEventCode} from "@silo-storage/shared";
+} from "@silo-storage/shared";
 
 import { auditEvents } from "@silo-storage/db/schema";
-import {
-  usageEventTypeToAuditEventCode,
-} from "@silo-storage/shared";
+import { usageEventTypeToAuditEventCode } from "@silo-storage/shared";
 
 import type { AuthContext } from "../types/auth";
 import {
@@ -34,6 +32,7 @@ export interface RecordAuditEventInput extends AuditActor {
   organizationId: string;
   projectId?: string | null;
   environmentId?: string | null;
+  clientIp?: string | null;
   eventCode: AuditEventCode;
   eventCategory: AuditEventCategory;
   resourceType: AuditResourceType;
@@ -81,6 +80,7 @@ export async function recordAuditEvent(
     resourceType: input.resourceType,
     resourceId: input.resourceId ?? null,
     resourceLabel: input.resourceLabel ?? null,
+    clientIp: input.clientIp ?? null,
     status: input.status ?? "success",
     summary: input.summary,
     changes: input.changes ?? null,
@@ -110,6 +110,7 @@ export async function recordUsageAuditEvent(
     metadata?: Record<string, unknown> | null;
     createdAt?: Date;
     isSignedUrl?: boolean;
+    clientIp?: string | null;
     auditLogDownloadPolicy?: "disabled" | "always" | "signed_only";
     auditRetentionDays?: number;
   },
@@ -144,6 +145,7 @@ export async function recordUsageAuditEvent(
     resourceType: "file",
     resourceId: input.resourceId ?? input.fileId ?? null,
     resourceLabel: input.resourceLabel ?? null,
+    clientIp: input.clientIp ?? null,
     status: input.eventType === "upload_failed" ? "failure" : "success",
     summary,
     metadata: {

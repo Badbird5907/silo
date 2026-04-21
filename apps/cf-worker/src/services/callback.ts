@@ -253,6 +253,7 @@ export interface TrackDownloadData {
   fileName: string;
   bytes: number;
   isSignedUrl: boolean;
+  clientIp?: string | null;
 }
 
 export interface ReportMissingObjectData {

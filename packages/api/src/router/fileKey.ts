@@ -23,13 +23,13 @@ import {
 } from "@silo-storage/db/schema";
 import { auditEventCodes } from "@silo-storage/shared";
 
+import { buildUserAuditActor, recordAuditEvent } from "../service/audit";
 import {
   deleteFileKey,
   markUploadAsFailed,
   updateFileKeyAccess,
   UploadFailureError,
 } from "../service/fileKey";
-import { buildUserAuditActor, recordAuditEvent } from "../service/audit";
 import { runLifecycleJobBatch } from "../service/lifecycleJob";
 import { organizationProcedure, requirePermission } from "../trpc";
 
@@ -449,6 +449,7 @@ export const fileKeyRouter = {
         environmentId: environment.id,
         isPublic: input.isPublic,
         serveImage: input.serveImage,
+        clientIp: ctx.clientIp,
       });
 
       if (result.status === "not_found") {
@@ -507,6 +508,7 @@ export const fileKeyRouter = {
         fileKeyId: input.id,
         audit: {
           organizationId: ctx.organizationId,
+          clientIp: ctx.clientIp,
           actor: buildUserAuditActor({
             userId: ctx.session.user.id,
             memberId: ctx.membership.id,
@@ -607,6 +609,7 @@ export const fileKeyRouter = {
           environmentId: fileKey.environmentId,
           fileKeyId: input.id,
           error: "Manually marked as failed",
+          clientIp: ctx.clientIp,
         });
 
         return updated;
@@ -672,6 +675,7 @@ export const fileKeyRouter = {
           fileKeyId: matchedFileKey.id,
           audit: {
             organizationId: ctx.organizationId,
+            clientIp: ctx.clientIp,
             actor,
           },
         });
@@ -710,6 +714,7 @@ export const fileKeyRouter = {
           fileKeyId: fk.id,
           audit: {
             organizationId: ctx.organizationId,
+            clientIp: ctx.clientIp,
             actor,
             recordAuditEvent: false,
           },
@@ -744,6 +749,7 @@ export const fileKeyRouter = {
         await recordAuditEvent(ctx.db, {
           organizationId: ctx.organizationId,
           projectId: input.projectId,
+          clientIp: ctx.clientIp,
           eventCode: auditEventCodes.fileDeleted,
           eventCategory: "lifecycle",
           resourceType: "file",
@@ -824,6 +830,7 @@ export const fileKeyRouter = {
             fileKeyId: matchedFileKey.id,
             error: "Manually marked as failed",
             actor,
+            clientIp: ctx.clientIp,
           });
           succeeded++;
         } catch {
@@ -843,6 +850,7 @@ export const fileKeyRouter = {
             fileKeyId: fk.id,
             error: "Manually marked as failed",
             actor,
+            clientIp: ctx.clientIp,
             recordAuditEvent: false,
           });
           failedFileKeyIds.push(fk.id);
@@ -858,6 +866,7 @@ export const fileKeyRouter = {
         await recordAuditEvent(ctx.db, {
           organizationId: ctx.organizationId,
           projectId: input.projectId,
+          clientIp: ctx.clientIp,
           eventCode: auditEventCodes.fileUploadFailed,
           eventCategory: "operational",
           resourceType: "file",
@@ -939,6 +948,7 @@ export const fileKeyRouter = {
           environmentId: matchedFileKey.environmentId,
           isPublic: input.isPublic,
           actor,
+          clientIp: ctx.clientIp,
         });
 
         return { updated: matchedFileKeys.length };
@@ -960,6 +970,7 @@ export const fileKeyRouter = {
           await recordAuditEvent(tx, {
             organizationId: ctx.organizationId,
             projectId: input.projectId,
+            clientIp: ctx.clientIp,
             eventCode: auditEventCodes.fileKeyAccessUpdated,
             eventCategory: "lifecycle",
             resourceType: "file_key",

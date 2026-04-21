@@ -71,6 +71,13 @@
       "when": 1776742913479,
       "tag": "0009_marvelous_morbius",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1776754365153,
+      "tag": "0010_glossy_franklin_richards",
+      "breakpoints": true
     }
   ]
 }

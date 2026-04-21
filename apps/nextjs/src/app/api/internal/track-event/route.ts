@@ -27,6 +27,7 @@ const eventSchema = z.object({
   apiKeyId: z.string().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
   isSignedUrl: z.boolean().optional(),
+  clientIp: z.string().nullable().optional(),
 });
 
 export async function POST(request: Request) {
@@ -118,6 +119,7 @@ export async function POST(request: Request) {
           : {}),
       },
       createdAt,
+      clientIp: parsed.data.clientIp ?? null,
       isSignedUrl: parsed.data.isSignedUrl ?? false,
       auditLogDownloadPolicy:
         project.auditLogDownloadPolicy as AuditLogDownloadPolicy,

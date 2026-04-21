@@ -20,6 +20,7 @@ const schema = z.object({
   fileName: z.string(),
   bytes: z.number(),
   isSignedUrl: z.boolean().optional(),
+  clientIp: z.string().nullable().optional(),
 });
 
 export async function POST(request: Request) {
@@ -90,6 +91,7 @@ export async function POST(request: Request) {
       resourceLabel: fileName,
       resourceId: fileKeyId,
       createdAt,
+      clientIp: parsed.data.clientIp ?? null,
       isSignedUrl: parsed.data.isSignedUrl ?? false,
       auditLogDownloadPolicy:
         project.auditLogDownloadPolicy as AuditLogDownloadPolicy,

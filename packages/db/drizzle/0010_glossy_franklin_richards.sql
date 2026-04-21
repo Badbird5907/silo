@@ -1,0 +1,2 @@
+ALTER TABLE "silo_audit_events" ADD COLUMN "client_ip" text;--> statement-breakpoint
+CREATE INDEX "audit_events_org_project_client_ip_created_at_idx" ON "silo_audit_events" USING btree ("organization_id","project_id","client_ip","created_at");
