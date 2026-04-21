@@ -61,6 +61,7 @@ import { CallbackHeadersDialog } from "./callback-headers-dialog";
 import { CreateEnvironmentDialog } from "./create-environment-dialog";
 import { ManageEnvironmentWebhookDialog } from "./manage-environment-webhook-dialog";
 import { Tooltip,TooltipContent,TooltipTrigger } from "@silo-storage/ui/components/tooltip";
+import { EnvBadge } from "../env-badge";
 
 interface EnvironmentsListProps {
   projectId: string;
@@ -96,19 +97,6 @@ function normalizeCallbackHeaders(raw: unknown): Record<string, string> {
     }
   }
   return out;
-}
-
-function getTypeBadgeVariant(
-  type: string,
-): "default" | "secondary" | "outline" {
-  switch (type) {
-    case "production":
-      return "default";
-    case "staging":
-      return "secondary";
-    default:
-      return "outline";
-  }
 }
 
 export function EnvironmentsList({
@@ -287,9 +275,10 @@ export function EnvironmentsList({
                       ) : null}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={getTypeBadgeVariant(env.type)}>
+                      {/* <Badge variant={getTypeBadgeVariant(env.type)}>
                         {env.type}
-                      </Badge>
+                      </Badge> */}
+                      <EnvBadge name={env.type} type={env.type} />
                     </TableCell>
                     <TableCell>
                       <Badge variant={env.ownerUserId ? "secondary" : "outline"}>

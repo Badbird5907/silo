@@ -14,7 +14,7 @@ const querySchema = z.object({
 export async function GET(request: Request) {
   const authResult = await authenticateRequest(request);
   if (authResult instanceof Response) return authResult;
-  if (authResult.type !== "apiKey" || !authResult.rawApiKey) {
+  if (authResult.type !== "apiKey" || !authResult.apiKey.rawKey) {
     return jsonError(
       "Unauthorized",
       "API key is required for completion wait.",

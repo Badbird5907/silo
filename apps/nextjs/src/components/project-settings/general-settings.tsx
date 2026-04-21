@@ -2,9 +2,19 @@
 
 import * as React from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Cog, Copy, Info, Loader2, Save } from "lucide-react";
+import {
+  Clock,
+  Copy,
+  Image,
+  Info,
+  Loader2,
+  Save,
+  Shield,
+  Upload,
+} from "lucide-react";
 import { toast } from "sonner";
 
+import { Badge } from "@silo-storage/ui/components/badge";
 import { Button } from "@silo-storage/ui/components/button";
 import {
   Card,
@@ -22,6 +32,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@silo-storage/ui/components/select";
+import { Separator } from "@silo-storage/ui/components/separator";
+import { Switch } from "@silo-storage/ui/components/switch";
 
 import { useTRPC } from "@/trpc/react";
 
@@ -175,9 +187,12 @@ export function ProjectGeneralSettings({
 
   return (
     <div className="flex w-full flex-col gap-6">
-      <Card className="flex-1">
+      {/* Project Information */}
+      <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Info className="h-4 w-4" /> Project Information</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Info className="h-4 w-4" /> Project Information
+          </CardTitle>
           <CardDescription>
             Basic information about your project
           </CardDescription>
@@ -226,50 +241,51 @@ export function ProjectGeneralSettings({
         </CardContent>
       </Card>
 
-      <Card className="flex-1">
+      {/* Upload & Access */}
+      <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Cog className="h-4 w-4" /> General Settings</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Upload className="h-4 w-4" /> Upload & Access
+          </CardTitle>
           <CardDescription>
-            Some general settings for your project.
+            How new files are exposed and when stale uploads are cleared.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid gap-4 lg:grid-cols-2 lg:gap-10">
-            <div className="space-y-5">
-              <div className="space-y-1">
-                <h3 className="text-sm font-semibold">Upload &amp; access</h3>
-                <p className="text-muted-foreground text-xs">
-                  How new files are exposed and when stale uploads are cleared.
-                </p>
-              </div>
+        <CardContent>
+          <div className="grid gap-6 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="default-access">Default Access Level</Label>
+              <Select
+                value={defaultFileAccess}
+                onValueChange={(v) =>
+                  setDefaultFileAccess(v as "public" | "private")
+                }
+              >
+                <SelectTrigger id="default-access" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="private">
+                    <div className="flex items-center gap-2">
+                      <Shield className="text-muted-foreground h-3.5 w-3.5" />
+                      Private
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="public">Public</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                {defaultFileAccess === "private"
+                  ? "Files require a signed URL to access"
+                  : "Files can be accessed directly without authentication"}
+              </p>
+            </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="default-access">Default Access Level</Label>
-                <Select
-                  value={defaultFileAccess}
-                  onValueChange={(v) =>
-                    setDefaultFileAccess(v as "public" | "private")
-                  }
-                >
-                  <SelectTrigger id="default-access" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="private">Private</SelectItem>
-                    <SelectItem value="public">Public</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-muted-foreground text-xs leading-relaxed">
-                  {defaultFileAccess === "private"
-                    ? "Files require a signed URL to access"
-                    : "Files can be accessed directly without authentication"}
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="pending-upload-fail-after-minutes">
-                  Auto-fail Pending Uploads (minutes)
-                </Label>
+            <div className="space-y-2">
+              <Label htmlFor="pending-upload-fail-after-minutes">
+                Auto-fail Pending Uploads
+              </Label>
+              <div className="relative">
                 <Input
                   id="pending-upload-fail-after-minutes"
                   type="number"
@@ -284,228 +300,259 @@ export function ProjectGeneralSettings({
                       Math.min(43200, Math.max(5, nextValue)),
                     );
                   }}
-                  className="w-full"
+                  className="w-full pr-16"
                 />
-                <p className="text-muted-foreground text-xs leading-relaxed">
-                  Pending uploads older than this are automatically marked as
-                  failed.
-                </p>
+                <span className="text-muted-foreground pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs">
+                  minutes
+                </span>
               </div>
-            </div>
-
-            <div className="space-y-5">
-              <div className="space-y-1">
-                <h3 className="text-sm font-semibold">Image CDN</h3>
-                <p className="text-muted-foreground text-xs">
-                  On-the-fly transforms and metadata for
-                  <span className="font-mono"> /i/...</span> URLs.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="image-delivery-policy">Enable Image CDN</Label>
-                <Select
-                  value={imageDeliveryPolicy}
-                  onValueChange={(value) =>
-                    setImageDeliveryPolicy(
-                      value as
-                        | "disabled"
-                        | "public_only"
-                        | "public_and_private_opt_in",
-                    )
-                  }
-                >
-                  <SelectTrigger id="image-delivery-policy" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="disabled">Disabled</SelectItem>
-                    <SelectItem value="public_only">
-                      Public files only
-                    </SelectItem>
-                    <SelectItem value="public_and_private_opt_in">
-                      Public + serve image opt-in
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-muted-foreground text-xs leading-relaxed">
-                  Controls whether transformed image URLs from
-                  <span className="font-mono"> /i/...</span> are available.
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-2 md:flex-row">
-                <div className="space-y-2">
-                  <Label htmlFor="default-serve-image">
-                    Default Serve Image
-                  </Label>
-                  <Select
-                    value={defaultServeImage ? "true" : "false"}
-                    onValueChange={(value) =>
-                      setDefaultServeImage(value === "true")
-                    }
-                  >
-                    <SelectTrigger id="default-serve-image" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="false">Disabled</SelectItem>
-                      <SelectItem value="true">Enabled</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-muted-foreground text-xs leading-relaxed">
-                    Used only for private image uploads when the SDK request
-                    does not explicitly set{" "}
-                    <span className="font-mono">serveImage</span>.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="preserve-image-exif">
-                    Preserve Image EXIF
-                  </Label>
-                  <Select
-                    value={preserveImageExif ? "true" : "false"}
-                    onValueChange={(value) =>
-                      setPreserveImageExif(value === "true")
-                    }
-                  >
-                    <SelectTrigger id="preserve-image-exif" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="false">Strip EXIF</SelectItem>
-                      <SelectItem value="true">Preserve EXIF</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-muted-foreground text-xs leading-relaxed">
-                    Applies to transformed image responses when the chosen
-                    output format supports metadata retention.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-4 lg:col-span-2">
-              <div className="space-y-1 pt-2">
-                <h3 className="text-sm font-semibold">Audit &amp; retention</h3>
-                <p className="text-muted-foreground text-xs">
-                  Control download auditing and how long raw event data is kept.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                <div className="min-w-0 space-y-2">
-                  <Label htmlFor="audit-log-download-policy">
-                    Audit Log Download Policy
-                  </Label>
-                  <Select
-                    value={auditLogDownloadPolicy}
-                    onValueChange={(value) =>
-                      setAuditLogDownloadPolicy(
-                        value as "disabled" | "always" | "signed_only",
-                      )
-                    }
-                  >
-                    <SelectTrigger
-                      id="audit-log-download-policy"
-                      className="w-full"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="disabled">Disabled</SelectItem>
-                      <SelectItem value="always">Always log</SelectItem>
-                      <SelectItem value="signed_only">
-                        Signed URLs only
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-muted-foreground text-xs leading-relaxed">
-                    Controls whether file and image downloads are written to the
-                    audit log.
-                  </p>
-                  {auditLogDownloadPolicy === "always" && (
-                    <p className="text-xs leading-relaxed text-orange-500">
-                      Don't use this setting if files will frequently be accessed.
-                    </p>
-                  )}
-                </div>
-
-                <div className="min-w-0 space-y-2">
-                  <Label htmlFor="audit-log-retention-days">
-                    Audit Log Retention (days)
-                  </Label>
-                  <Input
-                    id="audit-log-retention-days"
-                    type="number"
-                    min={1}
-                    max={3650}
-                    step={1}
-                    value={auditLogRetentionDays}
-                    onChange={(event) => {
-                      const nextValue = Number.parseInt(
-                        event.target.value,
-                        10,
-                      );
-                      if (Number.isNaN(nextValue)) return;
-                      setAuditLogRetentionDays(
-                        Math.min(3650, Math.max(1, nextValue)),
-                      );
-                    }}
-                    className="w-full"
-                  />
-                </div>
-
-                <div className="min-w-0 space-y-2">
-                  <Label htmlFor="usage-event-retention-days">
-                    Usage Event Retention (days)
-                  </Label>
-                  <Input
-                    id="usage-event-retention-days"
-                    type="number"
-                    min={1}
-                    max={3650}
-                    step={1}
-                    value={usageEventRetentionDays}
-                    onChange={(event) => {
-                      const nextValue = Number.parseInt(
-                        event.target.value,
-                        10,
-                      );
-                      if (Number.isNaN(nextValue)) return;
-                      setUsageEventRetentionDays(
-                        Math.min(3650, Math.max(1, nextValue)),
-                      );
-                    }}
-                    className="w-full"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
-            {hasChanges ? (
-              <p className="text-muted-foreground text-xs sm:mr-auto sm:text-left">
-                You have unsaved changes.
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                Pending uploads older than this are automatically marked as
+                failed.
               </p>
-            ) : null}
-            <Button
-              onClick={handleSave}
-              disabled={!hasChanges || updateMutation.isPending}
-              className="shrink-0 sm:min-w-36"
-            >
-              {updateMutation.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="mr-2 h-4 w-4" />
-              )}
-              Save Changes
-            </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Image CDN */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Image className="h-4 w-4" /> Image CDN
+          </CardTitle>
+          <CardDescription>
+            On-the-fly transforms and metadata for
+            <code className="bg-muted mx-1 rounded px-1 py-0.5 text-xs">
+              /i/...
+            </code>
+            URLs.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="image-delivery-policy">Delivery Policy</Label>
+            <Select
+              value={imageDeliveryPolicy}
+              onValueChange={(value) =>
+                setImageDeliveryPolicy(
+                  value as
+                    | "disabled"
+                    | "public_only"
+                    | "public_and_private_opt_in",
+                )
+              }
+            >
+              <SelectTrigger id="image-delivery-policy" className="w-full sm:max-w-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="disabled">Disabled</SelectItem>
+                <SelectItem value="public_only">Public files only</SelectItem>
+                <SelectItem value="public_and_private_opt_in">
+                  Public + serve image opt-in
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              Controls whether transformed image URLs from
+              <code className="bg-muted mx-1 rounded px-1 py-0.5 text-xs">
+                /i/...
+              </code>
+              are available.
+            </p>
+          </div>
+
+          {imageDeliveryPolicy !== "disabled" && (
+            <>
+              <Separator />
+              <div className="grid gap-6 sm:grid-cols-2">
+                <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor="default-serve-image"
+                      className="text-sm font-medium"
+                    >
+                      Default Serve Image
+                    </Label>
+                    <p className="text-muted-foreground text-xs leading-relaxed">
+                      Used only for private image uploads when the SDK request
+                      does not explicitly set{" "}
+                      <code className="bg-muted rounded px-1 py-0.5 text-xs">
+                        serveImage
+                      </code>
+                      .
+                    </p>
+                  </div>
+                  <Switch
+                    id="default-serve-image"
+                    checked={defaultServeImage}
+                    onCheckedChange={setDefaultServeImage}
+                  />
+                </div>
+
+                <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor="preserve-image-exif"
+                      className="text-sm font-medium"
+                    >
+                      Preserve Image EXIF
+                    </Label>
+                    <p className="text-muted-foreground text-xs leading-relaxed">
+                      Applies to transformed image responses when the chosen
+                      output format supports metadata retention.
+                    </p>
+                  </div>
+                  <Switch
+                    id="preserve-image-exif"
+                    checked={preserveImageExif}
+                    onCheckedChange={setPreserveImageExif}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Audit & Retention */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-4 w-4" /> Audit & Retention
+          </CardTitle>
+          <CardDescription>
+            Control download auditing and how long raw event data is kept.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="audit-log-download-policy">
+              Download Audit Policy
+            </Label>
+            <Select
+              value={auditLogDownloadPolicy}
+              onValueChange={(value) =>
+                setAuditLogDownloadPolicy(
+                  value as "disabled" | "always" | "signed_only",
+                )
+              }
+            >
+              <SelectTrigger
+                id="audit-log-download-policy"
+                className="w-full sm:max-w-sm"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="disabled">Disabled</SelectItem>
+                <SelectItem value="always">Always log</SelectItem>
+                <SelectItem value="signed_only">Signed URLs only</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              Controls whether file and image downloads are written to the
+              audit log.
+            </p>
+            {auditLogDownloadPolicy === "always" && (
+              <Badge variant="outline" className="border-orange-500/30 text-orange-500">
+                Not recommended for high-traffic files
+              </Badge>
+            )}
+          </div>
+
+          <Separator />
+
+          <div className="grid gap-6 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="audit-log-retention-days">
+                Audit Log Retention
+              </Label>
+              <div className="relative">
+                <Input
+                  id="audit-log-retention-days"
+                  type="number"
+                  min={1}
+                  max={3650}
+                  step={1}
+                  value={auditLogRetentionDays}
+                  onChange={(event) => {
+                    const nextValue = Number.parseInt(
+                      event.target.value,
+                      10,
+                    );
+                    if (Number.isNaN(nextValue)) return;
+                    setAuditLogRetentionDays(
+                      Math.min(3650, Math.max(1, nextValue)),
+                    );
+                  }}
+                  className="w-full pr-12"
+                />
+                <span className="text-muted-foreground pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs">
+                  days
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="usage-event-retention-days">
+                Usage Event Retention
+              </Label>
+              <div className="relative">
+                <Input
+                  id="usage-event-retention-days"
+                  type="number"
+                  min={1}
+                  max={3650}
+                  step={1}
+                  value={usageEventRetentionDays}
+                  onChange={(event) => {
+                    const nextValue = Number.parseInt(
+                      event.target.value,
+                      10,
+                    );
+                    if (Number.isNaN(nextValue)) return;
+                    setUsageEventRetentionDays(
+                      Math.min(3650, Math.max(1, nextValue)),
+                    );
+                  }}
+                  className="w-full pr-12"
+                />
+                <span className="text-muted-foreground pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs">
+                  days
+                </span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Floating save bar */}
+      <div
+        className={`bg-background fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-lg border px-4 py-2 shadow-lg transition-all duration-300 ease-out ${
+          hasChanges
+            ? "translate-y-0 opacity-100"
+            : "pointer-events-none translate-y-4 opacity-0"
+        }`}
+      >
+        <span className="text-muted-foreground text-sm">
+          Unsaved changes
+        </span>
+        <div className="bg-border mx-1 h-4 w-px" />
+        <Button
+          onClick={handleSave}
+          disabled={!hasChanges || updateMutation.isPending}
+          size="sm"
+        >
+          {updateMutation.isPending ? (
+            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Save className="mr-1.5 h-3.5 w-3.5" />
+          )}
+          Save Changes
+        </Button>
+      </div>
     </div>
   );
 }

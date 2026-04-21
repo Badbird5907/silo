@@ -79,6 +79,7 @@ import { FileStatusBadge } from "@/components/file-status-badge";
 import { UploadDialog } from "@/components/upload-dialog";
 import { useOrganization } from "@/hooks/use-organization";
 import { useTRPC } from "@/trpc/react";
+import { EnvBadge } from "@/components/env-badge";
 
 interface FilesPageProps {
   params: Promise<{
@@ -620,17 +621,20 @@ export default function FilesPage({ params }: FilesPageProps) {
         header: "File",
         meta: {
           headerClassName: isMobile ? undefined : "w-[35%]",
+          cellClassName: isMobile ? "max-w-0" : "max-w-0 w-[35%]",
         },
         cell: ({ row }) => {
           const fk = row.original;
           const FileIcon = getFileIcon(fk.mimeType);
           return (
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <div className="bg-muted flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
                 <FileIcon className="text-muted-foreground h-5 w-5" />
               </div>
-              <div className="flex min-w-0 flex-col">
-                <span className="truncate font-medium">{fk.fileName}</span>
+              <div className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate font-medium" title={fk.fileName}>
+                  {fk.fileName}
+                </span>
                 {fk.hash ? (
                   <span className="text-muted-foreground truncate font-mono text-xs">
                     {fk.hash.slice(0, 16)}...
@@ -682,17 +686,7 @@ export default function FilesPage({ params }: FilesPageProps) {
         cell: ({ row }) => {
           const env = row.original.environment;
           return env ? (
-            <Badge
-              variant={
-                env.type === "production"
-                  ? "default"
-                  : env.type === "staging"
-                    ? "secondary"
-                    : "outline"
-              }
-            >
-              {env.name}
-            </Badge>
+            <EnvBadge name={env.name} type={env.type} />
           ) : (
             <span className="text-muted-foreground">-</span>
           );
@@ -1352,8 +1346,13 @@ export default function FilesPage({ params }: FilesPageProps) {
       </Dialog>
 
       {/* Floating bulk action bar */}
-      {multiselect.selectedIds.length > 0 && (
-        <div className="bg-background fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-lg border px-4 py-2 shadow-lg">
+      <div
+        className={`bg-background fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-lg border px-4 py-2 shadow-lg transition-all duration-300 ease-out ${
+          multiselect.selectedIds.length > 0
+            ? "translate-y-0 opacity-100"
+            : "pointer-events-none translate-y-4 opacity-0"
+        }`}
+      >
           <span className="text-sm font-medium">
             {multiselect.selectedIds.length} selected
           </span>
@@ -1415,7 +1414,6 @@ export default function FilesPage({ params }: FilesPageProps) {
             <X className="h-3.5 w-3.5" />
           </Button>
         </div>
-      )}
     </>
   );
 }

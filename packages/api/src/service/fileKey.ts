@@ -8,8 +8,8 @@ import {
   usageEvents,
 } from "@silo-storage/db/schema";
 import { publishMessage } from "@silo-storage/redis";
+import type { AuditChange } from "@silo-storage/shared";
 import {
-  AuditChange,
   auditEventCodes,
   clearUploadSessionAdapterData,
   createUploadEventEnvelope,
@@ -99,6 +99,7 @@ async function trackUsageEvent(
     fileName?: string;
     actor?: AuditActor;
     isSignedUrl?: boolean;
+    recordAuditEvent?: boolean;
   },
 ) {
   const {
@@ -110,6 +111,7 @@ async function trackUsageEvent(
     fileName,
     actor,
     isSignedUrl,
+    recordAuditEvent = true,
   } = opts;
   try {
     const project = await db.query.projects.findFirst({
@@ -142,21 +144,23 @@ async function trackUsageEvent(
       expiresAt,
     });
 
-    await recordUsageAuditEvent(db, {
-      organizationId,
-      projectId,
-      environmentId,
-      eventType,
-      bytes,
-      fileId,
-      resourceLabel: fileName ?? null,
-      actor,
-      createdAt,
-      isSignedUrl,
-      auditLogDownloadPolicy:
-        project.auditLogDownloadPolicy as AuditLogDownloadPolicy,
-      auditRetentionDays: project.auditLogRetentionDays,
-    });
+    if (recordAuditEvent) {
+      await recordUsageAuditEvent(db, {
+        organizationId,
+        projectId,
+        environmentId,
+        eventType,
+        bytes,
+        fileId,
+        resourceLabel: fileName ?? null,
+        actor,
+        createdAt,
+        isSignedUrl,
+        auditLogDownloadPolicy:
+          project.auditLogDownloadPolicy as AuditLogDownloadPolicy,
+          auditRetentionDays: project.auditLogRetentionDays,
+      });
+    }
 
     const today = new Date().toISOString().substring(0, 10);
 
@@ -219,6 +223,7 @@ export async function markUploadAsFailed(
     fileKeyId: string;
     error?: string;
     actor?: AuditActor;
+    recordAuditEvent?: boolean;
   },
 ) {
   const [updated, fileKey] = await db.transaction(async (tx) => {
@@ -355,12 +360,13 @@ export async function markUploadAsFailed(
 
   // track usage analytics
   // void trackUsageEvent(db, "upload_failed", opts.projectId, opts.environmentId, undefined, undefined, fileKey.fileName);
-  void trackUsageEvent(db, {
+  await trackUsageEvent(db, {
     eventType: "upload_failed",
     projectId: opts.projectId,
     environmentId: opts.environmentId,
     fileName: fileKey.fileName,
     actor: opts.actor,
+    recordAuditEvent: opts.recordAuditEvent,
   });
 
   return updated;
@@ -392,6 +398,7 @@ export async function deleteFileKey(
     audit: {
       organizationId: string;
       actor?: AuditActor;
+      recordAuditEvent?: boolean;
     };
   },
 ): Promise<DeleteFileKeyResult> {
@@ -432,21 +439,23 @@ export async function deleteFileKey(
         .set(nextBase)
         .where(eq(fileKeys.id, fileKey.id));
 
-      await recordUsageAuditEvent(tx, {
-        organizationId: opts.audit.organizationId,
-        projectId: opts.projectId,
-        environmentId: fileKey.environmentId,
-        ...(opts.audit.actor ?? buildSystemAuditActor()),
-        eventType: "file_deleted",
-        resourceLabel: fileKey.fileName,
-        metadata: {
-          fileKeyId: fileKey.id,
-          fileId: null,
-          accessKey: fileKey.accessKey,
-          previousStatus: fileKey.status,
-          cleanupScheduled: false,
-        },
-      });
+      if (opts.audit.recordAuditEvent !== false) {
+        await recordUsageAuditEvent(tx, {
+          organizationId: opts.audit.organizationId,
+          projectId: opts.projectId,
+          environmentId: fileKey.environmentId,
+          ...(opts.audit.actor ?? buildSystemAuditActor()),
+          eventType: "file_deleted",
+          resourceLabel: fileKey.fileName,
+          metadata: {
+            fileKeyId: fileKey.id,
+            fileId: null,
+            accessKey: fileKey.accessKey,
+            previousStatus: fileKey.status,
+            cleanupScheduled: false,
+          },
+        });
+      }
 
       return { status: "deleted_without_cleanup" };
     }
@@ -470,22 +479,24 @@ export async function deleteFileKey(
       priority: 100,
     });
 
-    await recordUsageAuditEvent(tx, {
-      organizationId: opts.audit.organizationId,
-      projectId: opts.projectId,
-      environmentId: fileKey.environmentId,
-      ...(opts.audit.actor ?? buildSystemAuditActor()),
-      eventType: "file_deleted",
-      resourceLabel: fileKey.fileName,
-      metadata: {
-        fileKeyId: fileKey.id,
-        fileId: fileKey.file.id,
-        accessKey: fileKey.accessKey,
-        previousStatus: fileKey.status,
-        storageKey: fileKey.file.storageKey,
-        cleanupScheduled: true,
-      },
-    });
+    if (opts.audit.recordAuditEvent !== false) {
+      await recordUsageAuditEvent(tx, {
+        organizationId: opts.audit.organizationId,
+        projectId: opts.projectId,
+        environmentId: fileKey.environmentId,
+        ...(opts.audit.actor ?? buildSystemAuditActor()),
+        eventType: "file_deleted",
+        resourceLabel: fileKey.fileName,
+        metadata: {
+          fileKeyId: fileKey.id,
+          fileId: fileKey.file.id,
+          accessKey: fileKey.accessKey,
+          previousStatus: fileKey.status,
+          storageKey: fileKey.file.storageKey,
+          cleanupScheduled: true,
+        },
+      });
+    }
 
     return {
       status: "deleted_with_cleanup",

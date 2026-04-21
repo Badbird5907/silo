@@ -44,6 +44,7 @@ import {
 
 import { useTRPC } from "@/trpc/react";
 import { CreateApiKeyDialog } from "./create-api-key-dialog";
+import { EnvBadge } from "../env-badge";
 
 interface ApiKeysListProps {
   projectId: string;
@@ -186,17 +187,7 @@ export function ApiKeysList({ projectId, organizationId }: ApiKeysListProps) {
                       </code>
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        variant={
-                          apiKey.environment.type === "production"
-                            ? "default"
-                            : apiKey.environment.type === "staging"
-                              ? "secondary"
-                              : "outline"
-                        }
-                      >
-                        {apiKey.environment.name}
-                      </Badge>
+                      <EnvBadge name={apiKey.environment.name} type={apiKey.environment.type} />
                     </TableCell>
                     <TableCell>
                       {apiKey.createdBy ? (

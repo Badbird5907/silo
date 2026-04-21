@@ -25,7 +25,7 @@ export function FileStatusBadge({ status }: FileStatusBadgeProps) {
 
   if (normalizedStatus === "completed") {
     return (
-      <Badge variant="default" className="bg-green-600 text-white hover:bg-green-700">
+      <Badge variant="default" className="border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
         <CheckCircle2 className="mr-1 h-3 w-3" />
         Completed
       </Badge>
@@ -34,7 +34,7 @@ export function FileStatusBadge({ status }: FileStatusBadgeProps) {
 
   if (normalizedStatus === "pending") {
     return (
-      <Badge variant="secondary" className="bg-yellow-500 text-white hover:bg-yellow-600">
+      <Badge variant="secondary" className="border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400">
         <Clock className="mr-1 h-3 w-3" />
         Pending
       </Badge>
@@ -51,7 +51,7 @@ export function FileStatusBadge({ status }: FileStatusBadgeProps) {
   }
 
   return (
-    <Badge variant="destructive" className="bg-red-600 text-white hover:bg-red-700">
+    <Badge variant="outline" className="border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-400">
       <XCircle className="mr-1 h-3 w-3" />
       Failed
     </Badge>

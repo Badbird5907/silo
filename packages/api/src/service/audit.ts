@@ -5,11 +5,11 @@ import type {
   AuditEventCategory,
   AuditResourceType,
   AuditStatus,
-} from "@silo-storage/shared";
+
+  AuditEventCode} from "@silo-storage/shared";
 
 import { auditEvents } from "@silo-storage/db/schema";
 import {
-  AuditEventCode,
   usageEventTypeToAuditEventCode,
 } from "@silo-storage/shared";
 

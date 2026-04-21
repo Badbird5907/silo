@@ -21,6 +21,7 @@ import {
   projectEnvironments,
   projects,
 } from "@silo-storage/db/schema";
+import { auditEventCodes } from "@silo-storage/shared";
 
 import {
   deleteFileKey,
@@ -28,7 +29,7 @@ import {
   updateFileKeyAccess,
   UploadFailureError,
 } from "../service/fileKey";
-import { buildUserAuditActor } from "../service/audit";
+import { buildUserAuditActor, recordAuditEvent } from "../service/audit";
 import { runLifecycleJobBatch } from "../service/lifecycleJob";
 import { organizationProcedure, requirePermission } from "../trpc";
 
@@ -651,12 +652,57 @@ export const fileKeyRouter = {
       let succeeded = 0;
       let failed = 0;
       let requiresCleanupDrain = false;
+      const deletedFileKeyIds: Record<string, string> = {};
       const actor = buildUserAuditActor({
         userId: ctx.session.user.id,
         memberId: ctx.membership.id,
         name: ctx.session.user.name,
         email: ctx.session.user.email,
       });
+
+      if (matchedFileKeys.length === 1) {
+        const matchedFileKey = matchedFileKeys[0];
+
+        if (!matchedFileKey) {
+          return { succeeded: 0, failed: input.ids.length };
+        }
+
+        const result = await deleteFileKey(ctx.db, {
+          projectId: input.projectId,
+          fileKeyId: matchedFileKey.id,
+          audit: {
+            organizationId: ctx.organizationId,
+            actor,
+          },
+        });
+
+        if (result.status === "already_deleted") {
+          succeeded++;
+        } else if (
+          result.status === "pending_rejected" ||
+          result.status === "not_found"
+        ) {
+          failed++;
+        } else {
+          if (result.status === "deleted_with_cleanup") {
+            requiresCleanupDrain = true;
+          }
+
+          succeeded++;
+        }
+
+        failed += input.ids.length - matchedFileKeys.length;
+
+        if (requiresCleanupDrain) {
+          await runLifecycleJobBatch(ctx.db, {
+            limit: 50,
+            leaseSeconds: 45,
+            leaseOwner: "trpc:fileKey.bulkDelete",
+          });
+        }
+
+        return { succeeded, failed };
+      }
 
       for (const fk of matchedFileKeys) {
         const result = await deleteFileKey(ctx.db, {
@@ -665,6 +711,7 @@ export const fileKeyRouter = {
           audit: {
             organizationId: ctx.organizationId,
             actor,
+            recordAuditEvent: false,
           },
         });
 
@@ -685,10 +732,34 @@ export const fileKeyRouter = {
           requiresCleanupDrain = true;
         }
 
+        // deletedFileKeyIds.push(fk.id);
+        deletedFileKeyIds[fk.id] = fk.fileName;
         succeeded++;
       }
 
       failed += input.ids.length - matchedFileKeys.length;
+
+      const numDeleted = Object.keys(deletedFileKeyIds).length;
+      if (numDeleted > 0) {
+        await recordAuditEvent(ctx.db, {
+          organizationId: ctx.organizationId,
+          projectId: input.projectId,
+          eventCode: auditEventCodes.fileDeleted,
+          eventCategory: "lifecycle",
+          resourceType: "file",
+          resourceLabel: `${numDeleted} files`,
+          status: "success",
+          summary: `Bulk file deletion completed for ${numDeleted} files`,
+          metadata: {
+            bulk: true,
+            matchedCount: matchedFileKeys.length,
+            deletedCount: numDeleted,
+            failedCount: failed,
+            fileKeyIds: deletedFileKeyIds,
+          },
+          ...actor,
+        });
+      }
 
       if (requiresCleanupDrain) {
         await runLifecycleJobBatch(ctx.db, {
@@ -731,6 +802,38 @@ export const fileKeyRouter = {
 
       let succeeded = 0;
       let failed = 0;
+      const failedFileKeyIds: string[] = [];
+      const actor = buildUserAuditActor({
+        userId: ctx.session.user.id,
+        memberId: ctx.membership.id,
+        name: ctx.session.user.name,
+        email: ctx.session.user.email,
+      });
+
+      if (matchedFileKeys.length === 1) {
+        const matchedFileKey = matchedFileKeys[0];
+
+        if (!matchedFileKey) {
+          return { succeeded: 0, failed: input.ids.length };
+        }
+
+        try {
+          await markUploadAsFailed(ctx.db, {
+            projectId: input.projectId,
+            environmentId: matchedFileKey.environmentId,
+            fileKeyId: matchedFileKey.id,
+            error: "Manually marked as failed",
+            actor,
+          });
+          succeeded++;
+        } catch {
+          failed++;
+        }
+
+        failed += input.ids.length - matchedFileKeys.length;
+
+        return { succeeded, failed };
+      }
 
       for (const fk of matchedFileKeys) {
         try {
@@ -739,7 +842,10 @@ export const fileKeyRouter = {
             environmentId: fk.environmentId,
             fileKeyId: fk.id,
             error: "Manually marked as failed",
+            actor,
+            recordAuditEvent: false,
           });
+          failedFileKeyIds.push(fk.id);
           succeeded++;
         } catch {
           failed++;
@@ -747,6 +853,27 @@ export const fileKeyRouter = {
       }
 
       failed += input.ids.length - matchedFileKeys.length;
+
+      if (failedFileKeyIds.length > 0) {
+        await recordAuditEvent(ctx.db, {
+          organizationId: ctx.organizationId,
+          projectId: input.projectId,
+          eventCode: auditEventCodes.fileUploadFailed,
+          eventCategory: "operational",
+          resourceType: "file",
+          resourceLabel: `${failedFileKeyIds.length} files`,
+          status: "success",
+          summary: `Bulk upload failure marked for ${failedFileKeyIds.length} files`,
+          metadata: {
+            bulk: true,
+            matchedCount: matchedFileKeys.length,
+            failedUploadCount: failedFileKeyIds.length,
+            failedCount: failed,
+            fileKeyIds: failedFileKeyIds,
+          },
+          ...actor,
+        });
+      }
 
       return { succeeded, failed };
     }),
@@ -773,16 +900,92 @@ export const fileKeyRouter = {
         });
       }
 
-      const result = await ctx.db
-        .update(fileKeys)
-        .set({ isPublic: input.isPublic })
-        .where(
-          and(
-            inArray(fileKeys.id, input.ids),
-            eq(fileKeys.projectId, input.projectId),
-          ),
-        )
-        .returning({ id: fileKeys.id });
+      const matchedFileKeys = await ctx.db.query.fileKeys.findMany({
+        where: and(
+          inArray(fileKeys.id, input.ids),
+          eq(fileKeys.projectId, input.projectId),
+        ),
+        columns: {
+          id: true,
+          isPublic: true,
+          environmentId: true,
+        },
+      });
+
+      if (matchedFileKeys.length === 0) {
+        return { updated: 0 };
+      }
+
+      const actor = buildUserAuditActor({
+        userId: ctx.session.user.id,
+        memberId: ctx.membership.id,
+        name: ctx.session.user.name,
+        email: ctx.session.user.email,
+      });
+      const fileKeysToChange = matchedFileKeys.filter(
+        (fileKey) => fileKey.isPublic !== input.isPublic,
+      );
+
+      if (matchedFileKeys.length === 1) {
+        const matchedFileKey = matchedFileKeys[0];
+
+        if (!matchedFileKey) {
+          return { updated: 0 };
+        }
+
+        await updateFileKeyAccess(ctx.db, {
+          projectId: input.projectId,
+          fileKeyId: matchedFileKey.id,
+          environmentId: matchedFileKey.environmentId,
+          isPublic: input.isPublic,
+          actor,
+        });
+
+        return { updated: matchedFileKeys.length };
+      }
+
+      const result = await ctx.db.transaction(async (tx) => {
+        const updated = await tx
+          .update(fileKeys)
+          .set({ isPublic: input.isPublic })
+          .where(
+            and(
+              inArray(fileKeys.id, input.ids),
+              eq(fileKeys.projectId, input.projectId),
+            ),
+          )
+          .returning({ id: fileKeys.id });
+
+        if (fileKeysToChange.length > 1) {
+          await recordAuditEvent(tx, {
+            organizationId: ctx.organizationId,
+            projectId: input.projectId,
+            eventCode: auditEventCodes.fileKeyAccessUpdated,
+            eventCategory: "lifecycle",
+            resourceType: "file_key",
+            resourceLabel: `${fileKeysToChange.length} file keys`,
+            status: "success",
+            summary: `Bulk file key access updated for ${fileKeysToChange.length} file keys`,
+            changes: [
+              {
+                path: "isPublic",
+                before: "mixed",
+                after: input.isPublic,
+              },
+            ],
+            metadata: {
+              bulk: true,
+              matchedCount: matchedFileKeys.length,
+              updatedCount: fileKeysToChange.length,
+              fileKeyIds: fileKeysToChange.map((fileKey) => fileKey.id),
+              isPublic: input.isPublic,
+            },
+            ...actor,
+          });
+        }
+
+        return updated;
+      });
 
       return { updated: result.length };
     }),

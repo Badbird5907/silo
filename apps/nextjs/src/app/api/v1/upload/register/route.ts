@@ -17,7 +17,7 @@ import {
 export async function POST(request: Request) {
   const authResult = await authenticateRequest(request);
   if (authResult instanceof Response) return authResult;
-  if (authResult.type !== "apiKey" || !authResult.rawApiKey) {
+  if (authResult.type !== "apiKey" || !authResult.apiKey.rawKey) {
     return jsonError(
       "Unauthorized",
       "API key is required for upload registration. Use Authorization: Bearer <key> or X-API-Key header.",
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
         expiresAt: resolvedExpiresAt,
         callbackUrl,
         callbackMetadata,
-        apiKeyId: authResult.apiKeyId,
+        apiKeyId: authResult.apiKey.id,
       });
       registered.push({
         fileKeyId: row.id,

@@ -370,6 +370,10 @@ export default function AuditPage({ params }: AuditPageProps) {
     {
       accessorKey: "createdAt",
       header: "Timestamp",
+      meta: {
+        headerClassName: "w-[148px]",
+        cellClassName: "w-[148px]",
+      },
       cell: ({ row }) => (
         <span className="text-sm tabular-nums">
           {formatAuditTimestamp(row.original.createdAt)}
@@ -379,23 +383,31 @@ export default function AuditPage({ params }: AuditPageProps) {
     {
       id: "action",
       header: "Action",
+      meta: {
+        headerClassName: "w-[30%]",
+        cellClassName: "max-w-0 w-[30%]",
+      },
       cell: ({ row }) => {
         const event = row.original;
         const Icon = getAuditEventIcon(event.eventCode);
         const colorClass = getAuditEventColor(event.eventCode);
         const bgColorClass = getAuditEventBgColor(event.eventCode);
+        const title = getAuditEventLabel(event.eventCode);
         return (
-          <div className="flex items-start gap-3">
+          <div className="flex min-w-0 items-start gap-3">
             <div
               className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${bgColorClass} ${colorClass}`}
             >
               <Icon className="h-4 w-4" />
             </div>
-            <div className="min-w-0">
-              <div className="font-medium">
-                {getAuditEventLabel(event.eventCode)}
+            <div className="flex min-w-0 flex-1 flex-col">
+              <div className="truncate font-medium" title={title}>
+                {title}
               </div>
-              <div className="text-muted-foreground truncate text-xs">
+              <div
+                className="text-muted-foreground truncate text-xs"
+                title={event.summary}
+              >
                 {event.summary}
               </div>
             </div>
@@ -406,39 +418,68 @@ export default function AuditPage({ params }: AuditPageProps) {
     {
       id: "resource",
       header: "Resource",
-      cell: ({ row }) => (
-        <div className="space-y-1">
-          <div className="font-medium">
-            {row.original.resource.label ?? "—"}
+      meta: {
+        headerClassName: "w-[22%]",
+        cellClassName: "max-w-0 w-[22%]",
+      },
+      cell: ({ row }) => {
+        const label = row.original.resource.label ?? "—";
+        return (
+          <div className="min-w-0 space-y-1">
+            <div
+              className="truncate font-medium"
+              title={label === "—" ? undefined : label}
+            >
+              {label}
+            </div>
+            <Badge variant="outline">
+              {getAuditResourceTypeLabel(row.original.resource.type)}
+            </Badge>
           </div>
-          <Badge variant="outline">
-            {getAuditResourceTypeLabel(row.original.resource.type)}
-          </Badge>
-        </div>
-      ),
+        );
+      },
     },
     {
       id: "actor",
       header: "Actor",
-      cell: ({ row }) => (
-        <div className="space-y-1">
-          <div className="font-medium">
-            {row.original.actor.label ?? "Unknown"}
+      meta: {
+        headerClassName: "w-[16%]",
+        cellClassName: "max-w-0 w-[16%]",
+      },
+      cell: ({ row }) => {
+        const actorLabel = row.original.actor.label ?? "Unknown";
+        return (
+          <div className="min-w-0 space-y-1">
+            <div className="truncate font-medium" title={actorLabel}>
+              {actorLabel}
+            </div>
+            <div className="text-muted-foreground truncate text-xs">
+              {row.original.actor.type.replace("_", " ")}
+            </div>
           </div>
-          <div className="text-muted-foreground text-xs">
-            {row.original.actor.type.replace("_", " ")}
-          </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       id: "environment",
       header: "Environment",
+      meta: {
+        headerClassName: "w-[12%]",
+        cellClassName: "max-w-0 w-[12%]",
+      },
       cell: ({ row }) =>
         row.original.environment ? (
-          <div className="space-y-1">
-            <div className="font-medium">{row.original.environment.name}</div>
-            <div className="text-muted-foreground text-xs">
+          <div className="min-w-0 space-y-1">
+            <div
+              className="truncate font-medium"
+              title={row.original.environment.name}
+            >
+              {row.original.environment.name}
+            </div>
+            <div
+              className="text-muted-foreground truncate text-xs"
+              title={row.original.environment.slug}
+            >
               {row.original.environment.slug}
             </div>
           </div>
@@ -449,20 +490,27 @@ export default function AuditPage({ params }: AuditPageProps) {
     {
       id: "details",
       header: "Details",
-      cell: ({ row }) => (
-        <div className="space-y-1">
-          <Badge
-            variant={
-              row.original.status === "failure" ? "destructive" : "secondary"
-            }
-          >
-            {getAuditCategoryLabel(row.original.eventCategory)}
-          </Badge>
-          <div className="text-muted-foreground text-xs">
-            {getEventDetails(row.original)}
+      meta: { cellClassName: "max-w-0" },
+      cell: ({ row }) => {
+        const details = getEventDetails(row.original);
+        return (
+          <div className="min-w-0 space-y-1">
+            <Badge
+              variant={
+                row.original.status === "failure" ? "destructive" : "secondary"
+              }
+            >
+              {getAuditCategoryLabel(row.original.eventCategory)}
+            </Badge>
+            <div
+              className="text-muted-foreground truncate text-xs"
+              title={details}
+            >
+              {details}
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
   ];
 
@@ -528,7 +576,7 @@ export default function AuditPage({ params }: AuditPageProps) {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="min-w-0 space-y-4">
           {auditErrorMessage ? (
             <div className="rounded-md border border-destructive/50 bg-destructive/5 px-3 py-2 text-sm text-destructive">
               Failed to load audit events. {auditErrorMessage}

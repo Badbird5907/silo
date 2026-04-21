@@ -60,6 +60,7 @@ import { getDownloadUrl } from "@/actions/file";
 import { FileStatusBadge } from "@/components/file-status-badge";
 import { useOrganization } from "@/hooks/use-organization";
 import { useTRPC } from "@/trpc/react";
+import { EnvBadge } from "@/components/env-badge";
 
 interface FileDetailPageProps {
   params: Promise<{
@@ -145,7 +146,7 @@ function FileDetailRowSkeleton() {
 function FileDetailPageSkeleton() {
   return (
     <div
-      className="flex flex-1 flex-col gap-4 p-4"
+      className="flex min-w-0 flex-1 flex-col gap-4 p-4"
       aria-busy="true"
       aria-label="Loading file details"
     >
@@ -342,21 +343,20 @@ export default function FileDetailPage({ params }: FileDetailPageProps) {
     updateAccessMutation.mutate({
       id: fileId,
       projectId,
+      environmentId: fileKey.environment.id,
       organizationId,
       isPublic: value === "public",
     });
   };
 
   const handleServeImageChange = (value: ServeImageValue) => {
-    updateAccessMutation.mutate(
-      {
-        id: fileId,
-        projectId,
-        organizationId,
-        isPublic,
-        serveImage: value === "enabled",
-      } as never,
-    );
+    updateAccessMutation.mutate({
+      id: fileId,
+      projectId,
+      organizationId,
+      isPublic,
+      serveImage: value === "enabled",
+    } as never);
   };
 
   const handleDelete = () => {
@@ -379,7 +379,7 @@ export default function FileDetailPage({ params }: FileDetailPageProps) {
     organizationLoading ||
     (Boolean(organizationId) &&
       (projectQuery.isPending ||
-        projectQuery.isLoading ||
+        // projectQuery.isLoading ||
         fileKeyQuery.isPending ||
         fileKeyQuery.isLoading));
 
@@ -397,7 +397,10 @@ export default function FileDetailPage({ params }: FileDetailPageProps) {
     notFound();
   }
   if (environmentSlug && !environmentsQuery.isLoading && !selectedEnvironment) {
-    console.error("Environment not found", { environmentSlug, selectedEnvironment });
+    console.error("Environment not found", {
+      environmentSlug,
+      selectedEnvironment,
+    });
     notFound();
   }
 
@@ -412,7 +415,8 @@ export default function FileDetailPage({ params }: FileDetailPageProps) {
     ? "enabled"
     : "disabled";
   const isPublic = fileKey.isPublic;
-  const isImageFile = typeof mimeType === "string" && mimeType.startsWith("image/");
+  const isImageFile =
+    typeof mimeType === "string" && mimeType.startsWith("image/");
   const expiresAt = fileKey.expiresAt ? new Date(fileKey.expiresAt) : null;
   const isExpired =
     !!expiresAt &&
@@ -423,27 +427,29 @@ export default function FileDetailPage({ params }: FileDetailPageProps) {
 
   return (
     <>
-      <div className="flex flex-1 flex-col gap-4 p-4">
+      <div className="flex min-w-0 flex-1 flex-col gap-4 p-4">
         <Link
           href={`${projectBasePath}/files`}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+          className="text-muted-foreground hover:text-foreground flex items-center gap-2 text-sm"
         >
           <ArrowLeft className="h-4 w-4" /> Back to files
         </Link>
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-3">
-            <div className="bg-muted hidden h-12 w-12 items-center justify-center rounded-lg md:flex">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <div className="bg-muted hidden h-12 w-12 shrink-0 items-center justify-center rounded-lg md:flex">
               <FileIcon className="text-muted-foreground h-6 w-6" />
             </div>
-            <div>
-              <h1 className="text-xl font-semibold">{fileKey.fileName}</h1>
+            <div className="min-w-0">
+              <h1 className="text-xl font-semibold wrap-anywhere">
+                {fileKey.fileName}
+              </h1>
               <p className="text-muted-foreground text-sm">
                 {formatFileSize(size)}
                 {mimeType && ` • ${mimeType}`}
               </p>
             </div>
           </div>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-2">
             <Button
               variant="outline"
               onClick={handleGetUrl}
@@ -510,17 +516,7 @@ export default function FileDetailPage({ params }: FileDetailPageProps) {
                   <Tag className="text-muted-foreground h-4 w-4" />
                   <span className="text-muted-foreground">Environment</span>
                 </div>
-                <Badge
-                  variant={
-                    fileKey.environment.type === "production"
-                      ? "default"
-                      : fileKey.environment.type === "staging"
-                        ? "secondary"
-                        : "outline"
-                  }
-                >
-                  {fileKey.environment.name}
-                </Badge>
+                <EnvBadge name={fileKey.environment.name} type={fileKey.environment.type} />
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-sm">
@@ -622,7 +618,9 @@ export default function FileDetailPage({ params }: FileDetailPageProps) {
               <Select
                 value={effectiveAccess}
                 onValueChange={(v) => handleAccessChange(v as AccessValue)}
-                disabled={updateAccessMutation.isPending || status === "deleted"}
+                disabled={
+                  updateAccessMutation.isPending || status === "deleted"
+                }
               >
                 <SelectTrigger className="w-[180px]">
                   <SelectValue />
@@ -638,31 +636,36 @@ export default function FileDetailPage({ params }: FileDetailPageProps) {
                 ? "Anyone with the link can access this file"
                 : "A signed URL is required to access this file"}
             </p>
-            {isImageFile && !isPublic && projectQuery.data.imageDeliveryPolicy === "public_and_private_opt_in" && (
-              <div className="flex items-center justify-between border-t pt-4">
-                <div className="space-y-1">
-                  <Label>Serve Image</Label>
-                  <p className="text-muted-foreground text-xs">
-                    Allow image transform URLs for this file when private.
-                  </p>
+            {isImageFile &&
+              !isPublic &&
+              projectQuery.data.imageDeliveryPolicy ===
+                "public_and_private_opt_in" && (
+                <div className="flex items-center justify-between border-t pt-4">
+                  <div className="space-y-1">
+                    <Label>Serve Image</Label>
+                    <p className="text-muted-foreground text-xs">
+                      Allow image transform URLs for this file when private.
+                    </p>
+                  </div>
+                  <Select
+                    value={effectiveServeImage}
+                    onValueChange={(v) =>
+                      handleServeImageChange(v as ServeImageValue)
+                    }
+                    disabled={
+                      updateAccessMutation.isPending || status === "deleted"
+                    }
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="enabled">Enabled</SelectItem>
+                      <SelectItem value="disabled">Disabled</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <Select
-                  value={effectiveServeImage}
-                  onValueChange={(v) =>
-                    handleServeImageChange(v as ServeImageValue)
-                  }
-                  disabled={updateAccessMutation.isPending || status === "deleted"}
-                >
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="enabled">Enabled</SelectItem>
-                    <SelectItem value="disabled">Disabled</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+              )}
           </CardContent>
         </Card>
 

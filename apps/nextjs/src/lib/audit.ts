@@ -32,7 +32,16 @@ export function formatRelativeTime(date: Date): string {
 }
 
 export function formatAuditTimestamp(date: Date): string {
-  return new Date(date).toLocaleString();
+  return new Date(date).toLocaleString(
+    "en-US",
+    {
+      // year: "numeric", // Disabled year
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    },
+  );
 }
 
 export function formatBytes(bytes: number): string {

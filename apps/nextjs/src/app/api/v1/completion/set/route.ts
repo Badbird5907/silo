@@ -23,7 +23,7 @@ const requestSchema = z.object({
 export async function POST(request: Request) {
   const authResult = await authenticateRequest(request);
   if (authResult instanceof Response) return authResult;
-  if (authResult.type !== "apiKey" || !authResult.rawApiKey) {
+  if (authResult.type !== "apiKey" || !authResult.apiKey.rawKey) {
     return jsonError(
       "Unauthorized",
       "API key is required for completion writes.",
