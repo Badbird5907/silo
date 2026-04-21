@@ -12,6 +12,7 @@ import {
   FileIcon,
   FolderIcon,
   HardDriveIcon,
+  ScrollText,
   SettingsIcon,
   TrendingUpIcon,
   Upload,
@@ -68,7 +69,7 @@ function QuickActionsSkeleton() {
         <Skeleton className="h-5 w-32" />
       </CardHeader>
       <CardContent className="grid gap-2">
-        {Array.from({ length: 3 }).map((_, i) => (
+        {Array.from({ length: 4 }).map((_, i) => (
           <div
             key={i}
             className="flex items-center gap-3 rounded-lg border p-3"
@@ -398,6 +399,22 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                   <p className="text-sm font-medium">View Analytics</p>
                   <p className="text-muted-foreground text-xs">
                     Detailed usage statistics
+                  </p>
+                </div>
+                <ArrowRight className="text-muted-foreground h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100" />
+              </Link>
+
+              <Link
+                href={`${projectBasePath}/audit`}
+                className="hover:bg-muted/80 group flex items-center gap-3 rounded-lg border p-3 transition-all hover:shadow-sm"
+              >
+                <div className="rounded-lg bg-blue-500/10 p-2.5 text-blue-500">
+                  <ScrollText className="h-4 w-4" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Audit Log</p>
+                  <p className="text-muted-foreground text-xs">
+                    Full history of project events
                   </p>
                 </div>
                 <ArrowRight className="text-muted-foreground h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100" />

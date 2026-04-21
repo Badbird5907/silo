@@ -5,11 +5,11 @@ import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Activity,
   BarChart3,
   Files,
   FolderKanban,
   LayoutDashboard,
+  ScrollText,
   Settings,
 } from "lucide-react";
 
@@ -105,7 +105,7 @@ function getProjectNavItems(projectBasePath: string): NavItem[] {
     {
       title: "Audit Log",
       url: `${projectBasePath}/audit`,
-      icon: Activity,
+      icon: ScrollText,
     },
     {
       title: "Settings",
