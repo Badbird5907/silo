@@ -254,6 +254,7 @@ export interface TrackDownloadData {
   bytes: number;
   isSignedUrl: boolean;
   clientIp?: string | null;
+  isImageCDN?: boolean;
 }
 
 export interface ReportMissingObjectData {

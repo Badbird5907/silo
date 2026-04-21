@@ -1,6 +1,7 @@
 import type { Context } from "hono";
 
 import {
+  getClientIpFromHeaders,
   normalizeImageFormat,
   normalizeImageQuality,
   normalizeImageWidth,
@@ -96,6 +97,7 @@ function buildInternalImageSourceHeaders(env: Bindings): Headers {
 export async function handleImage(c: ImageContext): Promise<Response> {
   const accessKey = c.req.param("accessKey");
   const projectId = c.get("projectId");
+  const clientIp = getClientIpFromHeaders(c.req.raw.headers);
   const imageDeliveryPolicy = c.get("imageDeliveryPolicy");
   const preserveImageExif = c.get("preserveImageExif");
   const signature = c.req.query("sig");
@@ -236,6 +238,8 @@ export async function handleImage(c: ImageContext): Promise<Response> {
           fileName: fileKey.fileName,
           bytes,
           isSignedUrl,
+          clientIp,
+          isImageCDN: true,
         },
         c.env,
       );

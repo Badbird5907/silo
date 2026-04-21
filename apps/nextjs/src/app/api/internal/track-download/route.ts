@@ -21,6 +21,7 @@ const schema = z.object({
   bytes: z.number(),
   isSignedUrl: z.boolean().optional(),
   clientIp: z.string().nullable().optional(),
+  isImageCDN: z.boolean().optional(),
 });
 
 export async function POST(request: Request) {
@@ -87,7 +88,7 @@ export async function POST(request: Request) {
       eventType: "download",
       bytes,
       fileId,
-      actor: buildSystemAuditActor("System"),
+      actor: buildSystemAuditActor(parsed.data.clientIp ?? "System"),
       resourceLabel: fileName,
       resourceId: fileKeyId,
       createdAt,
@@ -98,6 +99,7 @@ export async function POST(request: Request) {
       auditRetentionDays: project.auditLogRetentionDays,
       metadata: {
         fileKeyId,
+        ...(parsed.data.isImageCDN ? { isImageCDN: true } : {}),
       },
     });
 
