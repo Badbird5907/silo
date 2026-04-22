@@ -9,7 +9,9 @@ import {
   DocsTitle,
 } from "fumadocs-ui/layouts/docs/page";
 
+import { DocsPageActions } from "@/components/docs-page-actions";
 import { getMDXComponents } from "@/components/mdx";
+import { GITHUB_DOCS_CONTENT_URL } from "@/lib/layout.shared";
 import { source } from "@/lib/source";
 
 interface DocPageData {
@@ -49,8 +51,18 @@ export default async function DocPage({
         style: "clerk",
       }}
     >
-      <DocsTitle>{page.data.title}</DocsTitle>
-      <DocsDescription>{page.data.description}</DocsDescription>
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0 flex-1">
+          <DocsTitle>{page.data.title}</DocsTitle>
+          <DocsDescription>{page.data.description}</DocsDescription>
+        </div>
+
+        <DocsPageActions
+          githubUrl={`${GITHUB_DOCS_CONTENT_URL}/${page.path}`}
+          markdownPath={`${page.url}.mdx`}
+        />
+      </div>
+
       <DocsBody>
         <Mdx components={getMDXComponents()} />
       </DocsBody>
