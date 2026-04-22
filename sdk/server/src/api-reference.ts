@@ -48,8 +48,7 @@ export type ServerApiReferenceRouter = FileRouter<
   ServerApiReferenceContext
 >;
 
-export type ServerApiReferenceRouteSlug = keyof ServerApiReferenceRouter &
-  string;
+export type ServerApiReferenceRouteSlug = keyof ServerApiReferenceRouter;
 
 export type ServerRouteBuilderMethods = SiloRouteBuilder<
   Request,

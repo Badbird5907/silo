@@ -28,10 +28,10 @@ export function createRouteHandler<
   const handler = createFetchRouteHandler(options);
 
   return {
-    GET(_args: TanStackStartHandlerArgs) {
+    GET(this: void, _args: TanStackStartHandlerArgs) {
       return handler.GET();
     },
-    POST(args: TanStackStartHandlerArgs) {
+    POST(this: void, args: TanStackStartHandlerArgs) {
       return handler.POST(args.request);
     },
   };

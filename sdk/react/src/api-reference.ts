@@ -15,7 +15,7 @@ export type ReactApiReferenceRouter = Record<
   }
 >;
 
-export type ReactApiReferenceRouteSlug = keyof ReactApiReferenceRouter & string;
+export type ReactApiReferenceRouteSlug = keyof ReactApiReferenceRouter  ;
 
 export type ReactUseUploadOptions = UseUploadOptions<
   ReactApiReferenceRouter,

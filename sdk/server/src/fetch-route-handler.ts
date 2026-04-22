@@ -162,8 +162,8 @@ export interface CreateFetchRouteHandlerOptions<
 }
 
 interface FetchRouteHandlers {
-  GET(): Response;
-  POST(request: Request): Promise<Response>;
+  GET(this: void): Response;
+  POST(this: void, request: Request): Promise<Response>;
 }
 
 export function createFetchRouteHandler<
@@ -205,13 +205,13 @@ export function createFetchRouteHandler<
         })
       : new MemoryCompletionStore());
 
-  function GET() {
+  function GET(this: void) {
     return json({
       routerConfig: extractRouterConfig(options.router),
     });
   }
 
-  async function POST(request: Request) {
+  async function POST(this: void, request: Request) {
     const context = options.resolveContext
       ? await options.resolveContext(request)
       : undefined;
