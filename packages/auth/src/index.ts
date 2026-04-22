@@ -2,6 +2,7 @@ import type { BetterAuthOptions, BetterAuthPlugin } from "better-auth";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { oAuthProxy, organization } from "better-auth/plugins";
+import { dash } from "@better-auth/infra";
 
 import { db } from "@silo-storage/db/client";
 
@@ -39,6 +40,7 @@ export function initAuth<
         roles: organizationRoles,
       }),
       ...(options.extraPlugins ?? []),
+      dash(),
     ],
     socialProviders: Object.fromEntries(
       Object.entries(options.socialProviders ?? {}).map(([key, value]) => [
