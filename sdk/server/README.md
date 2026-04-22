@@ -13,6 +13,9 @@ framework-agnostic router for defining typed file routes with middleware.
 - internal callback envelope in `callbackMetadata.__silo`
 - `handleUploadCallback(...)`: verify callback signatures and dispatch
   `onUploadComplete` handlers
+- `createFetchRouteHandler(...)`: shared `Request`/`Response` adapter for
+  framework route handlers
+- `createHttpCompletionStore(...)`: HTTP-backed completion-store client
 - `extractRouterConfig(...)`: safe route config extraction for client hydration
 
 By default, router registration uses core `uploadStrategy: "server"` (combined

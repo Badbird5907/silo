@@ -1,0 +1,165 @@
+---
+title: TanStack Start
+description: Server route integration for the Silo upload router.
+---
+
+`@silo-storage/sdk-tanstack-start` connects a typed Silo file router to TanStack Start server routes.
+
+Use it when you already have a typed upload router from `@silo-storage/sdk-server` and want to mount it directly in a Start route file under `server.handlers`.
+
+## What it provides
+
+- `createRouteHandler(...)` for TanStack Start `server.handlers`
+- callback verification and `onUploadComplete` dispatch
+- registration handling for browser uploads
+- completion polling used by the React client
+- `extractRouterConfig(...)` for optional client hydration
+
+## Getting started
+
+### 1. Install the package
+
+```npm
+npm install @silo-storage/sdk-tanstack-start @silo-storage/sdk-react @silo-storage/sdk-server @silo-storage/sdk-core
+```
+
+### 2. Define your file router
+
+```ts title="src/upload.ts"
+import type { FileRouter } from "@silo-storage/sdk-server";
+import { createSiloUpload } from "@silo-storage/sdk-server";
+
+export interface UploadContext {
+  userId: string;
+}
+
+const f = createSiloUpload<Request, UploadContext>();
+
+export const fileRouter = {
+  imageUploader: f({
+    image: {
+      maxFileSize: "8MB",
+      maxFileCount: 4,
+    },
+  })
+    .expires("30 days")
+    .public(false)
+    .serveImage(true)
+    .middleware(async ({ context }) => {
+      if (!context?.userId) {
+        throw new Error("Unauthorized");
+      }
+
+      return {
+        userId: context.userId,
+      };
+    })
+    .onUploadComplete(async ({ metadata, file }) => {
+      return {
+        uploadedBy: metadata.userId,
+        fileKeyId: file.fileKeyId,
+      };
+    }),
+} satisfies FileRouter<Request, UploadContext>;
+
+export type AppFileRouter = typeof fileRouter;
+```
+
+If you want more detail on route definitions, middleware, or callback behavior, read [Server](/docs/sdk/server).
+
+### 3. Mount the Start route
+
+Create a TanStack Start route file and pass the generated handlers into `server.handlers`.
+
+```ts title="src/routes/api/upload.ts"
+import { createFileRoute } from "@tanstack/react-start";
+import { createSiloCoreFromToken } from "@silo-storage/sdk-core";
+import { createRouteHandler } from "@silo-storage/sdk-tanstack-start";
+
+import type { UploadContext } from "@/upload";
+import { fileRouter } from "@/upload";
+
+const core = createSiloCoreFromToken({
+  url: process.env.SILO_URL!,
+  token: process.env.SILO_TOKEN!,
+  cdnHost: process.env.SILO_CDN!,
+});
+
+const handlers = createRouteHandler<UploadContext>({
+  router: fileRouter,
+  core,
+  resolveContext: async (request: Request): Promise<UploadContext> => {
+    const userId = request.headers.get("x-user-id");
+    if (!userId) throw new Error("Unauthorized");
+    return { userId };
+  },
+});
+
+export const Route = createFileRoute("/api/upload")({
+  server: {
+    handlers,
+  },
+});
+```
+
+`createRouteHandler(...)` keeps the same HTTP contract as the Next adapter:
+
+- `GET` returns the router config so clients can discover route metadata safely
+- `POST` handles upload registration requests from the browser
+- `POST` also verifies signed Silo callbacks and dispatches the matching `onUploadComplete`
+- `POST` handles completion polling used by the React SDK after an upload finishes
+
+By default, the adapter uses the current route URL as the callback URL. Override that with `callbackUrl` if your public callback origin differs from the incoming request origin.
+
+## Using with the React SDK
+
+The React integration stays the same. Point `createSiloReact(...)` at the Start route URL.
+
+```ts title="src/lib/upload.ts"
+"use client";
+
+import { createSiloReact } from "@silo-storage/sdk-react";
+
+import type { AppFileRouter } from "@/upload";
+
+export const {
+  useUpload,
+  useStagedUpload,
+  UploadButton,
+  UploadDropzone,
+  SiloRouterConfigProvider,
+} = createSiloReact<AppFileRouter>({
+  endpoint: "/api/upload",
+});
+```
+
+The zero-config path is to let the client fetch route config from the adapter's `GET` endpoint on demand. If you already have a server-rendered app shell and want to avoid that first client fetch, you can still call `extractRouterConfig(fileRouter)` and provide it through `SiloRouterConfigProvider`.
+
+## Completion storage
+
+The Start adapter stores `onUploadComplete` results temporarily so the client can wait for completion after the upload finishes.
+
+You can control the store with the same options as the Next adapter:
+
+- `completionStore`
+- `completionStoreUrl`
+- `completionStoreAuthToken`
+- `completionStorePathPrefix`
+- `completionTtlMs`
+
+By default it will:
+
+- use an HTTP-backed completion store when it has a base API URL and auth token
+- fall back to an in-memory store otherwise
+
+Use a shared store in production when the upload callback and the polling request may run on different instances.
+
+## Notes
+
+- Callback verification depends on `core.config.signingSecret`. `createSiloCoreFromToken(...)` fills that from `SILO_TOKEN`, so you usually do not need to pass anything extra into `createRouteHandler(...)`.
+- The adapter currently does not proxy Silo development SSE registration streams. If registration enters development stream mode, the route returns `DEV_STREAM_UNSUPPORTED`.
+- `extractRouterConfig(...)` only exposes the client-safe subset of your router definition.
+
+## API reference
+
+For generated type tables covering the route handler and completion store options, see [API Reference](/docs/sdk/tanstack-start/api-reference).

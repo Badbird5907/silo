@@ -1,0 +1,13 @@
+{
+  "extends": "@silo-storage/tsconfig/compiled-package.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "WebWorker"],
+    "baseUrl": ".",
+    "paths": {
+      "@silo-storage/sdk-core": ["../core/src/index.ts"],
+      "@silo-storage/sdk-server": ["../server/src/index.ts"]
+    }
+  },
+  "include": ["src"],
+  "exclude": ["node_modules"]
+}

@@ -1,5 +1,5 @@
 {
-  "name": "@silo-storage/sdk-server",
+  "name": "@silo-storage/sdk-tanstack-start",
   "version": "0.1.0",
   "type": "module",
   "license": "MIT",
@@ -21,23 +21,18 @@
     "dev": "tsup --watch",
     "format": "prettier --check . --ignore-path ../../.gitignore",
     "lint": "eslint",
-    "test": "tsx --test test/**/*.test.ts",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
-    "@silo-storage/mime-types": "workspace:*",
-    "@silo-storage/sdk-core": "workspace:*",
-    "@silo-storage/shared": "workspace:*",
-    "ms": "3.0.0-canary.202508261828",
-    "zod": "catalog:"
+    "@silo-storage/sdk-server": "workspace:*"
   },
   "devDependencies": {
     "@silo-storage/eslint-config": "workspace:*",
     "@silo-storage/prettier-config": "workspace:*",
+    "@silo-storage/sdk-core": "workspace:*",
     "@silo-storage/tsconfig": "workspace:*",
     "eslint": "catalog:",
     "prettier": "catalog:",
-    "tsx": "catalog:",
     "tsup": "^8.5.1",
     "typescript": "catalog:"
   },

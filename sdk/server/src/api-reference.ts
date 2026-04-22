@@ -1,4 +1,9 @@
 import type { HandleUploadCallbackInput } from "./callback-handler";
+import type {
+  CompletionStore,
+  CreateFetchRouteHandlerOptions,
+} from "./fetch-route-handler";
+import type { CreateHttpCompletionStoreOptions } from "./http-completion-store";
 import type { FileRouter } from "./router";
 import type {
   PrepareRouteUploadInput,
@@ -73,3 +78,14 @@ export type ServerHandleUploadCallbackOptions = HandleUploadCallbackInput<
   ServerApiReferenceContext,
   ServerApiReferenceRouter
 >;
+
+export type ServerCreateFetchRouteHandlerOptions =
+  CreateFetchRouteHandlerOptions<
+    ServerApiReferenceContext,
+    ServerApiReferenceRouter
+  >;
+
+export type ServerCreateHttpCompletionStoreOptions =
+  CreateHttpCompletionStoreOptions;
+
+export type ServerCompletionStore = CompletionStore;
