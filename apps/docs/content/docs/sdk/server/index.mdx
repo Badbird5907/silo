@@ -1,0 +1,511 @@
+---
+title: Server
+description: Typed file routes, middleware, and callback dispatch.
+---
+
+import { TypeTable } from "fumadocs-ui/components/type-table";
+
+`@silo-storage/sdk-server` is the framework-agnostic router layer for Silo uploads.
+
+It gives you an UploadThing-style API for defining file routes while keeping the runtime portable.
+
+## What it provides
+
+- `createSiloUpload`
+- `FileRouter`
+- `registerRouteUpload`
+- `prepareRouteUpload`
+- `handleUploadCallback`
+- `extractRouterConfig`
+
+Use this package when you want your upload rules, middleware, and completion logic to live in one place without coupling them to a specific HTTP adapter.
+
+## Install
+
+```npm
+npm install @silo-storage/sdk-server @silo-storage/sdk-core
+```
+
+If you are wiring the router into a framework adapter such as Next.js, install that package too and continue with [Next](/docs/sdk/next).
+
+## Define a file router
+
+Start by creating a typed route builder with the request and context types you want to use on the server.
+
+```ts title="src/upload.ts"
+import type { FileRouter } from "@silo-storage/sdk-server";
+import { createSiloUpload } from "@silo-storage/sdk-server";
+
+export interface UploadContext {
+  userId: string;
+  plan: "free" | "pro";
+}
+
+type UploadInput = {
+  // App-defined input, not a built-in SDK field.
+  folder: "avatars" | "attachments";
+};
+
+const f = createSiloUpload<Request, UploadContext, UploadInput>();
+
+export const fileRouter = {
+  avatar: f({
+    image: { maxFileSize: "8MB", maxFileCount: 1 },
+  })
+    .public(false)
+    .serveImage(true)
+    .expires("30 days")
+    .middleware(async ({ req, context, input }) => {
+      const session = req.headers.get("authorization");
+      if (!session || !context.userId) {
+        throw new Error("Unauthorized");
+      }
+
+      return {
+        userId: context.userId,
+        plan: context.plan,
+        folder: input?.folder ?? "avatars",
+      };
+    })
+    .onUploadComplete(async ({ metadata, file }) => {
+      return {
+        uploadedBy: metadata.userId,
+        plan: metadata.plan,
+        fileId: file.fileId,
+        fileKeyId: file.fileKeyId,
+      };
+    }),
+  attachments: f({
+    "application/pdf": { maxFileSize: "16MB", maxFileCount: 4 },
+    image: { maxFileSize: "8MB", maxFileCount: 4 },
+  })
+    .mimeTypes(async ({ context }) => {
+      if (context.plan === "pro") {
+        return ["application/pdf", "image/jpeg", "image/png"];
+      }
+
+      return ["image/jpeg", "image/png"];
+    })
+    .middleware(async ({ context }) => {
+      if (!context.userId) {
+        throw new Error("Unauthorized");
+      }
+
+      return {
+        userId: context.userId,
+      };
+    })
+    .onUploadComplete(async ({ metadata, file }) => {
+      return {
+        uploadedBy: metadata.userId,
+        fileName: file.fileName,
+      };
+    }),
+} satisfies FileRouter<Request, UploadContext>;
+```
+
+## How the route builder works
+
+Each call to `f(...)` starts a route definition:
+
+- `f(["image"])` is the shortest form when a broad file group is enough
+- `f({ image: { maxFileSize: "8MB", maxFileCount: 4 } })` gives you per-type constraints
+- `.middleware(...)` runs before registration and can reject the upload (throw an error)
+- `.public(...)`, `.serveImage(...)`, `.expires(...)`, and `.mimeTypes(...)` configure per-route behavior
+- `.onUploadComplete(...)` runs after Silo sends the signed callback for a completed upload
+
+The builder is fully typed. The `context` type comes from `createSiloUpload<Request, UploadContext>()`, and the optional `input` type comes from the third generic.
+
+<Callout type="idea">
+You can pass both static values and (optionally) async resolvers to all route builder methods.
+
+For example:
+```ts
+f(["image"])
+  .public(true) // either
+  .public(async ({ context }) => { // or
+    const isPublic = await someQuery(context.userId);
+    return isPublic;
+  })
+```
+</Callout>
+
+## What middleware does
+
+Middleware runs before upload registration and returns metadata for the file route.
+
+That metadata is:
+
+- persisted during registration
+- stored in Silo-owned callback metadata
+- passed back into `onUploadComplete`
+
+This lets you attach application state such as the current user ID or validated route input without asking the browser to report completion on its own.
+
+Middleware must return a plain object. That object becomes file metadata for the upload and is restored for the matching route when `handleUploadCallback(...)` dispatches `onUploadComplete(...)`.
+
+## MIME type configuration
+
+<Callout type="info">
+MIME types are enforced on the upload endpoint
+</Callout>
+
+Routes can be declared with coarse file groups:
+
+```ts
+f(["image"])
+```
+
+Or with a more explicit shape:
+
+```ts
+f({
+  image: { maxFileSize: "2MB", maxFileCount: 4 },
+  video: { maxFileSize: "256MB", maxFileCount: 1 },
+})
+```
+
+That route can accept both file categories in the same upload batch. For example, `3` images and `1` video would be valid.
+
+- up to 4 image files, each no larger than `2MB`, like screenshots, profile photos, or PNG/JPEG attachments
+- up to 1 video file no larger than `256MB`, like a screen recording, product demo clip, or short user-generated video
+
+You can also further constrain accepted types with `.mimeTypes(...)`:
+
+```ts
+f(["image"])
+  .mimeTypes(["image/jpeg", "image/png"]) // you can pass a static array
+  .mimeTypes("application/pdf") // or a single MIME type
+  .mimeTypes(async ({ context }) => {
+    // or you can pass a function
+    const canUploadPdf = await someQuery(context.userId);
+    if (canUploadPdf) return "application/pdf";
+    return ["image/jpeg", "image/png"];
+  })
+```
+
+Use a resolver when allowed MIME types depend on auth, plan, team membership, or other server-side state.
+
+## Register uploads manually
+
+If you are not using a framework adapter, call `registerRouteUpload(...)` directly from your own HTTP endpoint.
+
+```ts title="src/http/register-upload.ts"
+import { createSiloCoreFromToken } from "@silo-storage/sdk-core";
+import { registerRouteUpload } from "@silo-storage/sdk-server";
+
+import { fileRouter } from "../upload";
+
+const core = createSiloCoreFromToken({
+  url: process.env.SILO_URL!,
+  token: process.env.SILO_TOKEN!,
+  cdnHost: process.env.SILO_CDN_HOST!,
+});
+
+export async function registerUpload(request: Request, context: { userId: string; plan: "free" | "pro" }) {
+  const result = await registerRouteUpload({
+    core,
+    router: fileRouter,
+    routeSlug: "avatar",
+    req: request,
+    context,
+    // input can be anything you want
+    input: { folder: "avatars" },
+    callbackUrl: "https://app.example.com/api/upload/callback",
+    files: [
+      {
+        fileName: "avatar.png",
+        size: 1_250_000,
+        mimeType: "image/png",
+      },
+    ],
+  });
+
+  return result.registerResult;
+}
+```
+
+`registerRouteUpload(...)` does four important things for you:
+
+1. resolves the route from `routeSlug`
+2. runs middleware and captures its return value
+3. applies route options such as `public`, `serveImage`, `expires`, and `mimeTypes`
+4. writes internal callback metadata so completion can be dispatched back to the same route later
+
+By default registration uses the core `uploadStrategy: "server"` flow. Pass `uploadStrategy: "self"` only when you explicitly want local signing behavior for that call.
+
+### Set `callbackUrl` manually
+
+When you register uploads yourself, `callbackUrl` should point to the public URL of the server endpoint that will receive Silo's signed callback and call `handleUploadCallback(...)`.
+
+For example, if your callback handler lives at `https://app.example.com/api/upload/callback`, use that exact absolute URL during registration:
+
+```ts
+const result = await registerRouteUpload({
+  core,
+  router: fileRouter,
+  routeSlug: "avatar",
+  req: request,
+  context,
+  input: { folder: "avatars" },
+  callbackUrl: "https://app.example.com/api/upload/callback",
+  files: [
+    {
+      fileName: "avatar.png",
+      size: 1_250_000,
+      mimeType: "image/png",
+    },
+  ],
+});
+```
+
+This is especially useful when:
+
+- your public app URL differs from the current request origin
+- your upload registration endpoint and callback endpoint are different paths
+- you are behind a proxy, tunnel, or load balancer and do not want to infer the public origin from the incoming request
+
+<Callout type="warn">
+In production, the callback URL must be an absolute public URL that the Silo server can reach.
+
+You can provide it either:
+- once in `createSiloCoreFromToken({ callbackUrl: ... })`
+- or per call in `registerRouteUpload(...)` / `prepareRouteUpload(...)`
+</Callout>
+
+## Prepare a single upload
+
+Use `prepareRouteUpload(...)` when you want the convenience of single-file registration plus a response shaped like `core.prepareUpload(...)`.
+
+```ts title="src/http/prepare-upload.ts"
+import { createSiloCoreFromToken } from "@silo-storage/sdk-core";
+import { prepareRouteUpload } from "@silo-storage/sdk-server";
+
+import { fileRouter } from "../upload";
+
+const core = createSiloCoreFromToken({
+  url: process.env.SILO_URL!,
+  token: process.env.SILO_TOKEN!,
+  cdnHost: process.env.SILO_CDN_HOST!,
+});
+
+export async function prepareUpload(request: Request, context: { userId: string; plan: "free" | "pro" }) {
+  const result = await prepareRouteUpload({
+    core,
+    router: fileRouter,
+    routeSlug: "avatar",
+    req: request,
+    context,
+    // Same app-defined input shape as the `UploadInput` type above.
+    input: { folder: "avatars" },
+    file: {
+      fileName: "avatar.png",
+      size: 1_250_000,
+      mimeType: "image/png",
+    },
+  });
+
+  return result.prepareResult;
+}
+```
+
+Reach for `registerRouteUpload(...)` when you are handling a batch of files. Reach for `prepareRouteUpload(...)` when your transport or UI works better with one file at a time.
+
+## Handle upload callbacks
+
+<Callout type="info">
+Your framework adapter should handle this for you. You should only need to call this if you are
+handling the callback yourself.
+</Callout>
+
+When Silo sends a signed callback, use `handleUploadCallback(...)` to verify it and dispatch the matching route's `onUploadComplete(...)`.
+
+```ts title="src/http/upload-callback.ts"
+import { parseSiloToken } from "@silo-storage/sdk-core";
+import { handleUploadCallback } from "@silo-storage/sdk-server";
+
+import { fileRouter } from "../upload";
+import type { UploadContext } from "../upload";
+
+const signingSecret = parseSiloToken(process.env.SILO_TOKEN!).signingSecret;
+
+export async function handleCallback(request: Request, context: UploadContext) {
+  const result = await handleUploadCallback({
+    router: fileRouter,
+    request,
+    signingSecret,
+    context,
+  });
+
+  if (result.status === "ignored") {
+    return new Response(null, { status: 204 });
+  }
+
+  return Response.json({
+    routeSlug: result.routeSlug,
+    callbackMetadata: result.callbackMetadata,
+    onUploadCompleteResult: result.onUploadCompleteResult,
+  });
+}
+```
+
+`handleUploadCallback(...)` verifies the signature first, then reads the internal callback envelope to recover the original route slug and middleware metadata. That is what lets the library call the correct `onUploadComplete(...)` handler without trusting the browser to report success.
+
+`callbackMetadata.__silo` is reserved for sdk-server internals and should be treated as library-owned state.
+
+Your `callbackUrl` from registration should point at this handler. In other words, the URL you pass during registration and the route that runs `handleUploadCallback(...)` should be the same public endpoint.
+
+For a deeper explanation of the internal envelope and dispatch flow, read [Router Behavior](/docs/sdk/server/router-behavior).
+
+## Expose safe router config to clients
+
+`extractRouterConfig(...)` returns only the client-safe route config shape. This is useful when a UI layer wants to know route constraints without learning your middleware or server-only logic.
+
+```ts title="src/router-config.ts"
+import { extractRouterConfig } from "@silo-storage/sdk-server";
+
+import { fileRouter } from "./upload";
+
+export const routerConfig = extractRouterConfig(fileRouter);
+```
+
+This is commonly paired with a client SDK or server-rendered app shell so the browser can discover file size and count limits up front.
+
+## API Reference
+
+### `createSiloUpload`
+
+<TypeTable
+  type={{
+    TRequest: {
+      description: "Request type passed into middleware and registration helpers.",
+      type: "generic",
+      default: "Request",
+    },
+    TContext: {
+      description: "Server-resolved context shared with middleware, option resolvers, and callbacks.",
+      type: "generic",
+      default: "Record<string, never>",
+    },
+    TInput: {
+      description: "Optional route input type available as `input` inside middleware and helper calls.",
+      type: "generic",
+      default: "unknown",
+    },
+  }}
+/>
+
+### Route builder methods
+
+<TypeTable
+  type={{
+    middleware: {
+      description: "Runs before registration and must return a plain metadata object.",
+      type: "(args) => Promise<Record<string, unknown>> | Record<string, unknown>",
+    },
+    public: {
+      description: "Sets whether uploaded files are publicly accessible. Accepts a boolean or async resolver.",
+      type: "(boolean | resolver) => builder",
+    },
+    serveImage: {
+      description: "Enables image CDN behavior for image uploads. Accepts a boolean or async resolver.",
+      type: "(boolean | resolver) => builder",
+    },
+    expires: {
+      description: "Sets per-file expiry using a duration string, date, or explicit expiry object.",
+      type: "(expiry | resolver) => builder",
+    },
+    mimeTypes: {
+      description: "Overrides accepted MIME types with a string, string array, or async resolver.",
+      type: "(string | string[] | resolver) => builder",
+    },
+    onUploadComplete: {
+      description: "Registers the completion handler and finalizes the route definition.",
+      type: "(args) => Promise<TOutput> | TOutput",
+      required: true,
+    },
+  }}
+/>
+
+### `registerRouteUpload(...)`
+
+<TypeTable
+  type={{
+    core: {
+      description: "An `UploadCore` instance, usually created with `createSiloCoreFromToken(...)`.",
+      type: "UploadCore",
+      required: true,
+    },
+    router: {
+      description: "Your file router object.",
+      type: "FileRouter",
+      required: true,
+    },
+    routeSlug: {
+      description: "The route key to register against.",
+      type: "keyof router & string",
+      required: true,
+    },
+    req: {
+      description: "The incoming request object used by middleware.",
+      type: "TRequest",
+      required: true,
+    },
+    context: {
+      description: "Optional resolved server context passed into middleware and option resolvers.",
+      type: "TContext",
+    },
+    input: {
+      description: "Optional typed route input forwarded to middleware.",
+      type: "RouteInputBySlug<TRouter, TRouteSlug>",
+    },
+    files: {
+      description: "One or more files to register.",
+      type: "UploadFileInput[]",
+      required: true,
+    },
+    callbackUrl: {
+      description: "Public callback URL Silo should call after upload completion.",
+      type: "string",
+    },
+    fileExpiry: {
+      description: "Optional per-call expiry override.",
+      type: "SiloRouteExpiryInput",
+    },
+    uploadStrategy: {
+      description: "Upload strategy to use for registration.",
+      type: '"server" | "self"',
+      default: '"server"',
+    },
+  }}
+/>
+
+### `handleUploadCallback(...)`
+
+<TypeTable
+  type={{
+    router: {
+      description: "Your file router object.",
+      type: "FileRouter",
+      required: true,
+    },
+    request: {
+      description: "Either a standard `Request` or a `{ headers, body }` object.",
+      type: 'Request | { headers: Headers | Record<string, string | undefined>; body: string }',
+      required: true,
+    },
+    signingSecret: {
+      description: "Secret used to verify the callback signature.",
+      type: "string",
+      required: true,
+    },
+    maxAgeSeconds: {
+      description: "Optional freshness window for the signed callback.",
+      type: "number",
+    },
+    context: {
+      description: "Optional server context forwarded into `onUploadComplete(...)`.",
+      type: "TContext",
+    },
+  }}
+/>

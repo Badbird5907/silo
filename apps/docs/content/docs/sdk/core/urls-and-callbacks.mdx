@@ -1,0 +1,86 @@
+---
+title: URLs and Callbacks
+description: Generate file URLs and verify upload callbacks with sdk-core.
+---
+
+## Generate download URLs
+
+Use `generateDownloadUrl` when you need a file download link from a file access key or a file-like object.
+
+```ts
+const signedDownloadUrl = await core.generateDownloadUrl("file-access-key");
+
+const publicDownloadUrl = await core.generateDownloadUrl("file-access-key", {
+  sign: false,
+});
+```
+
+You can also pass an explicit object when you already know the file metadata:
+
+```ts
+const downloadUrl = await core.generateDownloadUrl({
+  accessKey: "file-access-key",
+  isPublic: false,
+  fileName: "photo.png",
+});
+```
+
+## Generate image URLs
+
+Use `generateImageUrl` when the file should be served through Silo's image delivery path.
+
+```ts
+const imageUrl = await core.generateImageUrl("file-access-key", {
+  width: 800,
+});
+
+const publicImageUrl = await core.generateImageUrl("file-access-key", {
+  sign: false,
+  width: 800,
+});
+```
+
+You can also generate an image URL from a prepared file payload:
+
+```ts
+const imageFromFile = await core.generateImageUrl(prepared.file);
+```
+
+## Callback URLs
+
+`sdk-core` expects an absolute `callbackUrl`. It does not resolve relative paths for you.
+
+```ts
+const core = createSiloCoreFromToken({
+  url: process.env.SILO_URL!,
+  token: process.env.SILO_TOKEN!,
+  cdnHost: process.env.SILO_CDN!,
+  callbackUrl: "https://app.example.com/api/upload",
+});
+```
+
+Framework-specific adapters should own path and origin resolution. If you are using Next.js, prefer [sdk-next](/docs/sdk/next) for that integration layer.
+
+## Verify callbacks
+
+Use `verifyAndParseUploadCallback` when you want one step that both verifies the callback signature and parses the payload.
+
+```ts
+const callback = await verifyAndParseUploadCallback({
+  request: req,
+  signingSecret,
+});
+```
+
+If you only need signature verification, use `verifyCallbackSignature` directly.
+
+## Dev SSE
+
+When registration runs in dev mode, Silo can return an SSE stream from `/api/v1/upload/register`.
+
+Use `consumeDevRegisterSse(...)` to consume:
+
+- `connected`
+- `chunk`
+- `keepalive`
+- `error`

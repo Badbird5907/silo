@@ -1,0 +1,293 @@
+---
+title: Core
+description: Framework-agnostic upload, URL, and callback primitives.
+---
+
+`@silo-storage/sdk-core` is the lowest-level Silo SDK package. It exposes the pieces needed to talk to Silo directly without taking a dependency on a server framework or UI layer.
+
+Use it when you want to build your own server integration, generate file URLs directly, or verify signed callbacks without the route abstraction from `@silo-storage/sdk-server`.
+
+## What it provides
+
+- `createSiloCoreFromToken`
+- `createSiloClient`
+- single-file and batch upload registration helpers
+- signed and public URL generation
+- file listing and file detail APIs
+- file access and expiry updates
+- callback signature verification
+- dev SSE consumption for local workflows
+
+## Install
+
+```npm
+npm install @silo-storage/sdk-core
+```
+
+## Create a core client
+
+```ts
+import { createSiloCoreFromToken } from "@silo-storage/sdk-core";
+
+const core = createSiloCoreFromToken({
+  url: process.env.SILO_URL!,
+  token: process.env.SILO_TOKEN!,
+  cdnHost: process.env.SILO_CDN ?? process.env.NEXT_PUBLIC_SILO_CDN!,
+  callbackUrl: "https://app.example.com/api/upload",
+});
+```
+
+This gives you a framework-agnostic upload client with enough configuration to:
+
+- register uploads
+- generate signed or public file URLs
+- verify signed callbacks
+- make authenticated file management requests
+
+If you want to share defaults such as `apiBaseUrl`, `cdnHost`, and a default token across multiple core instances, use `createSiloClient(...)`:
+
+```ts
+import { createSiloClient } from "@silo-storage/sdk-core";
+
+const silo = createSiloClient({
+  apiBaseUrl: process.env.SILO_URL!,
+  cdnHost: process.env.SILO_CDN!,
+  token: process.env.SILO_TOKEN!,
+});
+
+const core = silo.createSiloCoreFromToken();
+```
+
+## Upload strategies
+
+The core client supports two upload strategies:
+
+- `server`: calls Silo's combined upload endpoint and returns a ready-to-use signed upload URL
+- `self`: registers the upload first and signs the upload URL locally
+
+`server` is the default and is what higher-level packages use unless you override it.
+
+Use `server` unless you specifically need local signing behavior.
+
+## Core upload flow
+
+At the `sdk-core` level, uploads usually look like this:
+
+1. your server prepares or registers an upload with Silo
+2. your client uploads bytes to the returned `uploadUrl`
+3. Silo sends a signed callback to your server if you configured `callbackUrl`
+
+Higher-level packages such as `@silo-storage/sdk-server` and `@silo-storage/sdk-next` build on top of this flow.
+
+## Prepare an upload
+
+Use `prepareUpload(...)` when you are dealing with a single file and want the simplest API.
+
+```ts
+const prepared = await core.prepareUpload({
+  file: {
+    fileName: "photo.png",
+    size: 1234,
+    mimeType: "image/png",
+  },
+});
+```
+
+The returned `prepared.file` includes the values your client needs to actually upload the file:
+
+- `uploadUrl`
+- `accessKey`
+- `fileKeyId`
+- `expiresAt`
+
+If you need to force a strategy per call:
+
+```ts
+await core.prepareUpload({
+  uploadStrategy: "server",
+  file: {
+    fileName: "photo.png",
+    size: 1234,
+  },
+});
+```
+
+## Register a batch of files
+
+Use `registerUploadBatch(...)` when you want to register more than one file in one call, or when you want more direct control over callback metadata and registration behavior.
+
+```ts
+const registered = await core.registerUploadBatch({
+  callbackUrl: "https://app.example.com/api/upload/callback",
+  callbackMetadata: {
+    userId: "user_123",
+    source: "dashboard",
+  },
+  files: [
+    {
+      fileName: "photo.png",
+      size: 1234,
+      mimeType: "image/png",
+      acceptedMimeTypes: ["image/png", "image/jpeg"],
+    },
+    {
+      fileName: "manual.pdf",
+      size: 45_000,
+      mimeType: "application/pdf",
+      acceptedMimeTypes: ["application/pdf"],
+    },
+  ],
+});
+```
+
+In production, `callbackUrl` must be an absolute public URL. You can pass it once when creating the core client, or override it per request.
+
+The result shape depends on the mode:
+
+- production returns prepared files plus registration info
+- development can return an SSE stream for local workflows
+
+If you only need one file, prefer `prepareUpload(...)`.
+
+## Generate file URLs
+
+`sdk-core` also gives you direct URL helpers when you already know a file's access key or metadata.
+
+```ts
+const signedDownloadUrl = await core.generateDownloadUrl("file-access-key"); // this will generate a signed URL
+
+const publicDownloadUrl = await core.generateDownloadUrl("file-access-key", {
+  sign: false, // don't sign the URL (since we know it's public)
+});
+
+const imageUrl = await core.generateImageUrl("file-access-key", {
+  width: 800,
+  format: "webp",
+  quality: 80,
+}); // this will generate a signed image URL for a webp of width 800px and quality level 80
+```
+
+You can also generate URLs from an explicit file-like object:
+
+```ts
+const downloadUrl = await core.generateDownloadUrl({
+  accessKey: "file-access-key",
+  isPublic: false,
+  fileName: "photo.png",
+});
+```
+
+For more detail on URL generation, callback URLs, and low-level callback verification, read [URLs and Callbacks](/docs/sdk/core/urls-and-callbacks).
+
+## Verify callbacks directly
+
+If you are not using `sdk-server`, you can verify and parse signed callbacks yourself:
+
+```ts
+import {
+  parseSiloToken,
+  verifyAndParseUploadCallback,
+} from "@silo-storage/sdk-core";
+
+const signingSecret = parseSiloToken(process.env.SILO_TOKEN!).signingSecret;
+
+export async function POST(request: Request) {
+  const callback = await verifyAndParseUploadCallback({
+    request,
+    signingSecret,
+  });
+
+  return Response.json({
+    metadata: callback.metadata,
+    data: callback.data,
+  });
+}
+```
+
+Use this when you want raw access to the callback envelope. If you want route-aware callback dispatch and typed `onUploadComplete(...)` handlers, use [Server](/docs/sdk/server) instead.
+
+## Manage existing files
+
+Beyond upload preparation, `sdk-core` also exposes basic file management APIs.
+
+### List files
+
+<Callout type="info">
+You should not rely on this endpoint for your UI and business logic.
+Always store the file access key in your database and use it to generate URLs.
+</Callout>
+
+```ts
+const result = await core.listFiles({
+  page: 1,
+  pageSize: 20,
+  status: "completed",
+});
+```
+
+### Get file detail
+
+```ts
+const file = await core.getFile({
+  projectId: "proj_123",
+  fileKeyId: "filekey_123",
+});
+```
+
+### Update file access
+
+```ts
+await core.updateFileAccess({
+  projectId: "proj_123",
+  fileKeyId: "filekey_123",
+  isPublic: true,
+  serveImage: true,
+});
+```
+
+### Update file expiry
+
+```ts
+await core.updateFileExpiry({
+  projectId: "proj_123",
+  fileKeyId: "filekey_123",
+  ttlSeconds: 60 * 60 * 24 * 30, // 30 days from now
+});
+```
+
+```ts
+await core.updateFileExpiry({
+  projectId: "proj_123",
+  fileKeyId: "filekey_123",
+  expiresAt: new Date(Date.now() + 60 * 60 * 24 * 30 * 1000), // 30 days from now
+});
+```
+
+These APIs are useful for admin panels, background jobs, and internal tooling where you need to inspect or modify uploaded files after registration.
+
+## Dev mode and SSE
+
+When registration runs with `dev: true`, Silo can return an SSE stream instead of the normal production registration response.
+
+Use `consumeDevRegisterSse(...)` when you want to process:
+
+- `connected`
+- `chunk`
+- `keepalive`
+- `error`
+
+This is intended to be used for local development with the SDK when the local dev server is not accessible from the internet.
+
+## When to use `sdk-core` directly
+
+Reach for `sdk-core` when:
+
+- you want to integrate Silo into a custom backend runtime
+- you want to stay below the route abstraction from `sdk-server`
+- you need direct URL generation APIs
+- you need file listing or file update APIs
+- you want callback verification without the upload router abstraction
+
+If you want route-based uploads with typed middleware and completion handlers, move up to [Server](/docs/sdk/server).
+
+If you are using Next.js App Router and want the full request handler integration, move up to [Next](/docs/sdk/next).

@@ -1,0 +1,56 @@
+---
+title: Components
+description: Headless upload components exposed by sdk-react.
+---
+
+`@silo-storage/sdk-react` ships headless components rather than a fixed design system.
+
+That means you keep control over markup and styling while reusing the upload wiring.
+
+<Callout type="info">
+Honestly, you should probably just use the `useUpload` hook and build your own UI.
+It's not that hard and you'll get more control over the behavior etc...
+</Callout>
+
+## `UploadButton`
+
+`UploadButton` is an unstyled file-picker trigger.
+
+Use it when you want:
+
+- a standard button-driven upload flow
+- typed route inputs
+- full control over the rendered appearance
+
+## `UploadDropzone`
+
+`UploadDropzone` is an unstyled drag-and-drop region.
+
+Use it when you want:
+
+- drag-and-drop uploads
+- custom empty states and progress UI
+- the same route typing as `useUpload`
+
+## Factory pattern
+
+Both components come from the `createSiloReact(...)` factory, so they stay aligned with the same endpoint and router type as your hooks.
+
+```ts
+const {
+  UploadButton,
+  UploadDropzone,
+} = createSiloReact<AppFileRouter>({
+  endpoint: "/api/upload",
+});
+```
+
+## Typical composition
+
+A common pattern is:
+
+1. use `UploadButton` or `UploadDropzone` for selection
+2. use `useUpload` for custom lifecycle handling
+3. render your own pending, progress, error, and completion UI
+
+If you want a more controlled draft workflow, prefer `useStagedUpload` and build the surrounding UI yourself.

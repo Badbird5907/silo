@@ -139,3 +139,20 @@ body {
     @apply font-sans;
   }
 }
+
+@layer components {
+  /* Fumadocs misses the generated logical inset rule for these sidebar rails. */
+  :is(#nd-sidebar, #nd-sidebar-mobile) a[data-active] {
+    width: 100%;
+  }
+
+  :is(#nd-sidebar, #nd-sidebar-mobile) a[data-active="true"]::before {
+    inset-inline-start: calc(var(--spacing) * 2.5);
+  }
+
+  :is(#nd-sidebar, #nd-sidebar-mobile)
+    [data-state][class*="before:bg-fd-border"]::before {
+    inset-inline-start: calc(var(--spacing) * 2.5);
+  }
+}
+

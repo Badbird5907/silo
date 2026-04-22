@@ -1,0 +1,104 @@
+---
+title: React
+description: Typed React hooks for uploads, staged flows, and progress events.
+---
+
+`@silo-storage/sdk-react` is the client-side package for Silo uploads.
+
+It is built around a factory, `createSiloReact`, which binds your upload endpoint once and returns typed hooks and headless components.
+
+## Create the React helpers
+
+```ts
+import type { AppFileRouter } from "@/app/api/upload/core";
+
+import { createSiloReact } from "@silo-storage/sdk-react";
+
+export const {
+  useUpload,
+  useStagedUpload,
+  UploadButton,
+  UploadDropzone,
+  SiloRouterConfigProvider,
+} = createSiloReact<AppFileRouter>({
+  endpoint: "/api/upload",
+});
+```
+
+## `useUpload`
+
+`useUpload` is the main hook for direct uploads.
+
+It supports callbacks such as:
+
+- `onUploadBegin`
+- `onUploadProgress`
+- `onComplete`
+- `onError`
+- `onUploadAborted`
+- `onFileDialogCancel`
+
+Upload one file:
+
+```ts
+const upload = useUpload({ endpoint: "imageUploader" });
+
+await upload.uploadFile(file, {
+  input: { albumId: "abc" },
+});
+```
+
+Upload many files:
+
+```ts
+await upload.uploadFiles(files, {
+  input: { albumId: "abc" },
+  concurrency: 4,
+});
+```
+
+Open a file picker and upload immediately:
+
+```ts
+await upload.beginUpload({
+  multiple: true,
+  input: { albumId: "abc" },
+});
+```
+
+## `useStagedUpload`
+
+`useStagedUpload` is better for chat-style or draft-style interfaces where file selection and upload happen in separate steps.
+
+<Callout type="info">
+You should use this when you want the user to select files first,
+but upload them later. (e.g in a chat or messaging interface)
+</Callout>
+
+```ts
+const staged = useStagedUpload({
+  endpoint: "imageUploader",
+  onUploadProgress: (event) => {
+    console.log(event.aggregatePercent);
+  },
+});
+
+await staged.openFilePicker();
+await staged.upload();
+```
+
+It returns staged state and actions such as:
+
+- `files`
+- `openFilePicker`
+- `removeFile`
+- `clearFiles`
+- `upload`
+- `isUploading`
+- `uploadProgress`
+
+## Router config hydration
+
+`createSiloReact(...)` accepts optional `routerConfig`. You can also provide that later with `SiloRouterConfigProvider` if your server renders or fetches route config separately.
+
+If you want a concrete UI example in this repo, see the existing [SDK Demo](/docs/sdk-demo).

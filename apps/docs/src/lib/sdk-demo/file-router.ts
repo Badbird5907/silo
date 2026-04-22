@@ -1,7 +1,7 @@
 import type { FileRouter } from "@silo-storage/sdk-server";
 import { createSiloUpload } from "@silo-storage/sdk-server";
 
-interface UploadContext {
+export interface UploadContext {
   userId: string | null;
 }
 
@@ -32,7 +32,7 @@ export const fileRouter = {
       return {
         uploadedBy: metadata.userId,
       };
-    }),
+    })
 } satisfies FileRouter<Request, UploadContext>;
 
 export type AppFileRouter = typeof fileRouter;

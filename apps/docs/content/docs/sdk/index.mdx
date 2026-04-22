@@ -1,0 +1,24 @@
+---
+title: Getting Started
+description: Get started with the Silo SDK.
+---
+
+import { Nextjs } from "@/components/next-logo";
+import { React } from "@/components/react-logo";
+import { Server, Boxes } from "lucide-react";
+
+Select a package to get started:
+<Cards>
+  <Card href="/docs/sdk/next" title="Next.js" icon={<Nextjs />}>
+    Next.js integration for the Silo upload router.
+  </Card>
+  <Card href="/docs/sdk/server" title="Server" icon={<Server />}>
+    Server-side integration for the Silo upload router.
+  </Card>
+  <Card href="/docs/sdk/react" title="React" icon={<React />}>
+    React integration for the Silo upload router.
+  </Card>
+  <Card href="/docs/sdk/core" title="Core" icon={<Boxes />}>
+    Core transport and signing layer.
+  </Card>
+</Cards>

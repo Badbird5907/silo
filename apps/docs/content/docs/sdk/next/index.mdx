@@ -1,0 +1,189 @@
+---
+title: Next.js
+description: App Router integration for the Silo upload router.
+---
+
+`@silo-storage/sdk-next` is the App Router adapter for the Silo SDK stack.
+
+Use it when you already have a typed upload router from `@silo-storage/sdk-server` and want to expose it through a Next.js `route.ts` handler.
+
+## What it provides
+
+- `createRouteHandler(...)` for `GET` and `POST` route exports
+- callback verification and `onUploadComplete` dispatch
+- registration handling for browser uploads
+- completion polling used by the React client
+- `extractRouterConfig(...)` for optional client hydration
+
+## Getting started
+
+### 1. Install the package
+
+```npm
+npm install @silo-storage/sdk-next @silo-storage/sdk-react @silo-storage/sdk-server @silo-storage/sdk-core
+```
+
+### 2. Define your file router
+
+```ts title="src/upload.ts"
+import type { FileRouter } from "@silo-storage/sdk-server";
+import { createSiloUpload } from "@silo-storage/sdk-server";
+
+export interface UploadContext {
+  userId: string; // you can have whatever you want here
+};
+
+const f = createSiloUpload<Request, UploadContext>();
+
+export const fileRouter = {
+  imageUploader: f({
+    image: {
+      maxFileSize: "8MB",
+      maxFileCount: 4,
+    },
+  })
+    .expires("30 days") // delete after 30 days
+    .public(false) // do we need a signed url to access?
+    .serveImage(true) // serve images from the image CDN (transformations etc)
+    .middleware(async ({ context }) => {
+      if (!context?.userId) {
+        throw new Error("Unauthorized");
+      }
+
+      return {
+        userId: context.userId,
+      };
+    })
+    .onUploadComplete(async ({ metadata, file }) => {
+      return {
+        uploadedBy: metadata.userId,
+        fileKeyId: file.fileKeyId,
+      };
+    }),
+} satisfies FileRouter<Request, UploadContext>;
+
+export type AppFileRouter = typeof fileRouter;
+```
+
+If you want more detail on route definitions, middleware, or callback behavior, read [Server](/docs/sdk/server).
+
+### 3. Mount the App Router handler
+
+Create a route handler in your Next.js app, usually at `app/api/upload/route.ts`.
+
+```ts title="src/app/api/upload/route.ts"
+import { auth } from "your-auth-lib/server"; // this can be anything
+import { createSiloCoreFromToken } from "@silo-storage/sdk-core";
+import { createRouteHandler } from "@silo-storage/sdk-next";
+
+import type { UploadContext } from "@/upload";
+import { fileRouter } from "@/upload";
+
+const core = createSiloCoreFromToken({
+  url: process.env.SILO_URL!,
+  token: process.env.SILO_TOKEN!,
+  cdnHost: process.env.NEXT_PUBLIC_SILO_CDN!,
+});
+
+export const { GET, POST } = createRouteHandler<UploadContext>({
+  router: fileRouter,
+  core,
+  resolveContext: async (request: Request): Promise<UploadContext> => {
+    // do whatever you need here to satisfy the UploadContext type
+    const { userId } = await auth(request);
+    if (!userId) throw new Error("Unauthorized");
+    return { userId };
+  },
+});
+```
+
+This matches Next.js App Router route handlers, where `route.ts` exports HTTP method functions such as `GET` and `POST`.
+
+## What the route handler does
+
+`createRouteHandler(...)` returns two handlers:
+
+- `GET` returns the router config so clients can discover route metadata safely
+- `POST` handles upload registration requests from the browser
+- `POST` also verifies signed Silo callbacks and dispatches the matching `onUploadComplete`
+- `POST` handles completion polling used by the React SDK after an upload finishes
+
+By default, the adapter uses the current route URL as the callback URL. Override that with `callbackUrl` if your public callback origin differs from the incoming request origin.
+
+## Using in conjunction with the React SDK
+
+When using `@silo-storage/sdk-react`, you can hydrate the router config on the server so the client does not need to fetch it on first render.
+
+```ts title="src/lib/upload.ts"
+"use client";
+
+import { createSiloReact } from "@silo-storage/sdk-react";
+
+import type { AppFileRouter } from "@/upload";
+
+export const {
+  useUpload,
+  useStagedUpload,
+  UploadButton,
+  UploadDropzone,
+  SiloRouterConfigProvider,
+} = createSiloReact<AppFileRouter>({
+  endpoint: "/api/upload",
+});
+```
+
+```tsx title="src/app/layout.tsx"
+import { extractRouterConfig } from "@silo-storage/sdk-next";
+
+import { SiloRouterConfigProvider } from "@/lib/upload";
+import { fileRouter } from "@/upload";
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <SiloRouterConfigProvider routerConfig={extractRouterConfig(fileRouter)}>
+          {children}
+        </SiloRouterConfigProvider>
+      </body>
+    </html>
+  );
+}
+```
+
+For the client-side hooks and headless components themselves, continue with [React](/docs/sdk/react).
+
+## Completion storage
+
+The Next adapter stores `onUploadComplete` results temporarily so the client can wait for completion after the upload finishes.
+
+By default it will:
+
+- use an HTTP-backed completion store when it has a base API URL and auth token
+- fall back to an in-memory store otherwise
+
+You can override that behavior with:
+
+- `completionStore`
+- `completionStoreUrl`
+- `completionStoreAuthToken`
+- `completionStorePathPrefix`
+- `completionTtlMs`
+
+Use a shared store in production when the upload callback and the polling request may run on different instances. For the full flow, the store contract, and replacement examples including Redis, read [Completion Store](/docs/sdk/next/advanced/completion-store).
+
+## Notes
+
+- Callback verification depends on `core.config.signingSecret`. `createSiloCoreFromToken(...)` fills that from `SILO_TOKEN`, so you usually do not need to pass anything extra into `createRouteHandler(...)`.
+- The adapter currently does not proxy Silo development SSE registration streams. If registration enters development stream mode, the route returns `DEV_STREAM_UNSUPPORTED`.
+- `extractRouterConfig(...)` only exposes the client-safe subset of your router definition.
+
+## Next steps
+
+- Read [Server](/docs/sdk/server) for route authoring and middleware details
+- Read [React](/docs/sdk/react) for upload hooks and UI helpers
+- See the [SDK Demo](/docs/sdk-demo) for a working end-to-end example

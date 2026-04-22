@@ -1,0 +1,204 @@
+---
+title: Completion Store
+description: How the Next adapter stores onUploadComplete results and how to replace the default store.
+---
+
+The completion store is the temporary handoff between the upload callback and the client that is waiting for `onUploadComplete(...)` to finish.
+
+Without it, the browser would know that the file bytes uploaded successfully, but it would have no reliable way to retrieve the result returned by your route's `onUploadComplete`.
+
+## What it stores
+
+Each completion entry is keyed by `fileKeyId` and contains:
+
+- `routeSlug`
+- `fileKeyId`
+- `completedAt`
+- `onUploadCompleteResult`
+
+That value is intentionally short-lived. The default TTL is `10 minutes`, configurable with `completionTtlMs`.
+
+## How it works
+
+The flow looks like this:
+
+1. The browser registers an upload through the Next route handler.
+2. The client uploads the file bytes directly to the Silo upload URL.
+3. Silo sends the signed callback back to your Next route.
+4. The route handler runs your route's `onUploadComplete(...)`.
+5. The adapter stores that result in the completion store under the file's `fileKeyId`.
+6. The React client sends `await-completion` requests until the record is available or the timeout budget is exhausted.
+
+In `@silo-storage/sdk-react`, the client does not hold one long request open forever. It makes several short polling requests and retries for up to `60 seconds` by default. That makes it more resilient in serverless deployments where the callback and the client poll may land on different instances.
+
+## Default behavior
+
+`createRouteHandler(...)` chooses a store in this order:
+
+1. `completionStore` if you passed one explicitly
+2. an HTTP-backed store if it can resolve a base URL
+3. an in-memory store otherwise
+
+The built-in HTTP-backed store uses:
+
+- `completionStoreUrl ?? core.config.apiBaseUrl`
+- `completionStoreAuthToken ?? core.config.apiKey`
+- `completionStorePathPrefix ?? "/api/v1/completion"`
+
+The in-memory fallback is useful for local development or single-process deployments, but it should not be treated as a durable shared store. If the callback writes on one instance and the client polls another, the second instance will not see that memory.
+
+## When to replace it
+
+Replace the default store when:
+
+- your app runs on multiple instances or serverless workers
+- your callback path and your polling path do not share memory
+- you want a store that survives process restarts
+- you want to reuse your own infrastructure such as Redis or another internal service
+
+## The store contract
+
+Any custom store only needs to implement this interface:
+
+```ts
+interface CompletionStore {
+  set(fileKeyId: string, value: CompletionEntry, ttlMs: number): Promise<void>;
+  get(fileKeyId: string): Promise<CompletionEntry | null>;
+  wait(fileKeyId: string, timeoutMs: number): Promise<CompletionEntry | null>;
+}
+```
+
+The `wait(...)` method can be implemented however you want. The built-in memory store simply polls `get(...)` every `200ms`. A Redis-backed store can do the same, or it can combine a quick lookup with pub/sub, blocking commands, or another coordination mechanism if that fits your stack.
+
+## Using the built-in HTTP store
+
+If you already expose a compatible completion API, point the adapter at it:
+
+```ts title="src/app/api/upload/route.ts"
+import { createRouteHandler } from "@silo-storage/sdk-next";
+
+export const { GET, POST } = createRouteHandler({
+  router: fileRouter,
+  core,
+  completionStoreUrl: process.env.INTERNAL_API_URL,
+  completionStoreAuthToken: process.env.INTERNAL_API_TOKEN,
+  completionStorePathPrefix: "/api/v1/completion",
+});
+```
+
+If you want to build that store object yourself, `@silo-storage/sdk-next` also exports `createHttpCompletionStore(...)`.
+
+```ts
+import {
+  createHttpCompletionStore,
+  createRouteHandler,
+} from "@silo-storage/sdk-next";
+
+const completionStore = createHttpCompletionStore({
+  baseUrl: process.env.INTERNAL_API_URL!,
+  pathPrefix: "/api/v1/completion",
+  headers: () => ({
+    Authorization: `Bearer ${process.env.INTERNAL_API_TOKEN!}`,
+  }),
+});
+
+export const { GET, POST } = createRouteHandler({
+  router: fileRouter,
+  core,
+  completionStore,
+});
+```
+
+The built-in HTTP client expects three endpoints under the configured prefix:
+
+- `POST /set`
+- `GET /get?fileKeyId=...`
+- `GET /wait?fileKeyId=...&timeoutMs=...`
+
+Returning HTTP `202` from `get` or `wait` means the completion is still pending.
+
+## Replacing it with Redis
+
+Redis is a good fit when you need a shared ephemeral store with TTL support.
+
+This example keeps the implementation simple by storing JSON and polling in `wait(...)`:
+
+```ts title="src/lib/redis-completion-store.ts"
+import { createClient } from "redis";
+import type { CompletionEntry, CompletionStore } from "@silo-storage/sdk-next";
+
+declare global {
+  var redis:
+    | ReturnType<typeof createClient>
+    | undefined;
+}
+
+async function getRedis() {
+  if (global.redis) {
+    return global.redis;
+  }
+
+  const redis = createClient({
+    url: process.env.REDIS_URL,
+  });
+
+  await redis.connect();
+  global.redis = redis;
+  return redis;
+}
+
+function key(fileKeyId: string) {
+  return `silo:completion:${fileKeyId}`;
+}
+
+export const redisCompletionStore: CompletionStore = {
+  async set(fileKeyId, value, ttlMs) {
+    const redis = await getRedis();
+    await redis.set(key(fileKeyId), JSON.stringify(value), {
+      PX: ttlMs,
+    });
+  },
+
+  async get(fileKeyId) {
+    const redis = await getRedis();
+    const raw = await redis.get(key(fileKeyId));
+    return raw ? (JSON.parse(raw) as CompletionEntry) : null;
+  },
+
+  async wait(fileKeyId, timeoutMs) {
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt <= timeoutMs) {
+      const found = await this.get(fileKeyId);
+      if (found) return found;
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+
+    return null;
+  },
+};
+```
+
+Then pass it into the route handler:
+
+```ts title="src/app/api/upload/route.ts"
+import { createRouteHandler } from "@silo-storage/sdk-next";
+
+import { redisCompletionStore } from "@/lib/redis-completion-store";
+import { fileRouter } from "@/upload";
+
+export const { GET, POST } = createRouteHandler({
+  router: fileRouter,
+  core,
+  completionStore: redisCompletionStore,
+});
+```
+
+That is enough for most deployments. If you need lower polling overhead, you can keep the same `set/get/wait` interface and make `wait(...)` smarter with Redis pub/sub or another notification primitive.
+
+## Practical guidance
+
+- Keep the value small. Store the `onUploadComplete` result, not a large secondary payload.
+- Set a TTL long enough to cover slow callbacks and client retries, but still short enough that stale entries disappear quickly.
+- Use a shared store in production when uploads and callbacks can hit different instances.
+- Treat the completion store as temporary coordination state, not as your system of record.

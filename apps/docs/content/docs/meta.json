@@ -1,0 +1,15 @@
+{
+  "pages": [
+    "index",
+    "deploy",
+    "screenshots",
+    "sdk-demo",
+    
+    "---SDK---",
+    "sdk/index",
+    "sdk/core",
+    "sdk/server",
+    "sdk/next",
+    "sdk/react"
+  ]
+}

@@ -1,0 +1,40 @@
+---
+title: Router Behavior
+description: How registration, middleware, and callbacks behave in sdk-server.
+---
+
+## Registration flow
+
+`sdk-server` uses `@silo-storage/sdk-core` underneath to register uploads.
+
+By default it uses the core `server` upload strategy, which combines registration and URL signing into a single server-side flow. (it's faster + more straightforward than the `self` strategy)
+
+Opt into `self` only when you explicitly want local signing behavior for a route or call site. (you'll still need to register the upload with the server to register a callback)
+
+## Internal callback envelope
+
+`sdk-server` reserves `callbackMetadata.__silo` for its own route dispatch data.
+
+That internal envelope is what lets the callback handler:
+
+- resolve the route slug
+- restore middleware metadata
+- dispatch the right `onUploadComplete` handler
+
+Application code should treat `__silo` as library-owned state and avoid writing to it directly.
+
+## Handle callbacks
+
+Use `handleUploadCallback(...)` to:
+
+1. verify the callback signature
+2. resolve the route from the stored envelope
+3. call the matching `onUploadComplete` handler
+
+That keeps route completion logic on the server instead of relying on the browser to self-report success.
+
+## Hydrating client config
+
+Use `extractRouterConfig(...)` when you want to send a safe client-facing subset of your route config to the browser for optional hydration.
+
+This is useful with UI layers such as `@silo-storage/sdk-react`, which can consume route config for better client-side ergonomics.
