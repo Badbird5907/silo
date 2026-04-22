@@ -28,6 +28,7 @@ export const env = createEnv({
     CRON_SECRET: z.string().min(16).optional(),
     WEBHOOK_DELIVERY_ENABLED: z.boolean().default(true),
     DEV_UPLOAD_SSE_ENABLED: z.boolean().default(true),
+    BETTER_AUTH_API_KEY: z.string().optional(),
   },
 
   /**

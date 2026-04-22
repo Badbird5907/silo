@@ -22,7 +22,8 @@ const baseUrl =
       : "http://localhost:3000";
 
 const productionUrl = env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000";
-const dashPlugin = (dash as unknown as () => BetterAuthPlugin)();
+const enableInfra = !!env.BETTER_AUTH_API_KEY;
+const dashPlugin = enableInfra ? (dash as unknown as () => BetterAuthPlugin)() : undefined;
 export const auth = initAuth({
   baseUrl,
   productionUrl,
@@ -33,7 +34,8 @@ export const auth = initAuth({
       clientSecret: env.AUTH_GITHUB_SECRET,
     }
   },
-  extraPlugins: [nextCookies(), dashPlugin],
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  extraPlugins: [nextCookies(), ...(enableInfra ? [dashPlugin!] : [])],
   databaseHooks: {
     user: {
       create: {
