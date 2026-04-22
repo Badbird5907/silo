@@ -13,7 +13,8 @@
     "with-env": "dotenv -e ../../.env.local --"
   },
   "dependencies": {
-    "@better-auth/sso": "^1.4.17",
+    "@better-auth/infra": "^0.2.5",
+    "@better-auth/sso": "catalog:",
     "@silo-storage/api": "workspace:*",
     "@silo-storage/auth": "workspace:*",
     "@silo-storage/db": "workspace:*",

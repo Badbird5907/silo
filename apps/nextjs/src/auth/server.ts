@@ -11,6 +11,8 @@ import { nanoid } from "nanoid";
 import { db } from "@silo-storage/db/client";
 import { eq } from "@silo-storage/db";
 import { members,users } from "@silo-storage/db/schema";
+import { dash } from "@better-auth/infra";
+import type { BetterAuthPlugin } from "better-auth";
 
 const baseUrl =
   env.VERCEL_ENV === "production"
@@ -20,6 +22,7 @@ const baseUrl =
       : "http://localhost:3000";
 
 const productionUrl = env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000";
+const dashPlugin = (dash as unknown as () => BetterAuthPlugin)();
 export const auth = initAuth({
   baseUrl,
   productionUrl,
@@ -30,7 +33,7 @@ export const auth = initAuth({
       clientSecret: env.AUTH_GITHUB_SECRET,
     }
   },
-  extraPlugins: [nextCookies()],
+  extraPlugins: [nextCookies(), dashPlugin],
   databaseHooks: {
     user: {
       create: {
