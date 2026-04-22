@@ -10,6 +10,7 @@
     "sdk/core",
     "sdk/server",
     "sdk/next",
-    "sdk/react"
+    "sdk/react",
+    "sdk/tanstack-start"
   ]
 }
