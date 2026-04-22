@@ -1,4 +1,5 @@
 {
   "title": "TanStack Start",
-  "pages": ["index", "api-reference"]
+  "pages": ["index", "api-reference"],
+  "icon": "TanStack"
 }

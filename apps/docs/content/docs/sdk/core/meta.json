@@ -1,4 +1,5 @@
 {
   "title": "Core",
-  "pages": ["index", "urls-and-callbacks", "api-reference"]
+  "pages": ["index", "urls-and-callbacks", "api-reference"],
+  "icon": "Boxes"
 }

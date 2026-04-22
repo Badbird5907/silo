@@ -1,4 +1,5 @@
 {
   "title": "Server",
-  "pages": ["index", "router-behavior", "api-reference"]
+  "pages": ["index", "router-behavior", "api-reference"],
+  "icon": "Server"
 }
