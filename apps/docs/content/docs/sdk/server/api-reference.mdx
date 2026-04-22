@@ -1,0 +1,30 @@
+---
+title: API Reference
+description: Generated type tables for the server SDK.
+---
+
+This page renders directly from the source types used by `@silo-storage/sdk-server`.
+
+## `createSiloUpload(...)`
+
+<AutoTypeTable path="../../sdk/server/src/api-reference.ts" name="ServerCreateSiloUploadGenerics" />
+
+## Route builder methods
+
+<AutoTypeTable path="../../sdk/server/src/api-reference.ts" name="ServerRouteBuilderMethods" />
+
+## `registerRouteUpload(...)`
+
+<AutoTypeTable path="../../sdk/server/src/api-reference.ts" name="ServerRegisterRouteUploadOptions" />
+
+## `prepareRouteUpload(...)`
+
+<AutoTypeTable path="../../sdk/server/src/api-reference.ts" name="ServerPrepareRouteUploadOptions" />
+
+## `handleUploadCallback(...)`
+
+<AutoTypeTable path="../../sdk/server/src/api-reference.ts" name="ServerHandleUploadCallbackOptions" />
+
+## `extractRouterConfig(...)`
+
+`extractRouterConfig(router)` returns the client-safe route config shape for a file router. Use it when a client or app shell needs route limits without access to middleware or callback internals.

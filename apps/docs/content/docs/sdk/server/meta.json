@@ -1,4 +1,4 @@
 {
   "title": "Server",
-  "pages": ["index", "router-behavior"]
+  "pages": ["index", "router-behavior", "api-reference"]
 }

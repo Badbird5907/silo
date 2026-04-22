@@ -1,0 +1,22 @@
+---
+title: API Reference
+description: Generated type tables for the Next.js SDK.
+---
+
+This page renders directly from the source types used by `@silo-storage/sdk-next`.
+
+## `createRouteHandler(...)`
+
+<AutoTypeTable path="../../sdk/next/src/route-handler.ts" name="CreateRouteHandlerOptions" />
+
+## `createHttpCompletionStore(...)`
+
+<AutoTypeTable path="../../sdk/next/src/http-completion-store.ts" name="CreateHttpCompletionStoreOptions" />
+
+## `CompletionStore`
+
+<AutoTypeTable path="../../sdk/next/src/route-handler.ts" name="CompletionStore" />
+
+## `extractRouterConfig(...)`
+
+`extractRouterConfig(router)` forwards the client-safe route config shape from `@silo-storage/sdk-server`. Use it when you want to hydrate the React client without exposing middleware or callback logic.

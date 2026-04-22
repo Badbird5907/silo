@@ -1,4 +1,4 @@
 {
   "title": "Core",
-  "pages": ["index", "urls-and-callbacks"]
+  "pages": ["index", "urls-and-callbacks", "api-reference"]
 }

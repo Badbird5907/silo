@@ -34,6 +34,14 @@ export type {
   UseUploadResult,
 } from "./types";
 export { SiloUploadError } from "./types";
+export type {
+  ReactApiReferenceRouteSlug,
+  ReactApiReferenceRouter,
+  ReactUseStagedUploadOptions,
+  ReactUseStagedUploadResult,
+  ReactUseUploadOptions,
+  ReactUseUploadResult,
+} from "./api-reference";
 
 export interface CreateSiloReactOptions {
   endpoint: string;
