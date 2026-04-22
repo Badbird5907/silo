@@ -7,6 +7,7 @@
     "./adapterData": "./src/adapterData.ts",
     "./audit": "./src/audit.ts",
     "./events": "./src/events.ts",
+    "./network": "./src/network.ts",
     "./signing": "./src/signing.ts",
     "./slug": "./src/slug.ts"
   },
