@@ -242,11 +242,6 @@ export function createSiloCore(config: UploadCoreConfig) {
     if (input.files.length === 0) {
       throw new Error("registerUploadBatch requires at least one file");
     }
-    if (input.dev === true && input.files.length > 1) {
-      throw new Error(
-        "Dev SSE registration currently supports a single file per request. Call registerUploadBatch once per file when dev=true.",
-      );
-    }
 
     const protocol = resolveProtocol(baseUrl, input.protocol);
     const expiresIn = input.expiresIn ?? 3600;
@@ -374,9 +369,12 @@ export function createSiloCore(config: UploadCoreConfig) {
       });
     }
 
-    const registerBody: Record<string, unknown> = {
-      environmentId: config.environmentId,
-      fileKeys: preparedFilesWithoutUrl.map((file) => ({
+    function toRegisterFileKey(
+      file: Omit<PreparedUploadFile, "uploadUrl"> & {
+        uploadUrl?: string;
+      },
+    ) {
+      return {
         fileKeyId: file.fileKeyId,
         accessKey: file.accessKey,
         fileName: file.fileName,
@@ -387,16 +385,131 @@ export function createSiloCore(config: UploadCoreConfig) {
         serveImage: file.serveImage,
         acceptedMimeTypes: file.acceptedMimeTypes,
         metadata: file.metadata,
-      })),
-      dev: input.dev === true,
+      };
+    }
+
+    async function signPreparedFile(
+      projectSlug: string,
+      file: Omit<PreparedUploadFile, "uploadUrl"> & {
+        uploadUrl?: string;
+      },
+    ): Promise<PreparedUploadFile> {
+      const uploadUrl = await generateSignedUploadUrlWithSecret(
+        config.ingestServer,
+        projectSlug,
+        {
+          environmentId: config.environmentId,
+          fileKeyId: file.fileKeyId,
+          accessKey: file.accessKey,
+          fileName: file.fileName,
+          size: file.size,
+          hash: file.hash,
+          mimeType: file.mimeType,
+          acceptedMimeTypes: file.acceptedMimeTypes,
+          isPublic: file.isPublic,
+          keyId: selfKeyId,
+          expiresIn,
+          protocol,
+        },
+        selfSigningSecret,
+        { routeMode: resolvedRouteMode },
+      );
+
+      return {
+        ...file,
+        uploadUrl,
+      };
+    }
+
+    async function signPreparedFiles(
+      projectSlug: string,
+    ): Promise<PreparedUploadFile[]> {
+      const preparedFiles: PreparedUploadFile[] = [];
+      for (const file of preparedFilesWithoutUrl) {
+        preparedFiles.push(await signPreparedFile(projectSlug, file));
+      }
+      return preparedFiles;
+    }
+
+    if (input.dev) {
+      const preparedFiles: PreparedUploadFile[] = [];
+      const streams: ReadableStream<Uint8Array>[] = [];
+      const responses: Response[] = [];
+
+      for (const file of preparedFilesWithoutUrl) {
+        const registerBody: Record<string, unknown> = {
+          environmentId: config.environmentId,
+          fileKeys: [toRegisterFileKey(file)],
+          dev: true,
+        };
+
+        applyFileExpiryToRegisterBody(registerBody, input.fileExpiry);
+
+        const response = await fetchImpl(`${baseUrl}/api/v1/upload/register`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${config.apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(registerBody),
+        });
+
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(
+            `Upload register request failed (${response.status}): ${text || response.statusText}`,
+          );
+        }
+
+        const contentType = response.headers.get("content-type") ?? "";
+        if (!contentType.includes("text/event-stream")) {
+          throw new Error(
+            "Dev upload register request failed: expected an SSE response.",
+          );
+        }
+        if (!response.body) {
+          throw new Error(
+            "Register returned an SSE response without a readable body",
+          );
+        }
+
+        const projectSlug = response.headers.get("x-silo-project-slug");
+        if (!projectSlug) {
+          throw new Error(
+            "Register SSE response is missing x-silo-project-slug header.",
+          );
+        }
+
+        preparedFiles.push(await signPreparedFile(projectSlug, file));
+        streams.push(response.body);
+        responses.push(response);
+      }
+
+      const firstStream = streams[0];
+      const firstResponse = responses[0];
+      if (!firstStream || !firstResponse) {
+        throw new Error(
+          "Dev upload registration did not produce any SSE streams.",
+        );
+      }
+
+      return {
+        mode: "development",
+        files: preparedFiles,
+        streams,
+        responses,
+      };
+    }
+
+    const registerBody: Record<string, unknown> = {
+      environmentId: config.environmentId,
+      fileKeys: preparedFilesWithoutUrl.map(toRegisterFileKey),
+      dev: false,
     };
 
     applyFileExpiryToRegisterBody(registerBody, input.fileExpiry);
-
-    if (!input.dev) {
-      registerBody.callbackUrl = callbackUrl;
-      registerBody.callbackMetadata = input.callbackMetadata ?? {};
-    }
+    registerBody.callbackUrl = callbackUrl;
+    registerBody.callbackMetadata = input.callbackMetadata ?? {};
 
     const response = await fetchImpl(`${baseUrl}/api/v1/upload/register`, {
       method: "POST",
@@ -412,62 +525,6 @@ export function createSiloCore(config: UploadCoreConfig) {
       throw new Error(
         `Upload register request failed (${response.status}): ${text || response.statusText}`,
       );
-    }
-
-    const contentType = response.headers.get("content-type") ?? "";
-
-    async function signPreparedFiles(
-      projectSlug: string,
-    ): Promise<PreparedUploadFile[]> {
-      const preparedFiles: PreparedUploadFile[] = [];
-      for (const file of preparedFilesWithoutUrl) {
-        const uploadUrl = await generateSignedUploadUrlWithSecret(
-          config.ingestServer,
-          projectSlug,
-          {
-            environmentId: config.environmentId,
-            fileKeyId: file.fileKeyId,
-            accessKey: file.accessKey,
-            fileName: file.fileName,
-            size: file.size,
-            hash: file.hash,
-            mimeType: file.mimeType,
-            acceptedMimeTypes: file.acceptedMimeTypes,
-            isPublic: file.isPublic,
-            keyId: selfKeyId,
-            expiresIn,
-            protocol,
-          },
-          selfSigningSecret,
-          { routeMode: resolvedRouteMode },
-        );
-        preparedFiles.push({
-          ...file,
-          uploadUrl,
-        });
-      }
-      return preparedFiles;
-    }
-
-    if (contentType.includes("text/event-stream")) {
-      if (!response.body) {
-        throw new Error(
-          "Register returned an SSE response without a readable body",
-        );
-      }
-      const projectSlug = response.headers.get("x-silo-project-slug");
-      if (!projectSlug) {
-        throw new Error(
-          "Register SSE response is missing x-silo-project-slug header.",
-        );
-      }
-      const preparedFiles = await signPreparedFiles(projectSlug);
-      return {
-        mode: "development",
-        files: preparedFiles,
-        stream: response.body,
-        response,
-      };
     }
 
     const parsedJson = parseRegisterResponseBody(await response.json());
@@ -497,11 +554,19 @@ export function createSiloCore(config: UploadCoreConfig) {
     }
 
     if (result.mode === "development") {
+      const firstStream = result.streams[0];
+      const firstResponse = result.responses[0];
+      if (!firstStream || !firstResponse) {
+        throw new Error(
+          "prepareUpload failed to produce a development SSE stream",
+        );
+      }
+
       return {
         mode: "development" as const,
         file: firstFile,
-        stream: result.stream,
-        response: result.response,
+        stream: firstStream,
+        response: firstResponse,
       };
     }
 

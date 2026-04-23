@@ -192,6 +192,15 @@ function toUploadFiles(
   }));
 }
 
+function resolveDevelopmentStreams(input: {
+  streams: ReadableStream<Uint8Array>[];
+}): ReadableStream<Uint8Array>[] {
+  if (input.streams.length > 0) {
+    return input.streams;
+  }
+  throw new Error("Development upload registration did not return any streams");
+}
+
 export interface CreateFetchRouteHandlerOptions<
   TContext = undefined,
   TRouter extends FileRouter<Request, TContext> = FileRouter<Request, TContext>,
@@ -482,12 +491,20 @@ export function createFetchRouteHandler<
         throw new Error(`No route found for slug "${routeSlug}"`);
       }
 
-      startDevelopmentCompletionWorker({
-        routeSlug,
-        route,
-        context,
-        stream: registerResult.registerResult.stream,
-      });
+      const developmentStreams = resolveDevelopmentStreams(
+        registerResult.registerResult as {
+          streams: ReadableStream<Uint8Array>[];
+        },
+      );
+
+      for (const stream of developmentStreams) {
+        startDevelopmentCompletionWorker({
+          routeSlug,
+          route,
+          context,
+          stream,
+        });
+      }
     }
 
     return json({

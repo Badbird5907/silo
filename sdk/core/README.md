@@ -141,8 +141,11 @@ envelope library-owned.
 
 ## Dev SSE Consumption
 
-When registering with `dev: true`, `/api/v1/upload/register` returns SSE.
-Use `consumeDevRegisterSse(...)` to parse `connected`, `chunk`, `keepalive`, and `error` events.
+When registering with `dev: true`, `registerUploadBatch(...)` supports both single-file
+and multi-file calls.
+
+Use `consumeDevRegisterSse(...)` to parse `connected`, `chunk`, `keepalive`, and
+`error` events.
 
 ## Callback Signature Verification
 

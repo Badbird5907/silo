@@ -209,8 +209,8 @@ export interface ProductionUploadBatchResult {
 export interface DevelopmentUploadBatchResult {
   mode: "development";
   files: PreparedUploadFile[];
-  stream: ReadableStream<Uint8Array>;
-  response: Response;
+  streams: ReadableStream<Uint8Array>[];
+  responses: Response[];
 }
 
 export type RegisterUploadBatchResult =

@@ -198,12 +198,22 @@ export async function prepareRouteUpload<
 
   const prepareResult =
     registered.registerResult.mode === "development"
-      ? {
-          mode: "development" as const,
-          file: firstFile,
-          stream: registered.registerResult.stream,
-          response: registered.registerResult.response,
-        }
+      ? (() => {
+          const firstStream = registered.registerResult.streams[0];
+          const firstResponse = registered.registerResult.responses[0];
+          if (!firstStream || !firstResponse) {
+            throw new Error(
+              "registerRouteUpload did not return a development SSE stream",
+            );
+          }
+
+          return {
+            mode: "development" as const,
+            file: firstFile,
+            stream: firstStream,
+            response: firstResponse,
+          };
+        })()
       : {
           mode: "production" as const,
           file: firstFile,
