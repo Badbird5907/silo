@@ -30,6 +30,7 @@ export const fileRouter = {
       console.info("[sdk-demo:onUploadComplete]", { metadata, file });
 
       return {
+        test: "test",
         uploadedBy: metadata.userId,
       };
     })

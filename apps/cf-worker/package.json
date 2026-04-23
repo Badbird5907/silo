@@ -19,6 +19,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@cloudflare/workerd-windows-64": "^1.20260423.1",
     "@cloudflare/workers-types": "^4.20250109.0",
     "@silo-storage/eslint-config": "workspace:*",
     "@silo-storage/prettier-config": "workspace:*",

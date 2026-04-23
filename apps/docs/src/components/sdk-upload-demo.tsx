@@ -147,7 +147,8 @@ export function SdkUploadDemo() {
 
   const upload = useUpload({
     endpoint: "imageUploader",
-    onComplete: () => {
+    onComplete: (result) => {
+      console.log("onComplete", result);
       setUploadError(null);
       void myFilesQuery.refetch();
     },

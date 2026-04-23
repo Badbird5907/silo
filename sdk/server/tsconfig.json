@@ -4,6 +4,7 @@
     "lib": ["ES2022", "WebWorker"],
     "baseUrl": ".",
     "paths": {
+      "@silo-storage/mime-types": ["../../packages/mime-types/src/index.ts"],
       "@silo-storage/sdk-core": ["../core/src/index.ts"]
     }
   },

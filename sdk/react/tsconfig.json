@@ -2,7 +2,11 @@
   "extends": "@silo-storage/tsconfig/compiled-package.json",
   "compilerOptions": {
     "jsx": "preserve",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "baseUrl": ".",
+    "paths": {
+      "@silo-storage/mime-types": ["../../packages/mime-types/src/index.ts"]
+    }
   },
   "include": ["src"],
   "exclude": ["node_modules"]
