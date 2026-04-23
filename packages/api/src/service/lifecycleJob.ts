@@ -281,7 +281,12 @@ async function claimLifecycleJobs(db: Db, options: ClaimOptions) {
     )
     .returning();
 
-  return claimed;
+  const claimedById = new Map(claimed.map((job) => [job.id, job]));
+  return ids
+    .map((id) => claimedById.get(id))
+    .filter(
+      (job): job is NonNullable<typeof job> => job !== undefined,
+    );
 }
 
 export async function requeueDeadLifecycleJobs(
@@ -306,6 +311,10 @@ export async function requeueDeadLifecycleJobs(
             ...Array.from(RETRYABLE_STATUS_CODES),
           ]),
           eq(fileLifecycleJobs.lastErrorCode, "job_exception"),
+          and(
+            eq(fileLifecycleJobs.kind, "finalize_failed_filekey"),
+            eq(fileLifecycleJobs.lastErrorCode, "storage_cleanup_incomplete"),
+          ),
         ),
       ),
     )

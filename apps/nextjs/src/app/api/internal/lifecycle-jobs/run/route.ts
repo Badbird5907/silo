@@ -71,7 +71,11 @@ export async function POST(request: Request) {
 
     const replay = await requeueDeadLifecycleJobs(db, {
       limit: 200,
-      kinds: ["delete_object", "abort_multipart"],
+      kinds: [
+        "delete_object",
+        "abort_multipart",
+        "finalize_failed_filekey",
+      ],
     });
     deadRequeued = replay.requeued;
 
