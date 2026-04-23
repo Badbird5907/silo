@@ -106,7 +106,7 @@ app.get(
 
 // internal routes
 app.delete(
-  "/internal/delete/*",
+  "/internal/delete/:storageKey{.+}",
   requireMainDomain,
   requireCallbackSecret,
   handleInternalDelete,
@@ -124,7 +124,7 @@ app.post(
   handleInternalList,
 );
 app.post(
-  "/internal/get-metadata/*",
+  "/internal/get-metadata/:storageKey{.+}",
   requireMainDomain,
   requireCallbackSecret,
   handleInternalMetadata,
