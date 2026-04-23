@@ -56,11 +56,11 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Publishing SDK version $VERSION"
 
-      - name: Apply SDK version
-        run: pnpm sdk:set-version ${{ steps.version.outputs.version }}
-
       - name: Install dependencies
         run: pnpm install
+
+      - name: Apply SDK version
+        run: pnpm sdk:set-version ${{ steps.version.outputs.version }}
 
       - name: Build SDK packages
         run: pnpm sdk:build
