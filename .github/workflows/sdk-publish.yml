@@ -1,0 +1,74 @@
+name: Publish SDK Packages
+
+on:
+  push:
+    tags:
+      - "v*"
+      - "sdk-v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Semver version to publish for all SDK packages"
+        required: true
+        type: string
+
+concurrency:
+  group: sdk-publish-${{ github.ref_name || github.event.inputs.version || github.run_id }}
+  cancel-in-progress: false
+
+env:
+  FORCE_COLOR: 3
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+            VERSION="${TAG#sdk-v}"
+            VERSION="${VERSION#v}"
+          fi
+
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid SDK version: $VERSION" >&2
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Publishing SDK version $VERSION"
+
+      - name: Apply SDK version
+        run: pnpm sdk:set-version ${{ steps.version.outputs.version }}
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build SDK packages
+        run: pnpm sdk:build
+
+      - name: Typecheck SDK packages
+        run: pnpm sdk:typecheck
+
+      - name: Publish SDK packages
+        run: pnpm sdk:publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
