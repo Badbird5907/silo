@@ -1,6 +1,6 @@
 {
   "name": "@silo-storage/sdk-server",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -29,8 +29,8 @@
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
-    "@silo-storage/mime-types": "0.1.0",
-    "@silo-storage/sdk-core": "0.1.0",
+    "@silo-storage/mime-types": "0.1.1",
+    "@silo-storage/sdk-core": "0.1.1",
     "ms": "3.0.0-canary.202508261828",
     "zod": "^4.3.6"
   },

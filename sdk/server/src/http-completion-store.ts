@@ -12,6 +12,7 @@ export interface CreateHttpCompletionStoreOptions {
   fetchImpl?: typeof fetch;
   headers?: HeadersInit | (() => HeadersInit | Promise<HeadersInit>);
   pathPrefix?: string;
+  namespace?: string;
 }
 
 function toUrl(baseUrl: string | URL, path: string): URL {
@@ -39,6 +40,7 @@ export function createHttpCompletionStore(
 ): CompletionStore {
   const fetchImpl = options.fetchImpl ?? fetch;
   const pathPrefix = options.pathPrefix ?? "/api/internal/completion";
+  const namespace = options.namespace;
 
   return {
     async set(fileKeyId, value, ttlMs) {
@@ -50,6 +52,7 @@ export function createHttpCompletionStore(
         },
         body: JSON.stringify({
           fileKeyId,
+          namespace,
           completion: value,
           ttlSeconds: Math.max(1, Math.ceil(ttlMs / 1000)),
         }),
@@ -65,6 +68,9 @@ export function createHttpCompletionStore(
     async get(fileKeyId) {
       const url = toUrl(options.baseUrl, `${pathPrefix}/get`);
       url.searchParams.set("fileKeyId", fileKeyId);
+      if (namespace) {
+        url.searchParams.set("namespace", namespace);
+      }
       const response = await fetchImpl(url, {
         method: "GET",
         cache: "no-store",
@@ -84,6 +90,9 @@ export function createHttpCompletionStore(
       const url = toUrl(options.baseUrl, `${pathPrefix}/wait`);
       url.searchParams.set("fileKeyId", fileKeyId);
       url.searchParams.set("timeoutMs", String(Math.max(1, timeoutMs)));
+      if (namespace) {
+        url.searchParams.set("namespace", namespace);
+      }
       const response = await fetchImpl(url, {
         method: "GET",
         cache: "no-store",

@@ -5,6 +5,7 @@ import { waitForCompletionRecord } from "@/lib/upload/completion";
 
 const querySchema = z.object({
   fileKeyId: z.string().min(1),
+  namespace: z.string().min(1).optional(),
   timeoutMs: z.coerce.number().int().positive().max(120_000).optional(),
 });
 
@@ -30,7 +31,11 @@ export async function GET(request: Request) {
   }
 
   const timeoutMs = parsed.data.timeoutMs ?? 20_000;
-  const completion = await waitForCompletionRecord(parsed.data.fileKeyId, timeoutMs);
+  const completion = await waitForCompletionRecord(
+    parsed.data.fileKeyId,
+    timeoutMs,
+    parsed.data.namespace,
+  );
 
   if (!completion) {
     return new Response(

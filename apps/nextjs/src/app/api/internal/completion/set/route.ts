@@ -5,6 +5,7 @@ import { setCompletionRecord } from "@/lib/upload/completion";
 
 const requestSchema = z.object({
   fileKeyId: z.string().min(1),
+  namespace: z.string().min(1).optional(),
   completion: z
     .object({
       contractVersion: z.number().int().positive().optional(),
@@ -39,6 +40,7 @@ export async function POST(request: Request) {
 
   const record = await setCompletionRecord({
     fileKeyId: parsed.data.fileKeyId,
+    namespace: parsed.data.namespace,
     completion: parsed.data.completion,
     ttlSeconds: parsed.data.ttlSeconds,
   });

@@ -159,6 +159,7 @@ export interface CreateFetchRouteHandlerOptions<
   completionStoreUrl?: string | URL;
   completionStoreAuthToken?: string;
   completionStorePathPrefix?: string;
+  completionNamespace?: string;
 }
 
 interface FetchRouteHandlers {
@@ -191,12 +192,14 @@ export function createFetchRouteHandler<
     options.completionStoreAuthToken ?? options.core.config.apiKey;
   const completionStorePathPrefix =
     options.completionStorePathPrefix ?? "/api/v1/completion";
+  const completionNamespace = options.completionNamespace ?? "sdk-route-handler";
   const completionStore =
     options.completionStore ??
     (completionStoreUrl
       ? createHttpCompletionStore({
           baseUrl: completionStoreUrl,
           pathPrefix: completionStorePathPrefix,
+          namespace: completionNamespace,
           headers: completionStoreAuthToken
             ? {
                 Authorization: `Bearer ${completionStoreAuthToken}`,

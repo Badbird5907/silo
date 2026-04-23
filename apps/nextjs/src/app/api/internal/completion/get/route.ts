@@ -1,17 +1,26 @@
+import { z } from "zod";
+
 import { isCallbackAuthorized } from "@/lib/internal/callback-auth";
 import { getCompletionRecord } from "@/lib/upload/completion";
+
+const querySchema = z.object({
+  fileKeyId: z.string().min(1),
+  namespace: z.string().min(1).optional(),
+});
 
 export async function GET(request: Request) {
   if (!isCallbackAuthorized(request)) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const url = new URL(request.url);
-  const fileKeyId = url.searchParams.get("fileKeyId");
-  if (!fileKeyId) {
+  const parsed = querySchema.safeParse(
+    Object.fromEntries(new URL(request.url).searchParams.entries()),
+  );
+  if (!parsed.success) {
     return new Response(
       JSON.stringify({
-        error: "Missing fileKeyId query param",
+        error: "Invalid query params",
+        details: parsed.error.issues,
       }),
       {
         status: 400,
@@ -20,7 +29,10 @@ export async function GET(request: Request) {
     );
   }
 
-  const completion = await getCompletionRecord(fileKeyId);
+  const completion = await getCompletionRecord(
+    parsed.data.fileKeyId,
+    parsed.data.namespace,
+  );
   if (!completion) {
     return new Response(
       JSON.stringify({

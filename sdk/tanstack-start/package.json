@@ -1,6 +1,6 @@
 {
   "name": "@silo-storage/sdk-tanstack-start",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -28,12 +28,12 @@
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
-    "@silo-storage/sdk-server": "0.1.0"
+    "@silo-storage/sdk-server": "0.1.1"
   },
   "devDependencies": {
     "@silo-storage/eslint-config": "0.1.0",
     "@silo-storage/prettier-config": "0.1.0",
-    "@silo-storage/sdk-core": "0.1.0",
+    "@silo-storage/sdk-core": "0.1.1",
     "@silo-storage/tsconfig": "0.1.0",
     "eslint": "^9.38.0",
     "prettier": "^3.6.2",

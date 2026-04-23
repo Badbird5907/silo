@@ -589,6 +589,7 @@ export async function POST(request: Request) {
       try {
         await setCompletionRecord({
           fileKeyId: data.fileKeyId,
+          namespace: "default",
           completion: {
             contractVersion: 1,
             source: "nextjs.internal.callback",

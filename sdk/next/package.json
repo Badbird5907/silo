@@ -1,6 +1,6 @@
 {
   "name": "@silo-storage/sdk-next",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -28,7 +28,7 @@
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
-    "@silo-storage/sdk-server": "0.1.0"
+    "@silo-storage/sdk-server": "0.1.1"
   },
   "devDependencies": {
     "@silo-storage/eslint-config": "0.1.0",

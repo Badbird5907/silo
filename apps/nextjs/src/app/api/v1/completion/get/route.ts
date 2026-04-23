@@ -8,6 +8,7 @@ import { getCompletionRecord } from "@/lib/upload/completion";
 
 const querySchema = z.object({
   fileKeyId: z.string().min(1),
+  namespace: z.string().min(1).optional(),
 });
 
 export async function GET(request: Request) {
@@ -40,7 +41,10 @@ export async function GET(request: Request) {
     );
   }
 
-  const completion = await getCompletionRecord(parsed.data.fileKeyId);
+  const completion = await getCompletionRecord(
+    parsed.data.fileKeyId,
+    parsed.data.namespace,
+  );
   if (!completion) {
     return new Response(
       JSON.stringify({
