@@ -1001,55 +1001,6 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  test-silo-app:
-    dependencies:
-      '@silo-storage/sdk-core':
-        specifier: link:../sdk/core
-        version: link:../sdk/core
-      '@silo-storage/sdk-next':
-        specifier: link:../sdk/next
-        version: link:../sdk/next
-      '@silo-storage/sdk-react':
-        specifier: link:../sdk/react
-        version: link:../sdk/react
-      '@silo-storage/sdk-server':
-        specifier: link:../sdk/server
-        version: link:../sdk/server
-      next:
-        specifier: 16.1.6
-        version: 16.1.6(@babel/core@7.28.6)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
-      react:
-        specifier: catalog:react19
-        version: 19.2.3
-      react-dom:
-        specifier: catalog:react19
-        version: 19.2.3(react@19.2.3)
-    devDependencies:
-      '@tailwindcss/postcss':
-        specifier: 'catalog:'
-        version: 4.1.18
-      '@types/node':
-        specifier: 'catalog:'
-        version: 22.19.2
-      '@types/react':
-        specifier: catalog:react19
-        version: 19.2.10
-      '@types/react-dom':
-        specifier: catalog:react19
-        version: 19.2.3(@types/react@19.2.10)
-      eslint:
-        specifier: 'catalog:'
-        version: 9.39.2(jiti@2.6.1)
-      eslint-config-next:
-        specifier: 16.1.6
-        version: 16.1.6(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
-      tailwindcss:
-        specifier: 'catalog:'
-        version: 4.1.18
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
-
   tooling/eslint:
     dependencies:
       '@eslint/compat':
