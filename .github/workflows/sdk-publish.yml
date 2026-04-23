@@ -70,5 +70,3 @@ jobs:
 
       - name: Publish SDK packages
         run: pnpm sdk:publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
