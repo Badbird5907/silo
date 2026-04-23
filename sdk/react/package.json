@@ -1,6 +1,6 @@
 {
   "name": "@silo-storage/sdk-react",
-  "version": "0.1.1",
+  "version": "0.0.0-alpha.0",
   "type": "module",
   "types": "./dist/index.d.ts",
   "license": "MIT",
@@ -44,7 +44,7 @@
   },
   "prettier": "@silo-storage/prettier-config",
   "dependencies": {
-    "@silo-storage/mime-types": "0.1.1",
+    "@silo-storage/mime-types": "0.0.0-alpha.0",
     "tus-js-client": "^4.3.1"
   }
 }

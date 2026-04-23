@@ -1,6 +1,6 @@
 {
   "name": "@silo-storage/sdk-core",
-  "version": "0.1.1",
+  "version": "0.0.0-alpha.0",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -28,7 +28,7 @@
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
-    "@silo-storage/shared": "0.1.1",
+    "@silo-storage/shared": "0.0.0-alpha.0",
     "nanoid": "^5.1.6",
     "zod": "^4.3.6"
   },
