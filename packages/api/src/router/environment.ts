@@ -478,7 +478,7 @@ export const environmentRouter = {
         await recordAuditEvent(ctx.db, {
           organizationId: ctx.organizationId,
           projectId: environment.projectId,
-          environmentId: input.id,
+          environmentId: null,
           clientIp: ctx.clientIp,
           ...buildUserAuditActor({
             userId: ctx.session.user.id,

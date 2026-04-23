@@ -255,7 +255,7 @@ export const projectRouter = {
       if (deleted) {
         await recordAuditEvent(ctx.db, {
           organizationId: ctx.organizationId,
-          projectId: input.id,
+          projectId: null,
           clientIp: ctx.clientIp,
           ...buildUserAuditActor({
             userId: ctx.session.user.id,
