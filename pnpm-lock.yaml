@@ -820,7 +820,7 @@ importers:
   sdk/core:
     dependencies:
       '@silo-storage/shared':
-        specifier: 0.1.0
+        specifier: 0.1.1
         version: link:../../packages/shared
       nanoid:
         specifier: ^5.1.6
@@ -854,7 +854,7 @@ importers:
   sdk/next:
     dependencies:
       '@silo-storage/sdk-server':
-        specifier: 0.1.0
+        specifier: 0.1.1
         version: link:../server
       next:
         specifier: '>=14.0.0'
@@ -885,7 +885,7 @@ importers:
   sdk/react:
     dependencies:
       '@silo-storage/mime-types':
-        specifier: 0.1.0
+        specifier: 0.1.1
         version: link:../../packages/mime-types
       tus-js-client:
         specifier: ^4.3.1
@@ -922,10 +922,10 @@ importers:
   sdk/server:
     dependencies:
       '@silo-storage/mime-types':
-        specifier: 0.1.0
+        specifier: 0.1.1
         version: link:../../packages/mime-types
       '@silo-storage/sdk-core':
-        specifier: 0.1.0
+        specifier: 0.1.1
         version: link:../core
       ms:
         specifier: 3.0.0-canary.202508261828
@@ -962,7 +962,7 @@ importers:
   sdk/tanstack-start:
     dependencies:
       '@silo-storage/sdk-server':
-        specifier: 0.1.0
+        specifier: 0.1.1
         version: link:../server
     devDependencies:
       '@silo-storage/eslint-config':
@@ -972,7 +972,7 @@ importers:
         specifier: 0.1.0
         version: link:../../tooling/prettier
       '@silo-storage/sdk-core':
-        specifier: 0.1.0
+        specifier: 0.1.1
         version: link:../core
       '@silo-storage/tsconfig':
         specifier: 0.1.0
