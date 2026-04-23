@@ -8,6 +8,7 @@
  */
 import type { Auth, PermissionCheck, Session } from "@silo-storage/auth";
 import type { Redis } from "@upstash/redis";
+import type { TRPCProcedureBuilder, TRPCUnsetMarker } from "@trpc/server";
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { z, ZodError } from "zod/v4";
@@ -18,6 +19,15 @@ import { db } from "@silo-storage/db/client";
 import { members, organizations } from "@silo-storage/db/schema";
 import { redis } from "@silo-storage/redis";
 import { getClientIpFromHeaders } from "@silo-storage/shared";
+
+type AuthApi = Auth["api"];
+export type TRPCContext = {
+  authApi: AuthApi;
+  session: Session | null;
+  db: typeof db;
+  redis: Redis;
+  clientIp: string | null;
+};
 
 /**
  * 1. CONTEXT
@@ -35,13 +45,7 @@ import { getClientIpFromHeaders } from "@silo-storage/shared";
 export async function createTRPCContext(opts: {
   headers: Headers;
   auth: Auth;
-}): Promise<{
-  authApi: Auth["api"];
-  session: Session | null;
-  db: typeof db;
-  redis: Redis;
-  clientIp: string | null;
-}> {
+}): Promise<TRPCContext> {
   const authApi = opts.auth.api;
   const session = await authApi.getSession({
     headers: opts.headers,
@@ -55,13 +59,35 @@ export async function createTRPCContext(opts: {
   };
 }
 
+type AuthenticatedSession = Session & {
+  user: NonNullable<Session["user"]>;
+};
+
+type OrganizationProcedureContext = {
+  session: AuthenticatedSession;
+  organizationId: string;
+  organization: typeof organizations.$inferSelect;
+  membership: typeof members.$inferSelect;
+};
+
+type OrganizationProcedure = TRPCProcedureBuilder<
+  TRPCContext,
+  object,
+  OrganizationProcedureContext,
+  { organizationId: string },
+  { organizationId: string },
+  TRPCUnsetMarker,
+  TRPCUnsetMarker,
+  false
+>;
+
 /**
  * 2. INITIALIZATION
  *
  * This is where the trpc api is initialized, connecting the context and
  * transformer
  */
-const t = initTRPC.context<typeof createTRPCContext>().create({
+const t = initTRPC.context<TRPCContext>().create({
   transformer: superjson,
   errorFormatter: ({ shape, error }) => ({
     ...shape,
@@ -134,10 +160,13 @@ export const protectedProcedure = t.procedure
     if (!ctx.session?.user) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
     }
+
+    const session = ctx.session as AuthenticatedSession;
+
     return next({
       ctx: {
         // infers the `session` as non-nullable
-        session: { ...ctx.session, user: ctx.session.user },
+        session,
       },
     });
   });
@@ -152,7 +181,7 @@ export const protectedProcedure = t.procedure
  *
  * The organizationId and membership are added to the context.
  */
-export const organizationProcedure = protectedProcedure
+export const organizationProcedure: OrganizationProcedure = protectedProcedure
   .input(z.object({ organizationId: z.string() }))
   .use(async ({ ctx, input, next }) => {
     // Get the organization
