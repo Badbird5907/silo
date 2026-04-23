@@ -45,8 +45,8 @@ export function ProjectSwitcher() {
   const [createOrgOpen, setCreateOrgOpen] = React.useState(false);
   const { isMobile } = useSidebar();
   const router = useRouter();
-  const params = useParams<{ orgSlug?: string; projectId?: string }>();
-  const projectId = params.projectId;
+  const params = useParams<{ orgSlug?: string; projectSlug?: string }>();
+  const projectSlug = params.projectSlug;
   const trpc = useTRPC();
 
   const {
@@ -67,21 +67,21 @@ export function ProjectSwitcher() {
   );
 
   const currentProjectQuery = useQuery(
-    trpc.project.getById.queryOptions(
-      { id: projectId ?? "", organizationId },
-      { enabled: !!projectId && !!organizationId },
+    trpc.project.getBySlug.queryOptions(
+      { slug: projectSlug ?? "", organizationId },
+      { enabled: !!projectSlug && !!organizationId },
     ),
   );
 
   const projects = projectsQuery.data ?? [];
   const currentProject = currentProjectQuery.data ?? null;
 
-  if (!projectId || !currentProject) {
+  if (!projectSlug || !currentProject) {
     return null;
   }
 
-  const handleProjectChange = (project: { id: string }) => {
-    router.push(`/${orgSlug}/p/${project.id}`);
+  const handleProjectChange = (project: { slug: string }) => {
+    router.push(`/${orgSlug}/p/${project.slug}`);
   };
 
   return (
@@ -127,7 +127,7 @@ export function ProjectSwitcher() {
                     <FolderKanban className="size-3.5 shrink-0" />
                   </div>
                   <span className="flex-1 truncate">{project.name}</span>
-                  {project.id === projectId && (
+                  {project.slug === projectSlug && (
                     <Check className="text-primary size-4" />
                   )}
                 </DropdownMenuItem>
@@ -139,7 +139,7 @@ export function ProjectSwitcher() {
               )}
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild className="gap-2 p-2">
-                <Link href={`/${orgSlug}/p/${projectId}/settings`}>
+                <Link href={`/${orgSlug}/p/${projectSlug}/settings`}>
                   <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
                     <Settings className="size-3.5" />
                   </div>

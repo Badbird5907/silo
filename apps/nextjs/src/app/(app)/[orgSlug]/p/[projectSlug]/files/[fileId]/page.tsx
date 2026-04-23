@@ -65,7 +65,7 @@ import { EnvBadge } from "@/components/env-badge";
 interface FileDetailPageProps {
   params: Promise<{
     orgSlug: string;
-    projectId: string;
+    projectSlug: string;
     fileId: string;
     environment?: string;
   }>;
@@ -232,7 +232,7 @@ export default function FileDetailPage({ params }: FileDetailPageProps) {
   const queryClient = useQueryClient();
   const {
     fileId,
-    projectId,
+    projectSlug,
     orgSlug,
     environment: environmentSlug,
   } = use(params);
@@ -244,11 +244,12 @@ export default function FileDetailPage({ params }: FileDetailPageProps) {
   const [isLoadingUrl, setIsLoadingUrl] = React.useState(false);
 
   const projectQuery = useQuery(
-    trpc.project.getById.queryOptions(
-      { id: projectId, organizationId },
-      { enabled: !!organizationId },
+    trpc.project.getBySlug.queryOptions(
+      { slug: projectSlug, organizationId },
+      { enabled: !!organizationId && !!projectSlug },
     ),
   );
+  const projectId = projectQuery.data?.id ?? "";
 
   const environmentsQuery = useQuery(
     trpc.environment.list.queryOptions(
@@ -260,13 +261,13 @@ export default function FileDetailPage({ params }: FileDetailPageProps) {
     (env) => env.slug === environmentSlug,
   );
   const projectBasePath = selectedEnvironment
-    ? `/${orgSlug}/p/${projectId}/e/${selectedEnvironment.slug}`
-    : `/${orgSlug}/p/${projectId}`;
+    ? `/${orgSlug}/p/${projectSlug}/e/${selectedEnvironment.slug}`
+    : `/${orgSlug}/p/${projectSlug}`;
 
   const fileKeyQuery = useQuery(
     trpc.fileKey.getById.queryOptions(
       { id: fileId, projectId, organizationId },
-      { enabled: !!organizationId },
+      { enabled: !!organizationId && !!projectId },
     ),
   );
 

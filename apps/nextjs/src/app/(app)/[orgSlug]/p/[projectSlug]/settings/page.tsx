@@ -24,7 +24,7 @@ import { useTRPC } from "@/trpc/react";
 interface ProjectSettingsPageProps {
   params: Promise<{
     orgSlug: string;
-    projectId: string;
+    projectSlug: string;
   }>;
 }
 
@@ -37,16 +37,16 @@ export default function ProjectSettingsPage({
   const searchParams = useSearchParams();
   const { organization } = useOrganization();
   const organizationId = organization?.id ?? "";
-  const { orgSlug } = use(params);
-  const { projectId } = use(params);
+  const { orgSlug, projectSlug } = use(params);
   const shouldAutoOpenWizard = searchParams.get("createDevEnv") === "1";
 
   const projectQuery = useQuery(
-    trpc.project.getById.queryOptions(
-      { id: projectId, organizationId },
-      { enabled: !!organizationId },
+    trpc.project.getBySlug.queryOptions(
+      { slug: projectSlug, organizationId },
+      { enabled: !!organizationId && !!projectSlug },
     ),
   );
+  const projectId = projectQuery.data?.id ?? "";
 
   if (projectQuery.isLoading || !organizationId) {
     return (

@@ -66,7 +66,7 @@ type AuditListData = RouterOutputs["audit"]["list"];
 interface AuditPageProps {
   params: Promise<{
     orgSlug: string;
-    projectId: string;
+    projectSlug: string;
     environment?: string;
   }>;
 }
@@ -141,7 +141,7 @@ export default function AuditPage({ params }: AuditPageProps) {
   const { organization } = useOrganization();
   const organizationId = organization?.id ?? "";
 
-  const { projectId, environment: environmentSlug } = use(params);
+  const { projectSlug, environment: environmentSlug } = use(params);
 
   const page = parsePositiveInt(searchParams.get("page"), 1);
   const pageSize = parsePositiveInt(searchParams.get("pageSize"), 20);
@@ -251,11 +251,12 @@ export default function AuditPage({ params }: AuditPageProps) {
   }, [debouncedClientIp, updateQueryParams, urlClientIpQuery]);
 
   const projectQuery = useQuery(
-    trpc.project.getById.queryOptions(
-      { id: projectId, organizationId },
-      { enabled: !!organizationId && !!projectId },
+    trpc.project.getBySlug.queryOptions(
+      { slug: projectSlug, organizationId },
+      { enabled: !!organizationId && !!projectSlug },
     ),
   );
+  const projectId = projectQuery.data?.id ?? "";
 
   const environmentsQuery = useQuery(
     trpc.environment.list.queryOptions(

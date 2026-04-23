@@ -132,25 +132,26 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const organizationId = organization?.id ?? "";
 
   const projectMatch = /^\/[^/]+\/p\/([^/]+)(?:\/e\/([^/]+))?/.exec(pathname);
-  const currentProjectId = projectMatch?.[1];
+  const currentProjectSlug = projectMatch?.[1];
   const currentEnvironmentSlug = projectMatch?.[2];
-  const isInProject = !!currentProjectId;
-  const projectBasePath = currentProjectId
+  const isInProject = !!currentProjectSlug;
+  const projectBasePath = currentProjectSlug
     ? currentEnvironmentSlug
-      ? `/${orgSlug}/p/${currentProjectId}/e/${currentEnvironmentSlug}`
-      : `/${orgSlug}/p/${currentProjectId}`
+      ? `/${orgSlug}/p/${currentProjectSlug}/e/${currentEnvironmentSlug}`
+      : `/${orgSlug}/p/${currentProjectSlug}`
     : "";
+
+  const currentProjectQuery = useQuery(
+    trpc.project.getBySlug.queryOptions(
+      { slug: currentProjectSlug ?? "", organizationId },
+      { enabled: !!organizationId && !!currentProjectSlug },
+    ),
+  );
+  const currentProjectId = currentProjectQuery.data?.id;
 
   const environmentsQuery = useQuery(
     trpc.environment.list.queryOptions(
       { organizationId, projectId: currentProjectId ?? "" },
-      { enabled: !!organizationId && !!currentProjectId },
-    ),
-  );
-
-  const currentProjectQuery = useQuery(
-    trpc.project.getById.queryOptions(
-      { id: currentProjectId ?? "", organizationId },
       { enabled: !!organizationId && !!currentProjectId },
     ),
   );
@@ -166,7 +167,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     () =>
       (projectsQuery.data ?? []).map((project) => ({
         title: project.name,
-        url: `/${orgSlug}/p/${project.id}`,
+        url: `/${orgSlug}/p/${project.slug}`,
       })),
     [orgSlug, projectsQuery.data],
   );
@@ -201,18 +202,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     : null;
 
   const handleEnvironmentChange = (environmentSlug: string) => {
-    if (!currentProjectId || !orgSlug) return;
+    if (!currentProjectSlug || !orgSlug) return;
     const nextBase =
       environmentSlug === "__none__"
-        ? `/${orgSlug}/p/${currentProjectId}`
-        : `/${orgSlug}/p/${currentProjectId}/e/${environmentSlug}`;
+        ? `/${orgSlug}/p/${currentProjectSlug}`
+        : `/${orgSlug}/p/${currentProjectSlug}/e/${environmentSlug}`;
     const nextSuffix = pathname.replace(/^\/[^/]+\/p\/[^/]+(?:\/e\/[^/]+)?/, "");
     router.push(`${nextBase}${nextSuffix}`);
   };
 
   const handleCreateMyDevEnvironment = () => {
-    if (!currentProjectId || !orgSlug) return;
-    router.push(`/${orgSlug}/p/${currentProjectId}/settings?createDevEnv=1`);
+    if (!currentProjectSlug || !orgSlug) return;
+    router.push(`/${orgSlug}/p/${currentProjectSlug}/settings?createDevEnv=1`);
   };
 
   const hasOwnDevEnv = React.useMemo(() => {
@@ -227,7 +228,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const showProjectSwitcherSkeleton =
     isInProject &&
-    !!currentProjectId &&
+    !!currentProjectSlug &&
     !!orgSlug &&
     (!organization?.id ||
       (currentProjectQuery.isPending && !currentProjectQuery.isError));

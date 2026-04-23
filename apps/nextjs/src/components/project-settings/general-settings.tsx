@@ -136,6 +136,17 @@ export function ProjectGeneralSettings({
             organizationId,
           }),
         });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.project.getBySlug.queryKey({
+            slug: project.slug,
+            organizationId,
+          }),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.project.list.queryKey({
+            organizationId,
+          }),
+        });
       },
       onError: (error: { message?: string }) => {
         toast.error(error.message ?? "Failed to update project");

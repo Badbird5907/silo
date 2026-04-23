@@ -188,7 +188,7 @@ export function ProjectsPageClient() {
                   {filteredProjects.map((project) => (
                     <Link
                       key={project.id}
-                      href={`/${orgSlug}/p/${project.id}`}
+                      href={`/${orgSlug}/p/${project.slug}`}
                       className="hover:bg-muted/50 group flex items-center justify-between px-6 py-4 transition-colors"
                     >
                       <div className="min-w-0">

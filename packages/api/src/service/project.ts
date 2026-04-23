@@ -73,6 +73,12 @@ export async function getProjectById(db: Db, projectId: string) {
   });
 }
 
+export async function getProjectBySlug(db: Db, projectSlug: string) {
+  return db.query.projects.findFirst({
+    where: eq(projects.slug, projectSlug),
+  });
+}
+
 export async function createProject(
   db: Db,
   input: { name: string; slug: string; organizationId: string },

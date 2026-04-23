@@ -71,10 +71,10 @@ import { useIsMobile } from "@silo-storage/ui/hooks/use-mobile";
 import { cn } from "@silo-storage/ui/lib/utils";
 
 import { getDownloadUrl } from "@/actions/file";
-import { StorageChart } from "@/app/(app)/[orgSlug]/p/[projectId]/files/chart";
-import { StoredFilesChart } from "@/app/(app)/[orgSlug]/p/[projectId]/files/stored-files-chart";
-import { UploadActivityChart } from "@/app/(app)/[orgSlug]/p/[projectId]/files/upload-chart";
-import { UploadOutcomeRateChart } from "@/app/(app)/[orgSlug]/p/[projectId]/files/upload-outcome-rate-chart";
+import { StorageChart } from "@/app/(app)/[orgSlug]/p/[projectSlug]/files/chart";
+import { StoredFilesChart } from "@/app/(app)/[orgSlug]/p/[projectSlug]/files/stored-files-chart";
+import { UploadActivityChart } from "@/app/(app)/[orgSlug]/p/[projectSlug]/files/upload-chart";
+import { UploadOutcomeRateChart } from "@/app/(app)/[orgSlug]/p/[projectSlug]/files/upload-outcome-rate-chart";
 import { FileStatusBadge } from "@/components/file-status-badge";
 import { UploadDialog } from "@/components/upload-dialog";
 import { useOrganization } from "@/hooks/use-organization";
@@ -84,7 +84,7 @@ import { EnvBadge } from "@/components/env-badge";
 interface FilesPageProps {
   params: Promise<{
     orgSlug: string;
-    projectId: string;
+    projectSlug: string;
     environment?: string;
   }>;
 }
@@ -288,7 +288,7 @@ export default function FilesPage({ params }: FilesPageProps) {
   const isMobile = useIsMobile();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { projectId, orgSlug, environment: environmentSlug } = use(params);
+  const { projectSlug, orgSlug, environment: environmentSlug } = use(params);
   const { organization } = useOrganization();
   const organizationId = organization?.id ?? "";
 
@@ -333,11 +333,12 @@ export default function FilesPage({ params }: FilesPageProps) {
   ]);
 
   const projectQuery = useQuery(
-    trpc.project.getById.queryOptions(
-      { id: projectId, organizationId },
-      { enabled: !!organizationId },
+    trpc.project.getBySlug.queryOptions(
+      { slug: projectSlug, organizationId },
+      { enabled: !!organizationId && !!projectSlug },
     ),
   );
+  const projectId = projectQuery.data?.id ?? "";
 
   const environmentsQuery = useQuery(
     trpc.environment.list.queryOptions(
@@ -351,8 +352,8 @@ export default function FilesPage({ params }: FilesPageProps) {
   );
   const selectedEnvironmentId = selectedEnvironment?.id;
   const projectBasePath = selectedEnvironment
-    ? `/${orgSlug}/p/${projectId}/e/${selectedEnvironment.slug}`
-    : `/${orgSlug}/p/${projectId}`;
+    ? `/${orgSlug}/p/${projectSlug}/e/${selectedEnvironment.slug}`
+    : `/${orgSlug}/p/${projectSlug}`;
 
   React.useEffect(() => {
     if (selectedEnvironmentId) {
@@ -381,20 +382,20 @@ export default function FilesPage({ params }: FilesPageProps) {
         sortBy,
         sortOrder,
       },
-      { enabled: !!organizationId },
+      { enabled: !!organizationId && !!projectId },
     ),
   );
 
   const filterOptionsQuery = useQuery(
     trpc.fileKey.getFilterOptions.queryOptions(
       { organizationId, projectId, environmentId },
-      { enabled: !!organizationId },
+      { enabled: !!organizationId && !!projectId },
     ),
   );
   const fileStatsQuery = useQuery(
     trpc.fileKey.getStats.queryOptions(
       { organizationId, projectId, environmentId },
-      { enabled: !!organizationId },
+      { enabled: !!organizationId && !!projectId },
     ),
   );
 

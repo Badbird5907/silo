@@ -1,6 +1,6 @@
 "use client";
 
-import AuditPage from "@/app/(app)/[orgSlug]/p/[projectId]/audit/page";
+import AuditPage from "@/app/(app)/[orgSlug]/p/[projectSlug]/audit/page";
 
 type AuditPageProps = Parameters<typeof AuditPage>[0];
 

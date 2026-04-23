@@ -12,6 +12,7 @@ import {
   createProject,
   deleteProject,
   getProjectById,
+  getProjectBySlug,
   listProjects,
   updateProject,
 } from "../service/project";
@@ -29,6 +30,29 @@ export const projectRouter = {
     .use(requirePermission({ project: ["read"] }))
     .query(async ({ ctx, input }) => {
       const project = await getProjectById(ctx.db, input.id);
+
+      if (!project) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
+      }
+
+      if (project.parentOrganizationId !== ctx.organizationId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You don't have access to this project",
+        });
+      }
+
+      return project;
+    }),
+
+  getBySlug: organizationProcedure
+    .input(z.object({ slug: z.string() }))
+    .use(requirePermission({ project: ["read"] }))
+    .query(async ({ ctx, input }) => {
+      const project = await getProjectBySlug(ctx.db, input.slug);
 
       if (!project) {
         throw new TRPCError({

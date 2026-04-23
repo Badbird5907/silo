@@ -1,6 +1,6 @@
 "use client";
 
-import FileDetailsPage from "@/app/(app)/[orgSlug]/p/[projectId]/files/[fileId]/page";
+import FileDetailsPage from "@/app/(app)/[orgSlug]/p/[projectSlug]/files/[fileId]/page";
 
 type FileDetailsPageProps = Parameters<typeof FileDetailsPage>[0];
 

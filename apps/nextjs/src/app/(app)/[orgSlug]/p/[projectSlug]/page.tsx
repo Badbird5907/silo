@@ -45,7 +45,7 @@ import { useTRPC } from "@/trpc/react";
 interface ProjectPageProps {
   params: Promise<{
     orgSlug: string;
-    projectId: string;
+    projectSlug: string;
     environment?: string;
   }>;
 }
@@ -141,14 +141,15 @@ export default function ProjectPage({ params }: ProjectPageProps) {
   const { organization } = useOrganization();
   const organizationId = organization?.id ?? "";
 
-  const { projectId, orgSlug, environment: environmentSlug } = use(params);
+  const { projectSlug, orgSlug, environment: environmentSlug } = use(params);
 
   const projectQuery = useQuery(
-    trpc.project.getById.queryOptions(
-      { id: projectId, organizationId },
-      { enabled: !!organizationId },
+    trpc.project.getBySlug.queryOptions(
+      { slug: projectSlug, organizationId },
+      { enabled: !!organizationId && !!projectSlug },
     ),
   );
+  const projectId = projectQuery.data?.id ?? "";
   const environmentsQuery = useQuery(
     trpc.environment.list.queryOptions(
       { projectId, organizationId },
@@ -238,8 +239,8 @@ export default function ProjectPage({ params }: ProjectPageProps) {
   const environments = environmentsQuery.data ?? [];
   const recentEvents = recentEventsQuery.data ?? [];
   const projectBasePath = selectedEnvironment
-    ? `/${orgSlug}/p/${projectId}/e/${selectedEnvironment.slug}`
-    : `/${orgSlug}/p/${projectId}`;
+    ? `/${orgSlug}/p/${projectSlug}/e/${selectedEnvironment.slug}`
+    : `/${orgSlug}/p/${projectSlug}`;
 
   const totalBytes = stats.storage.totalBytes;
   const uploadBytes = stats.totals.bytesUploaded;

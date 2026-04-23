@@ -42,7 +42,7 @@ import { formatDateParam } from "@/lib/format";
 interface AnalyticsPageProps {
   params: Promise<{
     orgSlug: string;
-    projectId: string;
+    projectSlug: string;
     environment?: string;
   }>;
 }
@@ -136,14 +136,15 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
     getDefaultAnalyticsRange(),
   );
 
-  const { projectId, environment: environmentSlug } = use(params);
+  const { projectSlug, environment: environmentSlug } = use(params);
 
   const projectQuery = useQuery(
-    trpc.project.getById.queryOptions(
-      { id: projectId, organizationId },
-      { enabled: !!organizationId },
+    trpc.project.getBySlug.queryOptions(
+      { slug: projectSlug, organizationId },
+      { enabled: !!organizationId && !!projectSlug },
     ),
   );
+  const projectId = projectQuery.data?.id ?? "";
 
   const environmentsQuery = useQuery(
     trpc.environment.list.queryOptions(

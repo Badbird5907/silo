@@ -1,6 +1,6 @@
 "use client";
 
-import AnalyticsPage from "@/app/(app)/[orgSlug]/p/[projectId]/analytics/page";
+import AnalyticsPage from "@/app/(app)/[orgSlug]/p/[projectSlug]/analytics/page";
 
 type AnalyticsPageProps = Parameters<typeof AnalyticsPage>[0];
 
