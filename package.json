@@ -26,8 +26,10 @@
     "lint:ws": "pnpm dlx sherif@latest",
     "preinstall": "pnpm auto-export",
     "postinstall": "pnpm lint:ws",
-    "sdk:build": "pnpm --filter @silo-storage/sdk-core --filter @silo-storage/sdk-server --filter @silo-storage/sdk-next --filter @silo-storage/sdk-tanstack-start --filter @silo-storage/sdk-react build",
-    "sdk:typecheck": "pnpm --filter @silo-storage/sdk-core --filter @silo-storage/sdk-server --filter @silo-storage/sdk-next --filter @silo-storage/sdk-tanstack-start --filter @silo-storage/sdk-react typecheck",
+    "sdk:build": "pnpm --filter @silo-storage/shared --filter @silo-storage/mime-types --filter @silo-storage/sdk-core --filter @silo-storage/sdk-server --filter @silo-storage/sdk-next --filter @silo-storage/sdk-tanstack-start --filter @silo-storage/sdk-react build",
+    "sdk:publish": "pnpm -r --filter @silo-storage/shared --filter @silo-storage/mime-types --filter @silo-storage/sdk-core --filter @silo-storage/sdk-server --filter @silo-storage/sdk-react --filter @silo-storage/sdk-next --filter @silo-storage/sdk-tanstack-start publish --access public --no-git-checks",
+    "sdk:publish:dry-run": "pnpm -r --filter @silo-storage/shared --filter @silo-storage/mime-types --filter @silo-storage/sdk-core --filter @silo-storage/sdk-server --filter @silo-storage/sdk-react --filter @silo-storage/sdk-next --filter @silo-storage/sdk-tanstack-start publish --dry-run --access public --no-git-checks",
+    "sdk:typecheck": "pnpm --filter @silo-storage/shared --filter @silo-storage/mime-types --filter @silo-storage/sdk-core --filter @silo-storage/sdk-server --filter @silo-storage/sdk-next --filter @silo-storage/sdk-tanstack-start --filter @silo-storage/sdk-react typecheck",
     "typecheck": "turbo run typecheck",
     "ui-add": "pnpm -F @silo-storage/ui ui-add"
   },

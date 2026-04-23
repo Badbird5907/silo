@@ -1,6 +1,7 @@
 {
   "name": "@silo-storage/eslint-config",
   "private": true,
+  "version": "0.1.0",
   "type": "module",
   "exports": {
     "./base": "./base.ts",

@@ -25,22 +25,22 @@
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "devDependencies": {
-    "@silo-storage/eslint-config": "workspace:*",
-    "@silo-storage/prettier-config": "workspace:*",
-    "@silo-storage/tsconfig": "workspace:*",
-    "@types/react": "catalog:react19",
-    "eslint": "catalog:",
-    "prettier": "catalog:",
-    "react": "catalog:react19",
+    "@silo-storage/eslint-config": "0.1.0",
+    "@silo-storage/prettier-config": "0.1.0",
+    "@silo-storage/tsconfig": "0.1.0",
+    "@types/react": "~19.2.3",
+    "eslint": "^9.38.0",
+    "prettier": "^3.6.2",
+    "react": "19.2.3",
     "tsup": "^8.5.1",
-    "typescript": "catalog:"
+    "typescript": "^5.9.3"
   },
   "peerDependencies": {
     "react": ">=18.2.0"
   },
   "prettier": "@silo-storage/prettier-config",
   "dependencies": {
-    "@silo-storage/mime-types": "workspace:*",
+    "@silo-storage/mime-types": "0.1.0",
     "tus-js-client": "^4.3.1"
   }
 }

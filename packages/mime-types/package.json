@@ -1,33 +1,63 @@
 {
   "name": "@silo-storage/mime-types",
-  "private": true,
+  "version": "0.1.0",
   "type": "module",
-  "autoexport": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "autoexport": false,
   "exports": {
-    ".": "./src/index.ts",
-    "./application": "./src/application.ts",
-    "./audio": "./src/audio.ts",
-    "./image": "./src/image.ts",
-    "./misc": "./src/misc.ts",
-    "./text": "./src/text.ts",
-    "./video": "./src/video.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./application": {
+      "types": "./dist/application.d.ts",
+      "default": "./dist/application.js"
+    },
+    "./audio": {
+      "types": "./dist/audio.d.ts",
+      "default": "./dist/audio.js"
+    },
+    "./image": {
+      "types": "./dist/image.d.ts",
+      "default": "./dist/image.js"
+    },
+    "./misc": {
+      "types": "./dist/misc.d.ts",
+      "default": "./dist/misc.js"
+    },
+    "./text": {
+      "types": "./dist/text.d.ts",
+      "default": "./dist/text.js"
+    },
+    "./video": {
+      "types": "./dist/video.d.ts",
+      "default": "./dist/video.js"
+    }
   },
   "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "build": "tsc",
+    "build": "tsup",
     "clean": "git clean -xdf .cache .turbo dist node_modules",
-    "dev": "tsc",
+    "dev": "tsup --watch",
     "format": "prettier --check . --ignore-path ../../.gitignore",
     "lint": "eslint",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "devDependencies": {
-    "@silo-storage/eslint-config": "workspace:*",
-    "@silo-storage/prettier-config": "workspace:*",
-    "@silo-storage/tsconfig": "workspace:*",
-    "eslint": "catalog:",
-    "prettier": "catalog:",
-    "typescript": "catalog:"
+    "@silo-storage/eslint-config": "0.1.0",
+    "@silo-storage/prettier-config": "0.1.0",
+    "@silo-storage/tsconfig": "0.1.0",
+    "eslint": "^9.38.0",
+    "prettier": "^3.6.2",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
   },
   "prettier": "@silo-storage/prettier-config"
 }

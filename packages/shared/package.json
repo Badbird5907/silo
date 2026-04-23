@@ -1,40 +1,64 @@
 {
   "name": "@silo-storage/shared",
-  "private": true,
+  "version": "0.1.0",
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./adapterData": "./src/adapterData.ts",
-    "./audit": "./src/audit.ts",
-    "./events": "./src/events.ts",
-    "./network": "./src/network.ts",
-    "./signing": "./src/signing.ts",
-    "./slug": "./src/slug.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./adapterData": {
+      "types": "./dist/adapterData.d.ts",
+      "default": "./dist/adapterData.js"
+    },
+    "./audit": {
+      "types": "./dist/audit.d.ts",
+      "default": "./dist/audit.js"
+    },
+    "./events": {
+      "types": "./dist/events.d.ts",
+      "default": "./dist/events.js"
+    },
+    "./network": {
+      "types": "./dist/network.d.ts",
+      "default": "./dist/network.js"
+    },
+    "./signing": {
+      "types": "./dist/signing.d.ts",
+      "default": "./dist/signing.js"
+    },
+    "./slug": {
+      "types": "./dist/slug.d.ts",
+      "default": "./dist/slug.js"
+    }
   },
-  "autoexport": true,
+  "autoexport": false,
   "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "build": "tsc",
+    "build": "tsup",
     "clean": "git clean -xdf .cache .turbo dist node_modules",
-    "dev": "tsc",
+    "dev": "tsup --watch",
     "format": "prettier --check . --ignore-path ../../.gitignore",
     "lint": "eslint",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "devDependencies": {
-    "@silo-storage/eslint-config": "workspace:*",
-    "@silo-storage/prettier-config": "workspace:*",
-    "@silo-storage/tsconfig": "workspace:*",
-    "@types/node": "catalog:",
-    "eslint": "catalog:",
-    "prettier": "catalog:",
-    "typescript": "catalog:"
+    "@silo-storage/eslint-config": "0.1.0",
+    "@silo-storage/prettier-config": "0.1.0",
+    "@silo-storage/tsconfig": "0.1.0",
+    "@types/node": "22.19.2",
+    "eslint": "^9.38.0",
+    "prettier": "^3.6.2",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
   },
-  "prettier": "@silo-storage/prettier-config",
-  "dependencies": {
-    "@silo-storage/types": "workspace:*",
-    "@silo-storage/validators": "workspace:*",
-    "@t3-oss/env-core": "^0.13.10",
-    "zod": "catalog:"
-  }
+  "prettier": "@silo-storage/prettier-config"
 }

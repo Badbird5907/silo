@@ -25,21 +25,20 @@
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
-    "@silo-storage/mime-types": "workspace:*",
-    "@silo-storage/sdk-core": "workspace:*",
-    "@silo-storage/shared": "workspace:*",
+    "@silo-storage/mime-types": "0.1.0",
+    "@silo-storage/sdk-core": "0.1.0",
     "ms": "3.0.0-canary.202508261828",
-    "zod": "catalog:"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@silo-storage/eslint-config": "workspace:*",
-    "@silo-storage/prettier-config": "workspace:*",
-    "@silo-storage/tsconfig": "workspace:*",
-    "eslint": "catalog:",
-    "prettier": "catalog:",
+    "@silo-storage/eslint-config": "0.1.0",
+    "@silo-storage/prettier-config": "0.1.0",
+    "@silo-storage/tsconfig": "0.1.0",
+    "eslint": "^9.38.0",
+    "prettier": "^3.6.2",
     "tsup": "^8.5.1",
-    "tsx": "catalog:",
-    "typescript": "catalog:"
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   },
   "prettier": "@silo-storage/prettier-config"
 }
