@@ -123,12 +123,16 @@ async function parseActionBody(request: Request): Promise<RouteActionRequest> {
 function resolveCallbackUrl(
   request: Request,
   callbackUrl?: string | ((request: Request) => string | Promise<string>),
+  coreCallbackUrl?: string,
 ): Promise<string> {
   if (typeof callbackUrl === "function") {
     return Promise.resolve(callbackUrl(request));
   }
   if (typeof callbackUrl === "string") {
     return Promise.resolve(callbackUrl);
+  }
+  if (typeof coreCallbackUrl === "string" && coreCallbackUrl.length > 0) {
+    return Promise.resolve(coreCallbackUrl);
   }
   return Promise.resolve(new URL(request.url).toString());
 }
@@ -323,7 +327,11 @@ export function createFetchRouteHandler<
       throw new Error(`Unknown route endpoint "${action.endpoint}"`);
     }
     const routeSlug = action.endpoint as keyof TRouter & string;
-    const callbackUrl = await resolveCallbackUrl(request, options.callbackUrl);
+    const callbackUrl = await resolveCallbackUrl(
+      request,
+      options.callbackUrl,
+      options.core.config.callbackUrl,
+    );
 
     const registerResult = await registerRouteUpload({
       core: options.core,
