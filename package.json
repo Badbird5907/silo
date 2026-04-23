@@ -23,7 +23,7 @@
     "format:fix": "turbo run format --continue -- --write --cache --cache-location .cache/.prettiercache",
     "lint": "turbo run lint --continue -- --cache --cache-location .cache/.eslintcache",
     "lint:fix": "turbo run lint --continue -- --fix --cache --cache-location .cache/.eslintcache",
-    "lint:ws": "pnpm dlx sherif@latest",
+    "lint:ws": "sherif",
     "preinstall": "pnpm auto-export",
     "postinstall": "pnpm lint:ws",
     "sdk:build": "pnpm --filter @silo-storage/shared --filter @silo-storage/mime-types --filter @silo-storage/sdk-core --filter @silo-storage/sdk-server --filter @silo-storage/sdk-next --filter @silo-storage/sdk-tanstack-start --filter @silo-storage/sdk-react build",
@@ -39,6 +39,7 @@
     "@turbo/gen": "^2.5.8",
     "dotenv-cli": "^10.0.0",
     "prettier": "catalog:",
+    "sherif": "1.11.1",
     "tsx": "catalog:",
     "turbo": "^2.5.8",
     "typescript": "catalog:"
