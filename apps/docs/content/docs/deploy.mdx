@@ -59,6 +59,10 @@ wrangler queues create silo-delete-prefix-dlq --message-retention-period-secs 86
 The queue and bucket names are referenced in `wrangler.toml`
 </Callout>
 
+<Callout type="info">
+Enable Cloudflare image transforms for your zone before deploying. In the Cloudflare dashboard, go to Media > Images > Transformations, select your zone, and enable transformations for that zone.
+</Callout>
+
 ### 5. Configure wrangler.toml
 Open `apps/cf-worker/wrangler.toml` and fill in your values.
 
