@@ -112,6 +112,12 @@ Each call to `f(...)` starts a route definition:
 - `.public(...)`, `.serveImage(...)`, `.expires(...)`, and `.mimeTypes(...)` configure per-route behavior
 - `.onUploadComplete(...)` runs after Silo sends the signed callback for a completed upload
 
+<Callout type="info">
+`onUploadComplete(...)` is a per-file callback.
+
+If a route allows multiple files and the client uploads `4` files, Silo dispatches `4` completion callbacks and your route's `onUploadComplete(...)` handler runs `4` separate times, once for each file.
+</Callout>
+
 The builder is fully typed. The `context` type comes from `createSiloUpload<Request, UploadContext>()`, and the optional `input` type comes from the third generic.
 
 <Callout type="idea">

@@ -57,6 +57,16 @@ await upload.uploadFiles(files, {
 });
 ```
 
+### Multi-file callback behavior
+
+When you call `upload.uploadFiles(files, ...)`, each file uploads and completes independently.
+
+- Server-side `onUploadComplete(...)` runs once per file
+- Client-side `onComplete(completions)` runs once after all files finish
+- The `completions` array contains one entry per uploaded file
+
+If you upload `3` files successfully, your route's `onUploadComplete(...)` handler runs `3` times, and your React `onComplete(...)` callback runs once with `3` completion objects.
+
 Open a file picker and upload immediately:
 
 ```ts
