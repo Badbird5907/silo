@@ -39,7 +39,7 @@ If you want to run the full platform yourself, follow the [deployment guide](htt
 
 Silo targets:
 
-- Node.js `^22.21.0`
+- Node.js `^24.15.0`
 - pnpm `^10.19.0`
 
 Install dependencies from the repo root:
