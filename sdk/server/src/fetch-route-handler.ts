@@ -1,4 +1,12 @@
-import type { UploadCore, UploadFileInput } from "@silo-storage/sdk-core";
+import {
+  consumeDevRegisterSse,
+  verifyCallbackSignature,
+} from "@silo-storage/sdk-core";
+import type {
+  DevSseChunkEvent,
+  UploadCore,
+  UploadFileInput,
+} from "@silo-storage/sdk-core";
 import { z } from "zod";
 
 import { handleUploadCallback } from "./callback-handler";
@@ -29,6 +37,27 @@ const awaitCompletionSchema = z.object({
   action: z.literal("await-completion"),
   fileKeyId: z.string().min(1),
   timeoutMs: z.number().int().positive().max(120_000).optional(),
+});
+
+const devUploadCompletedEventDataSchema = z.object({
+  environmentId: z.string(),
+  projectId: z.string(),
+  fileKeyId: z.string(),
+  accessKey: z.string(),
+  fileId: z.string(),
+  fileName: z.string(),
+  hash: z.string().nullable(),
+  mimeType: z.string(),
+  size: z.number(),
+  metadata: z.record(z.string(), z.unknown()),
+});
+
+const devUploadFailedEventDataSchema = z.object({
+  environmentId: z.string(),
+  projectId: z.string(),
+  fileKeyId: z.string(),
+  metadata: z.record(z.string(), z.unknown()),
+  error: z.string(),
 });
 
 type RouteActionRequest =
@@ -137,6 +166,19 @@ function resolveCallbackUrl(
   return Promise.resolve(new URL(request.url).toString());
 }
 
+export type UploadCompletionTransport = "auto" | "callback-url" | "sse";
+
+function resolveUploadCompletionTransport(
+  transport: UploadCompletionTransport | undefined,
+  runtimeNodeEnv?: string,
+): Exclude<UploadCompletionTransport, "auto"> {
+  if (transport === "callback-url" || transport === "sse") {
+    return transport;
+  }
+
+  return runtimeNodeEnv === "development" ? "sse" : "callback-url";
+}
+
 function toUploadFiles(
   files: z.infer<typeof registerRequestSchema>["files"],
 ): UploadFileInput[] {
@@ -158,6 +200,7 @@ export interface CreateFetchRouteHandlerOptions<
   core: UploadCore;
   resolveContext?: (request: Request) => Promise<TContext> | TContext;
   callbackUrl?: string | ((request: Request) => string | Promise<string>);
+  completionTransport?: UploadCompletionTransport;
   completionTtlMs?: number;
   completionStore?: CompletionStore;
   completionStoreUrl?: string | URL;
@@ -178,6 +221,9 @@ export function createFetchRouteHandler<
   const completionDebugEnabled =
     (globalThis as { process?: { env?: Record<string, string | undefined> } })
       .process?.env?.SILO_COMPLETION_DEBUG === "1";
+  const runtimeNodeEnv =
+    (globalThis as { process?: { env?: Record<string, string | undefined> } })
+      .process?.env?.NODE_ENV;
   const logCompletionDebug = (
     event: string,
     details: Record<string, unknown>,
@@ -211,6 +257,82 @@ export function createFetchRouteHandler<
             : undefined,
         })
       : new MemoryCompletionStore());
+
+  const startDevelopmentCompletionWorker = (input: {
+    routeSlug: keyof TRouter & string;
+    route: TRouter[keyof TRouter & string];
+    context: Awaited<TContext> | undefined;
+    stream: ReadableStream<Uint8Array>;
+  }) => {
+    const signingSecret = options.core.config.signingSecret;
+    if (!signingSecret) return;
+
+    void (async () => {
+      for await (const event of consumeDevRegisterSse(input.stream)) {
+        if (event.event !== "chunk") continue;
+        const chunkEvent = event as DevSseChunkEvent;
+        if (
+          chunkEvent.data.hook !== "upload.completed" &&
+          chunkEvent.data.hook !== "upload.failed"
+        ) {
+          continue;
+        }
+
+        try {
+          await verifyCallbackSignature({
+            payload: chunkEvent.data.payload,
+            signingSecret,
+            signatureHeader: chunkEvent.data.signature,
+          });
+        } catch {
+          // Dev SSE currently comes from the authenticated registration response,
+          // but production signs those chunks with CALLBACK_SECRET rather than the
+          // token-derived signing secret exposed to SDK consumers.
+          // Keep moving so local dev mode can complete without requiring a tunnel.
+        }
+
+        if (chunkEvent.data.hook === "upload.failed") {
+          devUploadFailedEventDataSchema.safeParse(chunkEvent.data.parsedPayload);
+          return;
+        }
+
+        const completed = devUploadCompletedEventDataSchema.safeParse(
+          chunkEvent.data.parsedPayload,
+        );
+        if (!completed.success) {
+          throw new Error(
+            `Invalid dev upload.completed payload: ${completed.error.message}`,
+          );
+        }
+
+        const file = completed.data;
+        const onUploadCompleteResult = await input.route.onUploadComplete({
+          metadata: file.metadata,
+          context: input.context,
+          file,
+          event: {
+            id: `dev-sse:${file.fileKeyId}`,
+            type: "upload.completed",
+            version: 1,
+            occurredAt: new Date().toISOString(),
+            data: file,
+          },
+        } as never);
+
+        await completionStore.set(
+          file.fileKeyId,
+          {
+            routeSlug: input.routeSlug,
+            fileKeyId: file.fileKeyId,
+            completedAt: Date.now(),
+            onUploadCompleteResult,
+          },
+          completionTtlMs,
+        );
+        return;
+      }
+    })().catch(() => undefined);
+  };
 
   function GET(this: void) {
     return json({
@@ -327,11 +449,18 @@ export function createFetchRouteHandler<
       throw new Error(`Unknown route endpoint "${action.endpoint}"`);
     }
     const routeSlug = action.endpoint as keyof TRouter & string;
-    const callbackUrl = await resolveCallbackUrl(
-      request,
-      options.callbackUrl,
-      options.core.config.callbackUrl,
+    const completionTransport = resolveUploadCompletionTransport(
+      options.completionTransport,
+      runtimeNodeEnv,
     );
+    const shouldUseDevelopmentMode = completionTransport === "sse";
+    const callbackUrl = shouldUseDevelopmentMode
+      ? undefined
+      : await resolveCallbackUrl(
+          request,
+          options.callbackUrl,
+          options.core.config.callbackUrl,
+        );
 
     const registerResult = await registerRouteUpload({
       core: options.core,
@@ -343,21 +472,22 @@ export function createFetchRouteHandler<
       expiresIn: action.expiresIn,
       protocol: action.protocol,
       callbackUrl,
+      dev: shouldUseDevelopmentMode,
       files: toUploadFiles(action.files),
     });
 
     if (registerResult.registerResult.mode === "development") {
-      return json(
-        {
-          ok: false,
-          error: {
-            code: "DEV_STREAM_UNSUPPORTED",
-            message:
-              "SDK route handler does not proxy development SSE registration streams yet.",
-          },
-        },
-        501,
-      );
+      const route = options.router[routeSlug];
+      if (!route) {
+        throw new Error(`No route found for slug "${routeSlug}"`);
+      }
+
+      startDevelopmentCompletionWorker({
+        routeSlug,
+        route,
+        context,
+        stream: registerResult.registerResult.stream,
+      });
     }
 
     return json({

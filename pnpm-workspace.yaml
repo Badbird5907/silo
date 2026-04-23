@@ -2,6 +2,7 @@ packages:
   - apps/*
   - packages/*
   - sdk/*
+  - test-silo-app
   - tooling/*
 
 catalog:

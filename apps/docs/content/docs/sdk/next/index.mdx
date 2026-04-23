@@ -88,6 +88,9 @@ const core = createSiloCoreFromToken({
 export const { GET, POST } = createRouteHandler<UploadContext>({
   router: fileRouter,
   core,
+  // Defaults to "sse" in development and "callback-url" otherwise.
+  // Override it when you want to force one transport explicitly.
+  completionTransport: "auto",
   resolveContext: async (request: Request): Promise<UploadContext> => {
     // do whatever you need here to satisfy the UploadContext type
     const { userId } = await auth(request);
@@ -108,7 +111,15 @@ This matches Next.js App Router route handlers, where `route.ts` exports HTTP me
 - `POST` also verifies signed Silo callbacks and dispatches the matching `onUploadComplete`
 - `POST` handles completion polling used by the React SDK after an upload finishes
 
-By default, the adapter uses the current route URL as the callback URL. Override that with `callbackUrl` if your public callback origin differs from the incoming request origin.
+By default, the adapter uses `completionTransport: "auto"`, which selects `sse` when `NODE_ENV === "development"` and `callback-url` otherwise.
+
+When the adapter uses callback URLs, it defaults to the current route URL. Override that with `callbackUrl` if your public callback origin differs from the incoming request origin.
+
+Set `completionTransport` explicitly when you want to force one mode:
+
+- `"auto"` to keep the environment-based default
+- `"sse"` to always use the development SSE flow
+- `"callback-url"` to always use signed callbacks
 
 ## Using in conjunction with the React SDK
 
@@ -179,7 +190,7 @@ Use a shared store in production when the upload callback and the polling reques
 ## Notes
 
 - Callback verification depends on `core.config.signingSecret`. `createSiloCoreFromToken(...)` fills that from `SILO_TOKEN`, so you usually do not need to pass anything extra into `createRouteHandler(...)`.
-- The adapter currently does not proxy Silo development SSE registration streams. If registration enters development stream mode, the route returns `DEV_STREAM_UNSUPPORTED`.
+- If you force `completionTransport: "callback-url"` in development, make sure the configured callback endpoint is publicly reachable by Silo.
 - `extractRouterConfig(...)` only exposes the client-safe subset of your router definition.
 
 ## API reference
