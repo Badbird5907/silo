@@ -1,5 +1,5 @@
 {
   "title": "Next",
-  "pages": ["index", "advanced", "api-reference"],
+  "pages": ["index", "advanced", "api-reference", "minimal-sdk-demo"],
   "icon": "Nextjs"
 }
