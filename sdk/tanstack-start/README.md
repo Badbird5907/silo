@@ -1,5 +1,7 @@
 # @silo-storage/sdk-tanstack-start
 
+[Read the Docs](https://silo.evanyu.dev/docs/sdk/tanstack-start)
+
 TanStack Start server-route adapter for `@silo-storage/sdk-server`.
 
 ## What it provides

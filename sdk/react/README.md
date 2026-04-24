@@ -1,5 +1,7 @@
 # @silo-storage/sdk-react
 
+[Read the Docs](https://silo.evanyu.dev/docs/sdk/react)
+
 React SDK for Silo.
 
 ## Quick start

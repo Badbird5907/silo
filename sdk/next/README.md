@@ -1,5 +1,7 @@
 # @silo-storage/sdk-next
 
+[Read the Docs](https://silo.evanyu.dev/docs/sdk/next)
+
 Next.js App Router adapter for `@silo-storage/sdk-server`.
 
 ## What it provides

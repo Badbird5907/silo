@@ -1,5 +1,7 @@
 # @silo-storage/sdk-server
 
+[Read the Docs](https://silo.evanyu.dev/docs/sdk/server)
+
 Framework-agnostic router runtime for Silo uploads.
 
 This package, inspired by the UploadThing SDK, provides a

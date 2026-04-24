@@ -1,5 +1,7 @@
 # @silo-storage/sdk-core
 
+[Read the Docs](https://silo.evanyu.dev/docs/sdk/core)
+
 This package contains framework-agnostic primitives for Silo uploads and callback handling.
 
 ## Core Upload API
@@ -112,9 +114,6 @@ const publicImageUrl = await uploadCore.generateImageUrl("file-access-key", {
 });
 ```
 
-`sign` is only available on the overload override object.
-The existing explicit object API continues to use `isPublic` and `serveImage`.
-
 `SILO_TOKEN` is a base64url JSON payload with compact keys:
 
 - `v` version
@@ -123,32 +122,3 @@ The existing explicit object API continues to use `isPublic` and `serveImage`.
 - `ss` signingSecret
 - `rm` routeMode (`s` = subdomain, `p` = path)
 - `ps` projectSlug
-
-The ingest/CDN host is no longer embedded in `SILO_TOKEN`. Provide it via app env
-(`SILO_CDN`, or `NEXT_PUBLIC_SILO_CDN` in Next.js) and pass it as `cdnHost`.
-
-## Callback URL
-
-`sdk-core` only accepts absolute callback URLs. Path/origin resolution should be
-handled by framework-specific adapters.
-
-## Callback Metadata
-
-`callbackMetadata` is intentionally low-level in `sdk-core`.
-If you are building route-based uploads, prefer `@silo-storage/sdk-server`, which
-stores internal route dispatch state in `callbackMetadata.__silo` and keeps that
-envelope library-owned.
-
-## Dev SSE Consumption
-
-When registering with `dev: true`, `registerUploadBatch(...)` supports both single-file
-and multi-file calls.
-
-Use `consumeDevRegisterSse(...)` to parse `connected`, `chunk`, `keepalive`, and
-`error` events.
-
-## Callback Signature Verification
-
-Use `verifyAndParseUploadCallback` to verify callback signatures and parse the callback envelope,
-or call `verifyCallbackSignature` directly when you only need signature verification.
-The callback must be signed with the requesting API key's signing secret.
