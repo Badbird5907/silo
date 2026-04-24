@@ -40,8 +40,12 @@ export const fileRouter = {
       if (!userId) throw new Error("Unauthorized");
       return { userId, input };
     })
-    .onUploadComplete(async ({ metadata, file }) => {
-      return { uploadedBy: metadata.userId, fileId: file.fileId };
+    .onUploadComplete(async ({ metadata, file, core }) => {
+      return {
+        uploadedBy: metadata.userId,
+        fileId: file.fileId,
+        imageUrl: await core.generateImageUrl(file),
+      };
     }),
   mediaPost: f({
     image: { maxFileSize: "2MB", maxFileCount: 4 },
@@ -53,8 +57,12 @@ export const fileRouter = {
       if (!userId) throw new Error("Unauthorized");
       return { userId, input };
     })
-    .onUploadComplete(async ({ metadata, file }) => {
-      return { uploadedBy: metadata.userId, fileId: file.fileId };
+    .onUploadComplete(async ({ metadata, file, core }) => {
+      return {
+        uploadedBy: metadata.userId,
+        fileId: file.fileId,
+        imageUrl: await core.generateImageUrl(file),
+      };
     }),
 } satisfies FileRouter;
 ```

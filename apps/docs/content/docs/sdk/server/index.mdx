@@ -65,12 +65,13 @@ export const fileRouter = {
         folder: input?.folder ?? "avatars",
       };
     })
-    .onUploadComplete(async ({ metadata, file }) => {
+    .onUploadComplete(async ({ metadata, file, core }) => {
       return {
         uploadedBy: metadata.userId,
         plan: metadata.plan,
         fileId: file.fileId,
         fileKeyId: file.fileKeyId,
+        imageUrl: await core.generateImageUrl(file),
       };
     }),
   attachments: f({
@@ -110,7 +111,7 @@ Each call to `f(...)` starts a route definition:
 - `f({ image: { maxFileSize: "8MB", maxFileCount: 4 } })` gives you per-type constraints
 - `.middleware(...)` runs before registration and can reject the upload (throw an error)
 - `.public(...)`, `.serveImage(...)`, `.expires(...)`, and `.mimeTypes(...)` configure per-route behavior
-- `.onUploadComplete(...)` runs after Silo sends the signed callback for a completed upload
+- `.onUploadComplete(...)` runs after Silo sends the signed callback for a completed upload and receives the route `core` instance
 
 <Callout type="info">
 `onUploadComplete(...)` is a per-file callback.
@@ -325,17 +326,23 @@ handling the callback yourself.
 When Silo sends a signed callback, use `handleUploadCallback(...)` to verify it and dispatch the matching route's `onUploadComplete(...)`.
 
 ```ts title="src/http/upload-callback.ts"
-import { parseSiloToken } from "@silo-storage/sdk-core";
+import { createSiloCoreFromToken, parseSiloToken } from "@silo-storage/sdk-core";
 import { handleUploadCallback } from "@silo-storage/sdk-server";
 
 import { fileRouter } from "../upload";
 import type { UploadContext } from "../upload";
 
+const core = createSiloCoreFromToken({
+  url: process.env.SILO_URL!,
+  token: process.env.SILO_TOKEN!,
+  cdnHost: process.env.SILO_CDN_HOST!,
+});
 const signingSecret = parseSiloToken(process.env.SILO_TOKEN!).signingSecret;
 
 export async function handleCallback(request: Request, context: UploadContext) {
   const result = await handleUploadCallback({
     router: fileRouter,
+    core,
     request,
     signingSecret,
     context,

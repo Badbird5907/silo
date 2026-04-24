@@ -1,6 +1,9 @@
 import { z } from "zod";
 
-import { verifyAndParseUploadCallback } from "@silo-storage/sdk-core";
+import {
+  verifyAndParseUploadCallback,
+  type UploadCore,
+} from "@silo-storage/sdk-core";
 
 import type { FileRouter } from "./router";
 import {
@@ -43,6 +46,7 @@ export interface HandleUploadCallbackInput<
   >,
 > {
   router: TRouter;
+  core: UploadCore;
   request:
     | Request
     | {
@@ -126,6 +130,7 @@ export async function handleUploadCallback<
 
   const fileMetadata = completedEvent.data.data.metadata;
   const onUploadCompleteResult = await route.onUploadComplete({
+    core: input.core,
     metadata: fileMetadata,
     context: resolvedContext,
     file: completedEvent.data.data,

@@ -316,6 +316,7 @@ export function createFetchRouteHandler<
 
         const file = completed.data;
         const onUploadCompleteResult = await input.route.onUploadComplete({
+          core: options.core,
           metadata: file.metadata,
           context: input.context,
           file,
@@ -368,6 +369,7 @@ export function createFetchRouteHandler<
         TRouter
       >({
         router: options.router,
+        core: options.core,
         request,
         signingSecret,
         context,
