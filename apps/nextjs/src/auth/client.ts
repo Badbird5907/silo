@@ -5,11 +5,14 @@ import {
   organizationRoles,
 } from "@silo-storage/auth/permissions";
 
+const organizationPluginOptions =
+  {
+    ac: organizationAccessControl,
+    roles: organizationRoles,
+  } as Parameters<typeof organizationClient>[0];
+
 export const authClient = createAuthClient({
   plugins: [
-    organizationClient({
-      ac: organizationAccessControl,
-      roles: organizationRoles,
-    }),
+    organizationClient(organizationPluginOptions),
   ],
 });

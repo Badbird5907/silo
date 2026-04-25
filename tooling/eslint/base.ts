@@ -1,10 +1,13 @@
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import { includeIgnoreFile } from "@eslint/compat";
 import eslint from "@eslint/js";
 import importPlugin from "eslint-plugin-import";
 import turboPlugin from "eslint-plugin-turbo";
 import { defineConfig } from "eslint/config";
 import tseslint from "typescript-eslint";
+
+const currentDir = path.dirname(fileURLToPath(import.meta.url));
 
 /**
  * All packages that leverage t3-env should use this rule
@@ -38,7 +41,7 @@ export const restrictEnvAccess = defineConfig(
 
 export const baseConfig = defineConfig(
   // Ignore files not tracked by VCS and any config files
-  includeIgnoreFile(path.join(import.meta.dirname, "../../.gitignore")),
+  includeIgnoreFile(path.join(currentDir, "../../.gitignore")),
   { ignores: ["**/*.config.*"] },
   {
     files: ["**/*.js", "**/*.ts", "**/*.tsx"],
@@ -81,7 +84,7 @@ export const baseConfig = defineConfig(
     languageOptions: {
       parserOptions: {
         projectService: true,
-        tsconfigRootDir: import.meta.dirname,
+        tsconfigRootDir: currentDir,
       },
     },
   },

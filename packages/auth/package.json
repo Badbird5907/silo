@@ -29,6 +29,7 @@
     "@silo-storage/eslint-config": "workspace:*",
     "@silo-storage/prettier-config": "workspace:*",
     "@silo-storage/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
     "eslint": "catalog:",
     "prettier": "catalog:",
     "typescript": "catalog:"

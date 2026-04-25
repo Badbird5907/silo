@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
 import { and, eq } from "@silo-storage/db";
@@ -42,6 +43,7 @@ export default async function OrgLayout({ children, params }: OrgLayoutProps) {
 
   if (session.session.activeOrganizationId !== org.id) {
     await auth.api.setActiveOrganization({
+      headers: await headers(),
       body: { organizationId: org.id },
     });
   }
