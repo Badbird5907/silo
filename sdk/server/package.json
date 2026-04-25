@@ -29,9 +29,9 @@
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
-    "@standard-schema/spec": "^1.1.0",
     "@silo-storage/mime-types": "0.0.0-alpha.0",
     "@silo-storage/sdk-core": "0.0.0-alpha.0",
+    "@standard-schema/spec": "^1.1.0",
     "ms": "3.0.0-canary.202508261828",
     "zod": "^4.3.6"
   },
