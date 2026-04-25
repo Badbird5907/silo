@@ -14,7 +14,7 @@ Use it when you want to build your own server integration, generate file URLs di
 - single-file and batch upload registration helpers
 - signed and public URL generation
 - file listing and file detail APIs
-- file access and expiry updates
+- file access, expiry, and delete APIs
 - callback signature verification
 - dev SSE consumption for local workflows
 
@@ -263,6 +263,17 @@ await core.updateFileExpiry({
 });
 ```
 
+### Delete a file
+
+```ts
+const deleted = await core.deleteFile({
+  projectId: "proj_123",
+  fileKeyId: "filekey_123",
+});
+```
+
+`deleteFile(...)` accepts either `fileKeyId` or `accessKey`. It returns the deletion message plus any lifecycle cleanup work claimed by the API.
+
 These APIs are useful for admin panels, background jobs, and internal tooling where you need to inspect or modify uploaded files after registration.
 
 ## Dev mode and SSE
@@ -289,7 +300,7 @@ Reach for `sdk-core` when:
 - you want to integrate Silo into a custom backend runtime
 - you want to stay below the route abstraction from `sdk-server`
 - you need direct URL generation APIs
-- you need file listing or file update APIs
+- you need file listing, update, or delete APIs
 - you want callback verification without the upload router abstraction
 
 If you want route-based uploads with typed middleware and completion handlers, move up to [Server](/docs/sdk/server).

@@ -2,6 +2,7 @@ import type { z } from "zod";
 import { nanoid } from "nanoid";
 
 import type { UpdateFileAccessInput, UpdateFileAccessResult } from "./access";
+import type { DeleteFileInput, DeleteFileResult } from "./delete";
 import type { UpdateFileExpiryInput, UpdateFileExpiryResult } from "./expiry";
 import type { CreateSiloCoreFromTokenInput } from "./token";
 import type {
@@ -32,6 +33,10 @@ import {
   createUpdateFileAccessRequestBody,
   updateFileAccessResultSchema,
 } from "./access";
+import {
+  createDeleteFileRequestBody,
+  deleteFileResultSchema,
+} from "./delete";
 import {
   applyFileExpiryToRegisterBody,
   createUpdateFileExpiryRequestBody,
@@ -234,6 +239,37 @@ export function createSiloCore(config: UploadCoreConfig) {
     }
 
     return parseApiResponse(response, updateFileAccessResultSchema);
+  }
+
+  async function deleteFile(input: DeleteFileInput): Promise<DeleteFileResult> {
+    const body = createDeleteFileRequestBody(input, config.environmentId);
+
+    const response = await fetchImpl(`${baseUrl}/api/v1/delete`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${config.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(
+        `Delete file request failed (${response.status}): ${text || response.statusText}`,
+      );
+    }
+
+    const json: unknown = await response.json();
+    try {
+      return {
+        httpStatus: response.status,
+        ...deleteFileResultSchema.parse(json),
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Unexpected delete response shape: ${message}`);
+    }
   }
 
   async function registerUploadBatch(
@@ -773,6 +809,7 @@ export function createSiloCore(config: UploadCoreConfig) {
     prepareUpload,
     listFiles,
     getFile,
+    deleteFile,
     generateDownloadUrl,
     generateImageUrl,
     updateFileAccess,

@@ -4,6 +4,8 @@
 
 This package contains framework-agnostic primitives for Silo uploads and callback handling.
 
+It also includes direct file-management helpers for listing, fetching, updating, and deleting files.
+
 ## Core Upload API
 
 Use `createSiloCoreFromToken` to:
@@ -87,6 +89,11 @@ const imageUrl = await uploadCore.generateImageUrl({
   isPublic: false,
   serveImage: true,
   fileName: "photo.png",
+});
+
+await uploadCore.deleteFile({
+  projectId: "proj_123",
+  fileKeyId: "filekey_123",
 });
 ```
 
