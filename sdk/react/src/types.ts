@@ -32,6 +32,10 @@ export type AnyFileRouterLike = Record<
   {
     routeConfig: unknown;
     onUploadComplete(args: unknown): unknown;
+    readonly "~types"?: {
+      input: unknown;
+      output: unknown;
+    };
   }
 >;
 
@@ -42,6 +46,17 @@ export type RouteOutputBySlug<
   TRouter extends AnyFileRouterLike,
   TEndpoint extends RouteSlug<TRouter>,
 > = Awaited<ReturnType<TRouter[TEndpoint]["onUploadComplete"]>>;
+
+export type RouteInputBySlug<
+  TRouter extends AnyFileRouterLike,
+  TEndpoint extends RouteSlug<TRouter>,
+> = TRouter[TEndpoint] extends {
+  readonly "~types"?: {
+    input: infer TInput;
+  };
+}
+  ? TInput
+  : unknown;
 
 export interface UploadCompletion<
   TRouter extends AnyFileRouterLike,
@@ -72,14 +87,14 @@ export interface UseUploadResult<
   accept?: string;
   uploadFiles: (
     files: File[],
-    options?: UploadRequestOptions,
+    options?: UploadRequestOptions<TRouter, TEndpoint>,
   ) => Promise<UploadCompletion<TRouter, TEndpoint>[]>;
   uploadFile: (
     file: File,
-    options?: UploadRequestOptions,
+    options?: UploadRequestOptions<TRouter, TEndpoint>,
   ) => Promise<UploadCompletion<TRouter, TEndpoint>>;
   beginUpload: (
-    options?: OpenFilePickerOptions & UploadRequestOptions,
+    options?: OpenFilePickerOptions & UploadRequestOptions<TRouter, TEndpoint>,
   ) => Promise<UploadCompletion<TRouter, TEndpoint>[]>;
   abort: () => void;
   reset: () => void;
@@ -104,8 +119,11 @@ export interface OpenFilePickerOptions {
   accept?: string;
 }
 
-export interface UploadRequestOptions {
-  input?: unknown;
+export interface UploadRequestOptions<
+  TRouter extends AnyFileRouterLike,
+  TEndpoint extends RouteSlug<TRouter>,
+> {
+  input?: RouteInputBySlug<TRouter, TEndpoint>;
   expiresIn?: number;
   protocol?: "http" | "https";
   awaitTimeoutMs?: number;
@@ -118,7 +136,7 @@ export interface UseStagedUploadOptions<
 >
   extends
     UseUploadOptions<TRouter, TEndpoint>,
-    UploadRequestOptions,
+    UploadRequestOptions<TRouter, TEndpoint>,
     OpenFilePickerOptions {
   clearOnUploadComplete?: boolean;
 }
@@ -137,7 +155,7 @@ export interface UseStagedUploadResult<
   removeFile: (fileOrIndex: File | number) => void;
   clearFiles: () => void;
   upload: (
-    options?: UploadRequestOptions,
+    options?: UploadRequestOptions<TRouter, TEndpoint>,
   ) => Promise<UploadCompletion<TRouter, TEndpoint>[]>;
   abort: () => void;
   reset: () => void;

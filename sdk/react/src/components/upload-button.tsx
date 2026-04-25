@@ -2,15 +2,19 @@ import * as React from "react";
 
 import type {
   AnyFileRouterLike,
+  RouteInputBySlug,
   RouteSlug,
   UseUploadOptions,
   UseUploadResult,
 } from "../types";
 
-interface UploadButtonBaseProps {
+interface UploadButtonBaseProps<
+  TRouter extends AnyFileRouterLike,
+  TEndpoint extends RouteSlug<TRouter>,
+> {
   multiple?: boolean;
   disabled?: boolean;
-  input?: unknown;
+  input?: RouteInputBySlug<TRouter, TEndpoint>;
   awaitTimeoutMs?: number;
   concurrency?: number;
   children?: React.ReactNode;
@@ -19,7 +23,7 @@ interface UploadButtonBaseProps {
 export interface UploadButtonWithHookProps<
   TRouter extends AnyFileRouterLike,
   TEndpoint extends RouteSlug<TRouter>,
-> extends UploadButtonBaseProps,
+> extends UploadButtonBaseProps<TRouter, TEndpoint>,
     UseUploadOptions<TRouter, TEndpoint> {
   upload?: never;
   useUpload: (
@@ -30,7 +34,7 @@ export interface UploadButtonWithHookProps<
 export interface UploadButtonWithExternalUploadProps<
   TRouter extends AnyFileRouterLike,
   TEndpoint extends RouteSlug<TRouter>,
-> extends UploadButtonBaseProps {
+> extends UploadButtonBaseProps<TRouter, TEndpoint> {
   upload: UseUploadResult<TRouter, TEndpoint>;
   endpoint?: never;
   onUploadBegin?: never;
@@ -54,7 +58,7 @@ export type UploadButtonProps<
 interface UploadButtonRootProps<
   TRouter extends AnyFileRouterLike,
   TEndpoint extends RouteSlug<TRouter>,
-> extends UploadButtonBaseProps {
+> extends UploadButtonBaseProps<TRouter, TEndpoint> {
   upload: UseUploadResult<TRouter, TEndpoint>;
 }
 

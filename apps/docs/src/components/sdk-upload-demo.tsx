@@ -181,6 +181,9 @@ export function SdkUploadDemo() {
       <Show when="signed-in">
         <UploadDropzone
           upload={upload}
+          input={{
+            folder: "avatars"
+          }}
           clickable
           className="text-fd-muted-foreground data-[dragging=true]:border-primary data-[dragging=true]:bg-primary/10 data-[dragging=true]:text-foreground data-[dragging=true]:ring-primary/40 flex h-36 w-full min-w-0 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-4 text-center transition-all duration-150 data-[can-upload=false]:cursor-not-allowed data-[disabled=true]:cursor-not-allowed data-[disabled=true]:opacity-50 data-[dragging=true]:border-solid data-[dragging=true]:shadow-md data-[dragging=true]:ring-2 data-[uploading=true]:pointer-events-none data-[uploading=true]:opacity-60"
         >

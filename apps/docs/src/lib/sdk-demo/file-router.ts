@@ -1,5 +1,6 @@
-import type { FileRouter } from "@silo-storage/sdk-server";
-import { createSiloUpload } from "@silo-storage/sdk-server";
+import type { FileRouter } from "../../../../../sdk/server/src/index";
+import { createSiloUpload } from "../../../../../sdk/server/src/index";
+import { z } from "zod";
 
 export interface UploadContext {
   userId: string | null;
@@ -14,24 +15,33 @@ export const fileRouter = {
       maxFileCount: 2,
     },
   })
-    .middleware(({ context }) => {
+    .input(
+      z.object({
+        folder: z.enum(["avatars", "attachments"]).default("avatars"),
+      }),
+    )
+    .middleware(({ context, input }) => {
       if (!context.userId) {
         throw new Error("Unauthorized");
       }
 
       return {
         userId: context.userId,
+        folder: input.folder,
       };
     })
-    .expires("2 minutes")
+    .expires(({ input }) =>
+      input.folder === "avatars" ? "2 minutes" : "10 minutes",
+    )
     .public(false)
-    .serveImage(true)
+    .serveImage(({ input }) => input.folder === "avatars")
     .onUploadComplete(({ metadata, file }) => {
       console.info("[sdk-demo:onUploadComplete]", { metadata, file });
 
       return {
         test: "test",
         uploadedBy: metadata.userId,
+        folder: metadata.folder,
       };
     })
 } satisfies FileRouter<Request, UploadContext>;

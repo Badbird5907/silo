@@ -1,6 +1,9 @@
+import type { StandardSchemaV1 } from "@standard-schema/spec";
+
 import type {
   MiddlewareFn,
   OnUploadCompleteFn,
+  SiloInputSchema,
   SiloRouteBuilder,
   SiloRouteConfig,
   SiloRouteConfigInput,
@@ -16,7 +19,8 @@ function createRouteBuilder<
   TInput = unknown,
 >(
   routeConfig: TRouteConfig,
-  routeOptions?: SiloRouteOptions,
+  routeOptions?: SiloRouteOptions<TMiddlewareData, TContext, TInput>,
+  inputSchema?: SiloInputSchema<unknown, TInput>,
   middleware?: MiddlewareFn<
     TRequest,
     TRouteConfig,
@@ -26,7 +30,7 @@ function createRouteBuilder<
   >,
 ): SiloRouteBuilder<TRequest, TContext, TRouteConfig, TMiddlewareData, TInput> {
   const withRouteOptions = (
-    nextRouteOptions: SiloRouteOptions,
+    nextRouteOptions: SiloRouteOptions<TMiddlewareData, TContext, TInput>,
   ): SiloRouteBuilder<
     TRequest,
     TContext,
@@ -40,9 +44,32 @@ function createRouteBuilder<
       TRouteConfig,
       TMiddlewareData,
       TInput
-    >(routeConfig, nextRouteOptions, middleware);
+    >(routeConfig, nextRouteOptions, inputSchema, middleware);
 
   return {
+    input: <TSchema extends SiloInputSchema>(schema: TSchema) =>
+      createRouteBuilder<
+        TRequest,
+        TContext,
+        TRouteConfig,
+        TMiddlewareData,
+        StandardSchemaV1.InferOutput<TSchema>
+      >(
+        routeConfig,
+        routeOptions as SiloRouteOptions<
+          TMiddlewareData,
+          TContext,
+          StandardSchemaV1.InferOutput<TSchema>
+        >,
+        schema as SiloInputSchema<unknown, StandardSchemaV1.InferOutput<TSchema>>,
+        middleware as MiddlewareFn<
+          TRequest,
+          TRouteConfig,
+          TMiddlewareData,
+          TContext,
+          StandardSchemaV1.InferOutput<TSchema>
+        > | undefined,
+      ),
     middleware: <TNextMiddlewareData extends Record<string, unknown>>(
       nextMiddleware: MiddlewareFn<
         TRequest,
@@ -58,32 +85,62 @@ function createRouteBuilder<
         TRouteConfig,
         TNextMiddlewareData,
         TInput
-      >(routeConfig, routeOptions, nextMiddleware),
+      >(
+        routeConfig,
+        routeOptions as unknown as SiloRouteOptions<
+          TNextMiddlewareData,
+          TContext,
+          TInput
+        >,
+        inputSchema,
+        nextMiddleware,
+      ),
     public: (isPublic) =>
       withRouteOptions({
         ...routeOptions,
-        isPublic: isPublic as SiloRouteOptions["isPublic"],
+        isPublic:
+          isPublic as SiloRouteOptions<
+            TMiddlewareData,
+            TContext,
+            TInput
+          >["isPublic"],
       }),
     serveImage: (serveImage) =>
       withRouteOptions({
         ...routeOptions,
-        serveImage: serveImage as SiloRouteOptions["serveImage"],
+        serveImage:
+          serveImage as SiloRouteOptions<
+            TMiddlewareData,
+            TContext,
+            TInput
+          >["serveImage"],
       }),
     expires: (fileExpiry) =>
       withRouteOptions({
         ...routeOptions,
-        fileExpiry: fileExpiry as SiloRouteOptions["fileExpiry"],
+        fileExpiry:
+          fileExpiry as SiloRouteOptions<
+            TMiddlewareData,
+            TContext,
+            TInput
+          >["fileExpiry"],
       }),
     mimeTypes: (mimeTypes) =>
       withRouteOptions({
         ...routeOptions,
-        mimeTypes: mimeTypes as SiloRouteOptions["mimeTypes"],
+        mimeTypes:
+          mimeTypes as SiloRouteOptions<
+            TMiddlewareData,
+            TContext,
+            TInput
+          >["mimeTypes"],
       }),
     onUploadComplete: <TOutput>(
       onUploadComplete: OnUploadCompleteFn<TMiddlewareData, TOutput, TContext>,
     ) => ({
       routeConfig,
       routeOptions,
+      inputSchema,
       middleware,
       onUploadComplete,
     }),
@@ -93,11 +150,42 @@ function createRouteBuilder<
 export function createSiloUpload<
   TRequest = Request,
   TContext = Record<string, never>,
-  TInput = unknown,
+>(): <TRouteConfigInput extends SiloRouteConfigInput>(
+  routeConfigInput: TRouteConfigInput,
+  routeOptions?: SiloRouteOptions<Record<string, never>, TContext, undefined>,
+) => SiloRouteBuilder<
+  TRequest,
+  TContext,
+  ReturnType<typeof normalizeRouteConfigInput>,
+  Record<string, never>,
+  undefined
+>;
+export function createSiloUpload<
+  TRequest = Request,
+  TContext = Record<string, never>,
+  TLegacyInput = unknown,
+>(): <TRouteConfigInput extends SiloRouteConfigInput>(
+  routeConfigInput: TRouteConfigInput,
+  routeOptions?: SiloRouteOptions<
+    Record<string, never>,
+    TContext,
+    TLegacyInput
+  >,
+) => SiloRouteBuilder<
+  TRequest,
+  TContext,
+  ReturnType<typeof normalizeRouteConfigInput>,
+  Record<string, never>,
+  TLegacyInput
+>;
+export function createSiloUpload<
+  TRequest = Request,
+  TContext = Record<string, never>,
+  TInput = undefined,
 >() {
   return <TRouteConfigInput extends SiloRouteConfigInput>(
     routeConfigInput: TRouteConfigInput,
-    routeOptions?: SiloRouteOptions,
+    routeOptions?: SiloRouteOptions<Record<string, never>, TContext, TInput>,
   ) => {
     const routeConfig = normalizeRouteConfigInput(routeConfigInput);
 

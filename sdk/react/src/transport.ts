@@ -1,6 +1,6 @@
 import { Upload } from "tus-js-client";
 
-import type { RouterConfigLike } from "./types";
+import type { AnyFileRouterLike, RouteInputBySlug, RouteSlug, RouterConfigLike } from "./types";
 import { SiloUploadError } from "./types";
 
 interface RegisterResponse {
@@ -69,12 +69,15 @@ export async function fetchRouterConfig(
   return payload.routerConfig ?? {};
 }
 
-export async function registerUpload(
+export async function registerUpload<
+  TRouter extends AnyFileRouterLike,
+  TEndpoint extends RouteSlug<TRouter>,
+>(
   endpointUrl: string,
   fetchImpl: typeof fetch,
   payload: {
-    endpoint: string;
-    input?: unknown;
+    endpoint: TEndpoint;
+    input?: RouteInputBySlug<TRouter, TEndpoint>;
     expiresIn?: number;
     protocol?: "http" | "https";
     files: {

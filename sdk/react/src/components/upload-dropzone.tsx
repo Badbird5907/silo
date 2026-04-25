@@ -2,16 +2,20 @@ import * as React from "react";
 
 import type {
   AnyFileRouterLike,
+  RouteInputBySlug,
   RouteSlug,
   UseUploadOptions,
   UseUploadResult,
 } from "../types";
 
-interface UploadDropzoneBaseProps {
+interface UploadDropzoneBaseProps<
+  TRouter extends AnyFileRouterLike,
+  TEndpoint extends RouteSlug<TRouter>,
+> {
   disabled?: boolean;
   /** When true, clicking the dropzone opens the system file picker (via `upload.beginUpload`). */
   clickable?: boolean;
-  input?: unknown;
+  input?: RouteInputBySlug<TRouter, TEndpoint>;
   awaitTimeoutMs?: number;
   concurrency?: number;
   className?: string;
@@ -21,7 +25,7 @@ interface UploadDropzoneBaseProps {
 export interface UploadDropzoneWithHookProps<
   TRouter extends AnyFileRouterLike,
   TEndpoint extends RouteSlug<TRouter>,
-> extends UploadDropzoneBaseProps,
+> extends UploadDropzoneBaseProps<TRouter, TEndpoint>,
     UseUploadOptions<TRouter, TEndpoint> {
   upload?: never;
   useUpload: (
@@ -32,7 +36,7 @@ export interface UploadDropzoneWithHookProps<
 export interface UploadDropzoneWithExternalUploadProps<
   TRouter extends AnyFileRouterLike,
   TEndpoint extends RouteSlug<TRouter>,
-> extends UploadDropzoneBaseProps {
+> extends UploadDropzoneBaseProps<TRouter, TEndpoint> {
   upload: UseUploadResult<TRouter, TEndpoint>;
   endpoint?: never;
   onUploadBegin?: never;
@@ -56,7 +60,7 @@ export type UploadDropzoneProps<
 interface UploadDropzoneRootProps<
   TRouter extends AnyFileRouterLike,
   TEndpoint extends RouteSlug<TRouter>,
-> extends UploadDropzoneBaseProps {
+> extends UploadDropzoneBaseProps<TRouter, TEndpoint> {
   upload: UseUploadResult<TRouter, TEndpoint>;
 }
 

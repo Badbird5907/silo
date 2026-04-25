@@ -1,7 +1,7 @@
 "use client";
 
 import type { AppFileRouter } from "@/lib/sdk-demo/file-router";
-import type { RouterConfig } from "@silo-storage/sdk-server";
+import type { RouterConfig } from "../../../../sdk/server/src/index";
 import * as React from "react";
 import {
   ClerkLoaded,

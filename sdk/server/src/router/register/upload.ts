@@ -6,6 +6,7 @@ import type {
   InferMiddlewareData,
   SiloRouteOptionResolver,
   SiloRouteOptionResolverArgs,
+  RouteInputBySlug,
   UploadFileInputWithAcceptedMimeTypes,
 } from "../types";
 import type {
@@ -16,6 +17,7 @@ import type {
 } from "./types";
 import { buildInternalCallbackMetadata } from "../../envelope";
 import { enforceRouteConfigConstraints } from "../constraints";
+import { parseRouteInput } from "../input-schema";
 import {
   normalizeResolvedMimeTypesInput,
   normalizeRouteExpiryInput,
@@ -28,13 +30,20 @@ function toRecord(value: unknown, message: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function resolveRouteOption<TValue>(
-  option: SiloRouteOptionResolver<TValue> | undefined,
-  data: SiloRouteOptionResolverArgs<Record<string, unknown>, unknown>,
+function resolveRouteOption<
+  TValue,
+  TMiddlewareData extends Record<string, unknown>,
+  TContext,
+  TInput,
+>(
+  option:
+    | SiloRouteOptionResolver<TValue, TMiddlewareData, TContext, TInput>
+    | undefined,
+  data: SiloRouteOptionResolverArgs<TMiddlewareData, TContext, TInput>,
 ): Promise<TValue | undefined> {
   if (typeof option === "function") {
     const resolver = option as (
-      data: Record<string, unknown>,
+      data: SiloRouteOptionResolverArgs<TMiddlewareData, TContext, TInput>,
     ) => TValue | Promise<TValue>;
     return Promise.resolve(resolver(data));
   }
@@ -57,6 +66,13 @@ export async function registerRouteUpload<
   }
 
   const resolvedContext = (input.context ?? {}) as TContext;
+  const parsedInput = await parseRouteInput<RouteInputBySlug<TRouter, TRouteSlug>>(
+    {
+      routeSlug: input.routeSlug,
+      schema: route.inputSchema as never,
+      rawInput: input.input,
+    },
+  );
 
   const routeIsPublic = route.routeOptions?.isPublic;
   const files: UploadFileInputWithAcceptedMimeTypes[] = input.files.map(
@@ -77,7 +93,7 @@ export async function registerRouteUpload<
         await route.middleware({
           req: input.req,
           context: resolvedContext,
-          input: input.input,
+          input: parsedInput,
           files,
           routeConfig: route.routeConfig,
           routeSlug: input.routeSlug,
@@ -96,10 +112,12 @@ export async function registerRouteUpload<
 
   const routeOptionData: SiloRouteOptionResolverArgs<
     Record<string, unknown>,
-    TContext
+    TContext,
+    RouteInputBySlug<TRouter, TRouteSlug>
   > = {
     ...middlewareData,
     context: resolvedContext,
+    input: parsedInput,
   };
 
   const resolvedIsPublic = await resolveRouteOption(

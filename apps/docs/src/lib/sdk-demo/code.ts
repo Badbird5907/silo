@@ -14,7 +14,11 @@ export const fileRouter = {
       maxFileSize: "5MB",
       maxFileCount: 2,
     }
-  }).middleware(({ context }) => {
+  }).input(
+    z.object({ // input validation using zod (or any other Standard Schema lib)
+      folder: z.enum(["avatars", "attachments"]).default("avatars"),
+    })
+  ).middleware(({ context, input }) => {
     if (!context.userId) {
       throw new Error("Unauthorized");
     }

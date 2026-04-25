@@ -23,6 +23,7 @@ import { useStagedUploadInternal, useUploadInternal } from "./use-upload";
 
 export type {
   AnyFileRouterLike,
+  RouteInputBySlug,
   RouteOutputBySlug,
   RouteSlug,
   SiloProgressEvent,

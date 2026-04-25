@@ -219,7 +219,7 @@ export function useUploadInternal<
 
         files.forEach((file, index) => options.onUploadBegin?.(file, index));
 
-        const registrations = await registerUpload(
+        const registrations = await registerUpload<TRouter, TEndpoint>(
           factoryContext.endpointUrl,
           factoryContext.fetchImpl,
           {
@@ -599,7 +599,7 @@ export function useStagedUploadInternal<
         return [];
       }
 
-      const mergedOptions: UploadRequestOptions = {
+      const mergedOptions: UploadRequestOptions<TRouter, TEndpoint> = {
         input: requestOptions?.input ?? options.input,
         expiresIn: requestOptions?.expiresIn ?? options.expiresIn,
         protocol: requestOptions?.protocol ?? options.protocol,

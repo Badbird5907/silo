@@ -1,5 +1,5 @@
 import { ClerkProvider } from "@clerk/nextjs";
-import { extractRouterConfig } from "@silo-storage/sdk-server";
+import { extractRouterConfig } from "../../../../sdk/server/src/index";
 
 import { SdkDemoPageClient } from "@/components/sdk-demo-page-client";
 import { fileRouter } from "@/lib/sdk-demo/file-router";

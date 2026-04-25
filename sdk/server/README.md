@@ -28,6 +28,7 @@ By default, router registration uses core `uploadStrategy: "server"` (combined
 
 ```ts
 import type { FileRouter } from "@silo-storage/sdk-server";
+import { z } from "zod";
 
 import { createSiloUpload } from "@silo-storage/sdk-server";
 
@@ -37,14 +38,26 @@ const f = createSiloUpload<Request, Context>();
 
 export const fileRouter = {
   profilePicture: f(["image"])
+    .input(
+      z.object({
+        folder: z.enum(["avatars", "attachments"]).default("avatars"),
+        public: z.boolean().optional(),
+      }),
+    )
+    .public(({ input }) => input.public ?? false)
+    .serveImage(({ input }) => input.folder === "avatars")
     .middleware(async ({ req, context, input }) => {
       const userId = context?.userId ?? req.headers.get("x-user-id");
       if (!userId) throw new Error("Unauthorized");
-      return { userId, input };
+      return {
+        userId,
+        folder: input.folder,
+      };
     })
     .onUploadComplete(async ({ metadata, file, core }) => {
       return {
         uploadedBy: metadata.userId,
+        folder: metadata.folder,
         fileId: file.fileId,
         imageUrl: await core.generateImageUrl(file),
       };
@@ -53,15 +66,23 @@ export const fileRouter = {
     image: { maxFileSize: "2MB", maxFileCount: 4 },
     video: { maxFileSize: "256MB", maxFileCount: 1 },
   })
-    .mimeTypes(["image", "video"])
+    .input(
+      z.object({
+        kind: z.enum(["image", "video"]).default("image"),
+      }),
+    )
+    .mimeTypes(({ input }) =>
+      input.kind === "video" ? ["video"] : ["image/jpeg", "image/png"]
+    )
     .middleware(async ({ req, context, input }) => {
       const userId = context?.userId ?? req.headers.get("x-user-id");
       if (!userId) throw new Error("Unauthorized");
-      return { userId, input };
+      return { userId, kind: input.kind };
     })
     .onUploadComplete(async ({ metadata, file, core }) => {
       return {
         uploadedBy: metadata.userId,
+        kind: metadata.kind,
         fileId: file.fileId,
         imageUrl: await core.generateImageUrl(file),
       };
@@ -72,8 +93,12 @@ export const fileRouter = {
 Middleware return values are persisted as file metadata during registration and
 are provided back to `onUploadComplete` via the callback event file payload.
 
+Use `.input(schema)` when a specific route needs validated input. The schema must
+implement Standard Schema v1, so Zod works directly and the parsed output is
+what middleware and option resolvers receive as `input`.
+
 `mimeTypes(...)` accepts all of these forms:
 
 - `.mimeTypes("image")`
 - `.mimeTypes(["video", "image/jpeg"])`
-- `.mimeTypes(async ({ context }) => (context ? "blob" : ["image", "application/pdf"]))`
+- `.mimeTypes(async ({ context, input }) => (input?.kind === "video" ? "video" : ["image", "application/pdf"]))`

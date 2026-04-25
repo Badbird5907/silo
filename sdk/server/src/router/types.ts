@@ -1,4 +1,5 @@
 import type { FileRouterInputKey } from "@silo-storage/mime-types";
+import type { StandardSchemaV1 } from "@standard-schema/spec";
 import type {
   PrepareUploadInput,
   UploadCore,
@@ -50,26 +51,53 @@ export type UploadFileInputWithAcceptedMimeTypes = UploadFileInput & {
 export type SiloRouteOptionResolverArgs<
   TMiddlewareData extends Record<string, unknown>,
   TContext,
+  TInput = unknown,
 > = TMiddlewareData & {
   context: TContext;
+  input: TInput;
 };
 
 export type SiloRouteOptionResolver<
   TValue,
   TMiddlewareData extends Record<string, unknown> = Record<string, unknown>,
   TContext = Record<string, never>,
+  TInput = unknown,
 > =
   | TValue
   | undefined
   | ((
-      data: SiloRouteOptionResolverArgs<TMiddlewareData, TContext>,
+      data: SiloRouteOptionResolverArgs<TMiddlewareData, TContext, TInput>,
     ) => Promise<TValue | undefined> | TValue | undefined);
 
-export interface SiloRouteOptions {
-  isPublic?: SiloRouteOptionResolver<SiloRoutePublicInput>;
-  serveImage?: SiloRouteOptionResolver<SiloRouteServeImageInput>;
-  fileExpiry?: SiloRouteOptionResolver<SiloRouteExpiryInput | undefined>;
-  mimeTypes?: SiloRouteOptionResolver<SiloRouteMimeTypesInput | undefined>;
+export interface SiloRouteOptions<
+  TMiddlewareData extends Record<string, unknown> = Record<string, unknown>,
+  TContext = Record<string, never>,
+  TInput = unknown,
+> {
+  isPublic?: SiloRouteOptionResolver<
+    SiloRoutePublicInput,
+    TMiddlewareData,
+    TContext,
+    TInput
+  >;
+  serveImage?: SiloRouteOptionResolver<
+    SiloRouteServeImageInput,
+    TMiddlewareData,
+    TContext,
+    TInput
+  >;
+  fileExpiry?: SiloRouteOptionResolver<
+    SiloRouteExpiryInput | undefined,
+    TMiddlewareData,
+    TContext,
+    TInput
+  >;
+  mimeTypes?: SiloRouteOptionResolver<
+    SiloRouteMimeTypesInput | undefined,
+    TMiddlewareData,
+    TContext,
+    TInput
+  >;
 }
 
 export interface SiloRouteMiddlewareArgs<
@@ -80,7 +108,7 @@ export interface SiloRouteMiddlewareArgs<
 > {
   req: TRequest;
   context: TContext;
-  input?: TInput;
+  input: TInput;
   files: UploadFileInput[];
   routeConfig: TRouteConfig;
   routeSlug: string;
@@ -152,7 +180,12 @@ export interface SiloFileRoute<
   TInput = unknown,
 > {
   routeConfig: TRouteConfig;
-  routeOptions?: SiloRouteOptions;
+  routeOptions?: SiloRouteOptions<TMiddlewareData, TContext, TInput>;
+  inputSchema?: StandardSchemaV1<unknown, TInput>;
+  readonly "~types"?: {
+    input: TInput;
+    output: TOutput;
+  };
   middleware?(
     args: SiloRouteMiddlewareArgs<TRequest, TRouteConfig, TContext, TInput>,
   ): Promise<TMiddlewareData> | TMiddlewareData;
@@ -168,6 +201,15 @@ export interface SiloRouteBuilder<
   TMiddlewareData extends Record<string, unknown>,
   TInput = unknown,
 > {
+  input: <TSchema extends StandardSchemaV1>(
+    schema: TSchema,
+  ) => SiloRouteBuilder<
+    TRequest,
+    TContext,
+    TRouteConfig,
+    TMiddlewareData,
+    StandardSchemaV1.InferOutput<TSchema>
+  >;
   middleware: <TNextMiddlewareData extends Record<string, unknown>>(
     middleware: MiddlewareFn<
       TRequest,
@@ -187,7 +229,8 @@ export interface SiloRouteBuilder<
     isPublic: SiloRouteOptionResolver<
       SiloRoutePublicInput,
       TMiddlewareData,
-      TContext
+      TContext,
+      TInput
     >,
   ) => SiloRouteBuilder<
     TRequest,
@@ -200,7 +243,8 @@ export interface SiloRouteBuilder<
     serveImage: SiloRouteOptionResolver<
       SiloRouteServeImageInput,
       TMiddlewareData,
-      TContext
+      TContext,
+      TInput
     >,
   ) => SiloRouteBuilder<
     TRequest,
@@ -213,7 +257,8 @@ export interface SiloRouteBuilder<
     fileExpiry: SiloRouteOptionResolver<
       SiloRouteExpiryInput | undefined,
       TMiddlewareData,
-      TContext
+      TContext,
+      TInput
     >,
   ) => SiloRouteBuilder<
     TRequest,
@@ -226,7 +271,8 @@ export interface SiloRouteBuilder<
     mimeTypes: SiloRouteOptionResolver<
       SiloRouteMimeTypesInput | undefined,
       TMiddlewareData,
-      TContext
+      TContext,
+      TInput
     >,
   ) => SiloRouteBuilder<
     TRequest,
@@ -256,9 +302,9 @@ export type FileRouter<
     TRequest,
     TContext,
     SiloRouteConfig,
-    Record<string, unknown>,
-    unknown,
-    unknown
+    any,
+    any,
+    any
   >
 >;
 
@@ -285,17 +331,7 @@ export type RouteOutputBySlug<
 export type RouteInputBySlug<
   TRouter extends Record<string, unknown>,
   TRouteSlug extends RouteSlug<TRouter>,
-> =
-  TRouter[TRouteSlug] extends SiloFileRoute<
-    infer _TRequest,
-    infer _TContext,
-    infer _TRouteConfig,
-    infer _TMiddlewareData,
-    infer _TOutput,
-    infer TInput
-  >
-    ? TInput
-    : never;
+> = InferRouteInput<TRouter[TRouteSlug]>;
 
 export type InferMiddlewareData<TRoute> =
   TRoute extends SiloFileRoute<
@@ -309,19 +345,51 @@ export type InferMiddlewareData<TRoute> =
     ? TMiddlewareData
     : never;
 
+export type InferRouteInput<TRoute> =
+  TRoute extends {
+    readonly "~types"?: {
+      input: infer TInput;
+    };
+  }
+    ? TInput
+    : TRoute extends SiloFileRoute<
+          infer _TRequest,
+          infer _TContext,
+          infer _TRouteConfig,
+          infer _TMiddlewareData,
+          infer _TOutput,
+          infer TInput
+        >
+      ? TInput
+      : never;
+
 export type InferRouteOutput<TRoute> =
-  TRoute extends SiloFileRoute<
-    infer _TRequest,
-    infer _TContext,
-    infer _TRouteConfig,
-    infer _TMiddlewareData,
-    infer TOutput,
-    infer _TInput
-  >
+  TRoute extends {
+    readonly "~types"?: {
+      output: infer TOutput;
+    };
+  }
     ? TOutput
+    : TRoute extends SiloFileRoute<
+          infer _TRequest,
+          infer _TContext,
+          infer _TRouteConfig,
+          infer _TMiddlewareData,
+          infer TOutput,
+          infer _TInput
+        >
+      ? TOutput
     : never;
 
 export type RouteRegisterInput = Omit<PrepareUploadInput, "callbackMetadata">;
+
+export type SiloStandardSchema<
+  TInput = unknown,
+  TOutput = TInput,
+> = StandardSchemaV1<TInput, TOutput>;
+
+export type SiloInputSchema<TInput = unknown, TOutput = TInput> =
+  SiloStandardSchema<TInput, TOutput>;
 
 export type RouterConfig<TRouter extends Record<string, unknown>> = {
   [TRouteSlug in RouteSlug<TRouter>]: RouteConfigBySlug<TRouter, TRouteSlug>;

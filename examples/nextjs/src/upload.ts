@@ -1,4 +1,5 @@
 import { createSiloUpload, FileRouter } from "@silo-storage/sdk-server";
+import { z } from "zod";
 
 type UploadContext = {
   userId: string | null;
@@ -21,20 +22,28 @@ export const fileRouter = {
       maxFileCount: 1,
     },
   })
-    .middleware(async ({ context }) => {
+    .input(
+      z.object({
+        folder: z.enum(["avatars", "attachments"]).default("avatars"),
+        public: z.boolean().optional(),
+      }),
+    )
+    .middleware(async ({ context, input }) => {
       if (!context?.userId) {
         throw new Error("Unauthorized");
       }
       return {
         userId: context.userId,
+        folder: input.folder,
       };
     })
-    .public(true) // either this, or pass in a function
+    .public(({ input }) => input.public ?? true) // either this, or pass in a function
     .expires({ ttl: "2 minutes" }) // either this, or pass in a function
     .onUploadComplete(async ({ metadata, file }) => {
       console.info("[onUploadComplete]", { metadata, file });
       return {
         uploadedBy: metadata.userId,
+        folder: metadata.folder,
         fileKeyId: file.fileKeyId,
         accessKey: file.accessKey,
         fileName: file.fileName,

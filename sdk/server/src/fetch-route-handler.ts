@@ -10,6 +10,7 @@ import type {
 import { z } from "zod";
 
 import { handleUploadCallback } from "./callback-handler";
+import { SiloRouteInputValidationError } from "./errors";
 import { createHttpCompletionStore } from "./http-completion-store";
 import type { FileRouter } from "./router";
 import { extractRouterConfig, registerRouteUpload } from "./router";
@@ -351,180 +352,198 @@ export function createFetchRouteHandler<
   }
 
   async function POST(this: void, request: Request) {
-    const context = options.resolveContext
-      ? await options.resolveContext(request)
-      : undefined;
+    try {
+      const context = options.resolveContext
+        ? await options.resolveContext(request)
+        : undefined;
 
-    if (isCallbackRequest(request)) {
-      const signingSecret = options.core.config.signingSecret;
-      if (!signingSecret) {
-        throw new Error(
-          "Missing signingSecret for callback verification. Provide signingSecret when creating the core client.",
-        );
+      if (isCallbackRequest(request)) {
+        const signingSecret = options.core.config.signingSecret;
+        if (!signingSecret) {
+          throw new Error(
+            "Missing signingSecret for callback verification. Provide signingSecret when creating the core client.",
+          );
+        }
+
+        const callbackResult = await handleUploadCallback<
+          Request,
+          Awaited<TContext>,
+          TRouter
+        >({
+          router: options.router,
+          core: options.core,
+          request,
+          signingSecret,
+          context,
+        });
+
+        if (callbackResult.status === "handled") {
+          const fileKeyId = callbackResult.event.data.fileKeyId;
+          const setStartedAt = Date.now();
+          logCompletionDebug("callback.received", {
+            fileKeyId,
+            routeSlug: callbackResult.routeSlug,
+          });
+          try {
+            await completionStore.set(
+              fileKeyId,
+              {
+                routeSlug: callbackResult.routeSlug,
+                fileKeyId,
+                completedAt: Date.now(),
+                onUploadCompleteResult: callbackResult.onUploadCompleteResult,
+              },
+              completionTtlMs,
+            );
+            logCompletionDebug("completion.set.ok", {
+              fileKeyId,
+              elapsedMs: Date.now() - setStartedAt,
+            });
+          } catch (error) {
+            logCompletionDebug("completion.set.error", {
+              fileKeyId,
+              elapsedMs: Date.now() - setStartedAt,
+              error: error instanceof Error ? error.message : String(error),
+            });
+            throw error;
+          }
+        }
+
+        return json({
+          ok: true,
+          callback: callbackResult,
+        });
       }
 
-      const callbackResult = await handleUploadCallback<
-        Request,
-        Awaited<TContext>,
-        TRouter
-      >({
-        router: options.router,
-        core: options.core,
-        request,
-        signingSecret,
-        context,
-      });
+      const action = await parseActionBody(request);
 
-      if (callbackResult.status === "handled") {
-        const fileKeyId = callbackResult.event.data.fileKeyId;
-        const setStartedAt = Date.now();
-        logCompletionDebug("callback.received", {
-          fileKeyId,
-          routeSlug: callbackResult.routeSlug,
+      if (action.action === "await-completion") {
+        const timeoutMs = action.timeoutMs ?? 20_000;
+        const waitStartedAt = Date.now();
+        logCompletionDebug("completion.wait.start", {
+          fileKeyId: action.fileKeyId,
+          timeoutMs,
         });
+        let completion: CompletionEntry | null = null;
         try {
-          await completionStore.set(
-            fileKeyId,
-            {
-              routeSlug: callbackResult.routeSlug,
-              fileKeyId,
-              completedAt: Date.now(),
-              onUploadCompleteResult: callbackResult.onUploadCompleteResult,
-            },
-            completionTtlMs,
-          );
-          logCompletionDebug("completion.set.ok", {
-            fileKeyId,
-            elapsedMs: Date.now() - setStartedAt,
-          });
+          completion = await completionStore.wait(action.fileKeyId, timeoutMs);
         } catch (error) {
-          logCompletionDebug("completion.set.error", {
-            fileKeyId,
-            elapsedMs: Date.now() - setStartedAt,
+          logCompletionDebug("completion.wait.error", {
+            fileKeyId: action.fileKeyId,
+            timeoutMs,
+            elapsedMs: Date.now() - waitStartedAt,
             error: error instanceof Error ? error.message : String(error),
           });
           throw error;
+        }
+        logCompletionDebug("completion.wait.done", {
+          fileKeyId: action.fileKeyId,
+          timeoutMs,
+          elapsedMs: Date.now() - waitStartedAt,
+          found: Boolean(completion),
+        });
+        if (!completion) {
+          return json(
+            {
+              ok: false,
+              pending: true,
+            },
+            202,
+          );
+        }
+
+        return json({
+          ok: true,
+          completion,
+        });
+      }
+
+      if (!(action.endpoint in options.router)) {
+        throw new Error(`Unknown route endpoint "${action.endpoint}"`);
+      }
+      const routeSlug = action.endpoint as keyof TRouter & string;
+      const completionTransport = resolveUploadCompletionTransport(
+        options.completionTransport,
+        runtimeNodeEnv,
+      );
+      const shouldUseDevelopmentMode = completionTransport === "sse";
+      const callbackUrl = shouldUseDevelopmentMode
+        ? undefined
+        : await resolveCallbackUrl(
+            request,
+            options.callbackUrl,
+            options.core.config.callbackUrl,
+          );
+
+      const registerResult = await registerRouteUpload({
+        core: options.core,
+        router: options.router,
+        routeSlug,
+        req: request,
+        context,
+        input: action.input as never,
+        expiresIn: action.expiresIn,
+        protocol: action.protocol,
+        callbackUrl,
+        dev: shouldUseDevelopmentMode,
+        files: toUploadFiles(action.files),
+      });
+
+      if (registerResult.registerResult.mode === "development") {
+        const route = options.router[routeSlug];
+        if (!route) {
+          throw new Error(`No route found for slug "${routeSlug}"`);
+        }
+
+        const developmentStreams = resolveDevelopmentStreams(
+          registerResult.registerResult as {
+            streams: ReadableStream<Uint8Array>[];
+          },
+        );
+
+        for (const stream of developmentStreams) {
+          startDevelopmentCompletionWorker({
+            routeSlug,
+            route,
+            context,
+            stream,
+          });
         }
       }
 
       return json({
         ok: true,
-        callback: callbackResult,
+        endpoint: routeSlug,
+        files: registerResult.registerResult.files.map((file) => ({
+          fileKeyId: file.fileKeyId,
+          accessKey: file.accessKey,
+          uploadUrl: file.uploadUrl,
+          fileName: file.fileName,
+          size: file.size,
+          hash: file.hash,
+          mimeType: file.mimeType,
+          isPublic: file.isPublic,
+          serveImage: file.serveImage,
+          expiresAt: file.expiresAt,
+        })),
       });
-    }
-
-    const action = await parseActionBody(request);
-
-    if (action.action === "await-completion") {
-      const timeoutMs = action.timeoutMs ?? 20_000;
-      const waitStartedAt = Date.now();
-      logCompletionDebug("completion.wait.start", {
-        fileKeyId: action.fileKeyId,
-        timeoutMs,
-      });
-      let completion: CompletionEntry | null = null;
-      try {
-        completion = await completionStore.wait(action.fileKeyId, timeoutMs);
-      } catch (error) {
-        logCompletionDebug("completion.wait.error", {
-          fileKeyId: action.fileKeyId,
-          timeoutMs,
-          elapsedMs: Date.now() - waitStartedAt,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        throw error;
-      }
-      logCompletionDebug("completion.wait.done", {
-        fileKeyId: action.fileKeyId,
-        timeoutMs,
-        elapsedMs: Date.now() - waitStartedAt,
-        found: Boolean(completion),
-      });
-      if (!completion) {
+    } catch (error) {
+      if (error instanceof SiloRouteInputValidationError) {
         return json(
           {
             ok: false,
-            pending: true,
+            error: {
+              code: error.code,
+              message: error.message,
+              issues: error.issues,
+            },
           },
-          202,
+          400,
         );
       }
 
-      return json({
-        ok: true,
-        completion,
-      });
+      throw error;
     }
-
-    if (!(action.endpoint in options.router)) {
-      throw new Error(`Unknown route endpoint "${action.endpoint}"`);
-    }
-    const routeSlug = action.endpoint as keyof TRouter & string;
-    const completionTransport = resolveUploadCompletionTransport(
-      options.completionTransport,
-      runtimeNodeEnv,
-    );
-    const shouldUseDevelopmentMode = completionTransport === "sse";
-    const callbackUrl = shouldUseDevelopmentMode
-      ? undefined
-      : await resolveCallbackUrl(
-          request,
-          options.callbackUrl,
-          options.core.config.callbackUrl,
-        );
-
-    const registerResult = await registerRouteUpload({
-      core: options.core,
-      router: options.router,
-      routeSlug,
-      req: request,
-      context,
-      input: action.input as never,
-      expiresIn: action.expiresIn,
-      protocol: action.protocol,
-      callbackUrl,
-      dev: shouldUseDevelopmentMode,
-      files: toUploadFiles(action.files),
-    });
-
-    if (registerResult.registerResult.mode === "development") {
-      const route = options.router[routeSlug];
-      if (!route) {
-        throw new Error(`No route found for slug "${routeSlug}"`);
-      }
-
-      const developmentStreams = resolveDevelopmentStreams(
-        registerResult.registerResult as {
-          streams: ReadableStream<Uint8Array>[];
-        },
-      );
-
-      for (const stream of developmentStreams) {
-        startDevelopmentCompletionWorker({
-          routeSlug,
-          route,
-          context,
-          stream,
-        });
-      }
-    }
-
-    return json({
-      ok: true,
-      endpoint: routeSlug,
-      files: registerResult.registerResult.files.map((file) => ({
-        fileKeyId: file.fileKeyId,
-        accessKey: file.accessKey,
-        uploadUrl: file.uploadUrl,
-        fileName: file.fileName,
-        size: file.size,
-        hash: file.hash,
-        mimeType: file.mimeType,
-        isPublic: file.isPublic,
-        serveImage: file.serveImage,
-        expiresAt: file.expiresAt,
-      })),
-    });
   }
 
   return {
