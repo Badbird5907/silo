@@ -1,17 +1,17 @@
-import type { UploadAccepts } from "./types";
+import type { UploadAccept } from "./types";
 
 export function resolveStaticAcceptValue(
-  accepts: UploadAccepts | undefined,
+  accept: UploadAccept | undefined,
 ): string | undefined {
-  return typeof accepts === "string" ? accepts : undefined;
+  return typeof accept === "string" ? accept : undefined;
 }
 
 export async function resolveAcceptValue(
-  accepts: UploadAccepts | undefined,
+  accept: UploadAccept | undefined,
 ): Promise<string | undefined> {
-  if (typeof accepts === "function") {
-    return accepts();
+  if (typeof accept === "function") {
+    return accept();
   }
 
-  return accepts;
+  return accept;
 }

@@ -2,7 +2,6 @@ import * as React from "react";
 
 import type {
   AnyFileRouterLike,
-  OpenFilePickerOptions,
   RouterConfigLike,
   RouteSlug,
   UploadCompletion,
@@ -14,7 +13,6 @@ import type {
 } from "./types";
 import {
   resolveAcceptValue,
-  resolveStaticAcceptValue,
 } from "./accepts";
 import {
   buildAcceptAttribute,
@@ -51,7 +49,9 @@ function resolveUploadConcurrency(
 }
 
 function openFilePickerDialog(
-  options: OpenFilePickerOptions & {
+  options: {
+    multiple?: boolean;
+    accept?: string;
     onCancel?: () => void;
   },
 ): Promise<File[]> {
@@ -147,13 +147,9 @@ export function useUploadInternal<
     () => buildAcceptAttribute(routeFileTypeKeys),
     [routeFileTypeKeys],
   );
-  const accepts = React.useMemo(
-    () => options.accepts ?? options.accept ?? routeAccept,
-    [options.accepts, options.accept, routeAccept],
-  );
   const accept = React.useMemo(
-    () => resolveStaticAcceptValue(accepts) ?? routeAccept,
-    [accepts, routeAccept],
+    () => options.accept ?? routeAccept,
+    [options.accept, routeAccept],
   );
   const supportsMultipleByRoute = React.useMemo(
     () => routeAllowsMultipleFiles(effectiveRouterConfig, options.endpoint),
@@ -416,7 +412,7 @@ export function useUploadInternal<
     async (beginOptions) => {
       try {
         const pickerAccept = await resolveAcceptValue(
-          beginOptions?.accepts ?? beginOptions?.accept ?? accepts,
+          beginOptions?.accept ?? accept,
         );
         const selected = await openFilePickerDialog({
           multiple: beginOptions?.multiple ?? supportsMultipleByRoute ?? false,
@@ -462,7 +458,6 @@ export function useUploadInternal<
       }
     },
     [
-      accepts,
       maxFileCountByRoute,
       options,
       supportsMultipleByRoute,
@@ -489,7 +484,6 @@ export function useUploadInternal<
     error,
     result,
     accept,
-    accepts,
     uploadFiles,
     uploadFile,
     beginUpload,
@@ -536,12 +530,7 @@ export function useStagedUploadInternal<
           supportsMultipleByRoute ??
           false;
         const pickerAccept = await resolveAcceptValue(
-          pickerOptions?.accepts ??
-            pickerOptions?.accept ??
-            options.accepts ??
-            options.accept ??
-            upload.accepts ??
-            upload.accept,
+          pickerOptions?.accept ?? options.accept ?? upload.accept,
         );
         const selected = await openFilePickerDialog({
           multiple: shouldAllowMultiple,
@@ -602,7 +591,6 @@ export function useStagedUploadInternal<
       options,
       supportsMultipleByRoute,
       upload.accept,
-      upload.accepts,
     ],
   );
 
@@ -659,7 +647,6 @@ export function useStagedUploadInternal<
     error: upload.error,
     result: upload.result,
     accept: upload.accept,
-    accepts: upload.accepts,
     openFilePicker,
     removeFile,
     clearFiles,

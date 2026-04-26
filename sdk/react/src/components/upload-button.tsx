@@ -4,7 +4,7 @@ import type {
   AnyFileRouterLike,
   RouteInputBySlug,
   RouteSlug,
-  UploadAccepts,
+  UploadAccept,
   UseUploadOptions,
   UseUploadResult,
 } from "../types";
@@ -19,8 +19,7 @@ interface UploadButtonBaseProps<
 > {
   multiple?: boolean;
   disabled?: boolean;
-  accept?: string;
-  accepts?: UploadAccepts;
+  accept?: UploadAccept;
   input?: RouteInputBySlug<TRouter, TEndpoint>;
   awaitTimeoutMs?: number;
   concurrency?: number;
@@ -78,7 +77,6 @@ function UploadButtonRoot<
     multiple,
     disabled,
     accept,
-    accepts,
     input,
     awaitTimeoutMs,
     concurrency,
@@ -86,18 +84,18 @@ function UploadButtonRoot<
   } = props;
   const inputRef = React.useRef<HTMLInputElement>(null);
   const isDisabled = disabled === true || upload.isUploading;
-  const pickerAccepts = accepts ?? accept ?? upload.accepts ?? upload.accept;
+  const pickerAccept = accept ?? upload.accept;
   const staticAccept =
-    resolveStaticAcceptValue(pickerAccepts) ?? upload.accept ?? "";
+    resolveStaticAcceptValue(pickerAccept) ?? "";
   const handleClick = React.useCallback(() => {
     const input = inputRef.current;
     if (!input) return;
 
     void (async () => {
-      input.accept = (await resolveAcceptValue(pickerAccepts)) ?? "";
+      input.accept = (await resolveAcceptValue(pickerAccept)) ?? "";
       input.click();
     })();
-  }, [pickerAccepts]);
+  }, [pickerAccept]);
 
   return (
     <>
@@ -161,7 +159,6 @@ function UploadButtonWithHook<
     onUploadAborted,
     onFileDialogCancel,
     accept,
-    accepts,
     multiple,
     disabled,
     input,
@@ -172,7 +169,6 @@ function UploadButtonWithHook<
   const upload = useUpload({
     endpoint,
     accept,
-    accepts,
     onUploadBegin,
     onUploadProgress,
     onComplete,
@@ -187,7 +183,6 @@ function UploadButtonWithHook<
       multiple={multiple}
       disabled={disabled}
       accept={accept}
-      accepts={accepts}
       input={input}
       awaitTimeoutMs={awaitTimeoutMs}
       concurrency={concurrency}
@@ -215,7 +210,6 @@ export function UploadButton<
       multiple,
       disabled,
       accept,
-      accepts,
       input,
       awaitTimeoutMs,
       concurrency,
@@ -228,7 +222,6 @@ export function UploadButton<
         multiple={multiple}
         disabled={disabled}
         accept={accept}
-        accepts={accepts}
         input={input}
         awaitTimeoutMs={awaitTimeoutMs}
         concurrency={concurrency}

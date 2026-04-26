@@ -1,11 +1,13 @@
 "use client";
 
 import type { ListFilesResult, SiloFileSummary } from "@silo-storage/sdk-core";
+import type { UploadCompletion } from "@silo-storage/sdk-react";
 import * as React from "react";
 import { Show, SignInButton, SignUpButton, useAuth } from "@clerk/nextjs";
 import { useQuery } from "@tanstack/react-query";
 import { Eye, Loader2, RefreshCcw, UploadIcon } from "lucide-react";
 
+import type { AppFileRouter } from "@/lib/sdk-demo/file-router";
 import { Button } from "@silo-storage/ui/components/button";
 import {
   Card,
@@ -22,6 +24,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 interface MyFilesApiResponse {
   data: ListFilesResult;
 }
+
+type ImageUploadCompletion = UploadCompletion<AppFileRouter, "imageUploader">;
 
 async function fetchMyFiles(): Promise<SiloFileSummary[]> {
   const response = await fetch("/api/sdk-demo/my-files?page=1&pageSize=25", {
@@ -147,7 +151,8 @@ export function SdkUploadDemo() {
 
   const upload = useUpload({
     endpoint: "imageUploader",
-    onComplete: (result) => {
+    accept: "image/png,image/jpeg",
+    onComplete: (result: ImageUploadCompletion[]) => {
       console.log("onComplete", result);
       setUploadError(null);
       void myFilesQuery.refetch();

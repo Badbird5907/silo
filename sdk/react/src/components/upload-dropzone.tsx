@@ -4,7 +4,7 @@ import type {
   AnyFileRouterLike,
   RouteInputBySlug,
   RouteSlug,
-  UploadAccepts,
+  UploadAccept,
   UseUploadOptions,
   UseUploadResult,
 } from "../types";
@@ -16,8 +16,7 @@ interface UploadDropzoneBaseProps<
   disabled?: boolean;
   /** When true, clicking the dropzone opens the system file picker (via `upload.beginUpload`). */
   clickable?: boolean;
-  accept?: string;
-  accepts?: UploadAccepts;
+  accept?: UploadAccept;
   input?: RouteInputBySlug<TRouter, TEndpoint>;
   awaitTimeoutMs?: number;
   concurrency?: number;
@@ -76,7 +75,6 @@ function UploadDropzoneRoot<
     disabled,
     clickable,
     accept,
-    accepts,
     input,
     awaitTimeoutMs,
     concurrency,
@@ -94,7 +92,7 @@ function UploadDropzoneRoot<
         clickable && canUpload
           ? () => {
               void upload.beginUpload({
-                accepts: accepts ?? accept ?? upload.accepts ?? upload.accept,
+                accept: accept ?? upload.accept,
                 input,
                 awaitTimeoutMs,
                 concurrency,
@@ -152,7 +150,6 @@ function UploadDropzoneWithHook<
     onUploadAborted,
     onFileDialogCancel,
     accept,
-    accepts,
     disabled,
     clickable,
     input,
@@ -164,7 +161,6 @@ function UploadDropzoneWithHook<
   const upload = useUpload({
     endpoint,
     accept,
-    accepts,
     onUploadBegin,
     onUploadProgress,
     onComplete,
@@ -179,7 +175,6 @@ function UploadDropzoneWithHook<
       disabled={disabled}
       clickable={clickable}
       accept={accept}
-      accepts={accepts}
       input={input}
       awaitTimeoutMs={awaitTimeoutMs}
       concurrency={concurrency}
@@ -208,7 +203,6 @@ export function UploadDropzone<
       disabled,
       clickable,
       accept,
-      accepts,
       input,
       awaitTimeoutMs,
       concurrency,
@@ -222,7 +216,6 @@ export function UploadDropzone<
         disabled={disabled}
         clickable={clickable}
         accept={accept}
-        accepts={accepts}
         input={input}
         awaitTimeoutMs={awaitTimeoutMs}
         concurrency={concurrency}
