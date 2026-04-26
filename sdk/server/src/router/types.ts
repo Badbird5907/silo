@@ -329,27 +329,29 @@ export type SiloRouteBuilder<
     THasExpects
   >;
 
-export type FileRouter<
-  TRequest = unknown,
-  TContext = Record<string, never>,
-> = Record<
-  string,
-  SiloFileRoute<
-    TRequest,
-    TContext,
-    Record<string, unknown>,
-    unknown,
-    unknown
-  >
->;
+export interface AnyFileRoute {
+  routeConfig?: SiloRouteConfig;
+  expects?: unknown;
+  routeOptions?: {
+    isPublic?: unknown;
+    serveImage?: unknown;
+    fileExpiry?: unknown;
+  };
+  inputSchema?: StandardSchemaV1<unknown, unknown>;
+  readonly "~types"?: {
+    input: unknown;
+    output: unknown;
+  };
+  middleware?(args: unknown): unknown;
+  onUploadComplete(args: unknown): unknown;
+}
 
-export type AnyFileRouter = Record<
-  string,
-  {
-    routeConfig?: SiloRouteConfig;
-    onUploadComplete(args: unknown): unknown;
-  }
->;
+export type FileRouter<
+  _TRequest = unknown,
+  _TContext = Record<string, never>,
+> = Record<string, AnyFileRoute>;
+
+export type AnyFileRouter = Record<string, AnyFileRoute>;
 
 export type RouteSlug<TRouter extends Record<string, unknown>> = keyof TRouter &
   string;

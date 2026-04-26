@@ -6,6 +6,7 @@ import type {
   InferMiddlewareData,
   RouteInputBySlug,
   SiloRouteConfigInput,
+  SiloRouteOptions,
   SiloRouteOptionResolver,
   SiloRouteOptionResolverArgs,
   UploadFileInputWithAcceptedMimeTypes,
@@ -97,8 +98,15 @@ export async function registerRouteUpload<
       rawInput: input.input,
     },
   );
+  const routeOptions = route.routeOptions as
+    | SiloRouteOptions<
+        Record<string, unknown>,
+        TContext,
+        RouteInputBySlug<TRouter, TRouteSlug>
+      >
+    | undefined;
 
-  const routeIsPublic = route.routeOptions?.isPublic;
+  const routeIsPublic = routeOptions?.isPublic;
   const files: UploadFileInputWithAcceptedMimeTypes[] = input.files.map(
     (file) => ({
       ...file,
@@ -158,11 +166,11 @@ export async function registerRouteUpload<
   );
 
   const resolvedIsPublic = await resolveRouteOption(
-    route.routeOptions?.isPublic,
+    routeOptions?.isPublic,
     routeOptionData,
   );
   const resolvedServeImage = await resolveRouteOption(
-    route.routeOptions?.serveImage,
+    routeOptions?.serveImage,
     routeOptionData,
   );
 
@@ -183,7 +191,7 @@ export async function registerRouteUpload<
   }
 
   const routeFileExpiry = await resolveRouteOption(
-    route.routeOptions?.fileExpiry,
+    routeOptions?.fileExpiry,
     routeOptionData,
   );
 
