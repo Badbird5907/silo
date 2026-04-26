@@ -289,7 +289,7 @@ export function normalizeRouteConfigInput(
 export function parseMaxFileSizeBytes(maxFileSize: string): number {
   const trimmed = maxFileSize.trim();
   const match = /^(\d+(?:\.\d+)?)\s*(b|kb|mb|gb|tb)$/i.exec(trimmed);
-  if (!match) {
+  if (!match?.[1] || !match[2]) {
     throw new Error(
       `Invalid maxFileSize value "${maxFileSize}". Expected formats like "2MB" or "512KB".`,
     );
