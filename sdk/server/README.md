@@ -80,6 +80,7 @@ export const fileRouter = {
         uploadedBy: metadata.userId,
         folder: metadata.folder,
         fileId: file.fileId,
+        expiresAt: file.expiresAt,
         imageUrl: await core.generateImageUrl(file),
       };
     }),

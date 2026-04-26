@@ -85,6 +85,7 @@ export async function createDevUploadEventStream(request: Request, input: {
                   hash: fileKey.file?.hash ?? null,
                   mimeType: fileKey.file?.mimeType ?? "application/octet-stream",
                   size: fileKey.file?.size ?? 0,
+                  expiresAt: fileKey.expiresAt?.toISOString() ?? null,
                   metadata: normalizeFileKeyMetadata(fileKey.metadata),
                 },
               }

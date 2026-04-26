@@ -94,6 +94,7 @@ export const fileRouter = {
         plan: metadata.plan,
         fileId: file.fileId,
         fileKeyId: file.fileKeyId,
+        expiresAt: file.expiresAt,
         imageUrl: await core.generateImageUrl(file),
       };
     }),

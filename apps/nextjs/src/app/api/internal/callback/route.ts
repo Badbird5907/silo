@@ -575,6 +575,7 @@ export async function POST(request: Request) {
           hash: file.hash,
           mimeType: file.mimeType,
           size: file.size,
+          expiresAt: fileKey.expiresAt?.toISOString() ?? null,
           metadata: normalizeFileKeyMetadata(fileKey.metadata),
         },
         `upload.completed:${fileKey.id}`,

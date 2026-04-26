@@ -50,6 +50,7 @@ const devUploadCompletedEventDataSchema = z.object({
   hash: z.string().nullable(),
   mimeType: z.string(),
   size: z.number(),
+  expiresAt: z.string().datetime().nullable(),
   metadata: z.record(z.string(), z.unknown()),
 });
 

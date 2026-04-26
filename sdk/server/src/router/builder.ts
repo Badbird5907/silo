@@ -122,12 +122,7 @@ function createRouteBuilder<
     ) =>
       withRouteOptions({
         ...routeOptions,
-        isPublic:
-          isPublic as SiloRouteOptions<
-            TMiddlewareData,
-            TContext,
-            TInput
-          >["isPublic"],
+        isPublic,
       }),
     serveImage: (
       serveImage: SiloRouteOptions<
@@ -138,12 +133,7 @@ function createRouteBuilder<
     ) =>
       withRouteOptions({
         ...routeOptions,
-        serveImage:
-          serveImage as SiloRouteOptions<
-            TMiddlewareData,
-            TContext,
-            TInput
-          >["serveImage"],
+        serveImage,
       }),
     expires: (
       fileExpiry: SiloRouteOptions<
@@ -154,12 +144,7 @@ function createRouteBuilder<
     ) =>
       withRouteOptions({
         ...routeOptions,
-        fileExpiry:
-          fileExpiry as SiloRouteOptions<
-            TMiddlewareData,
-            TContext,
-            TInput
-          >["fileExpiry"],
+        fileExpiry,
       }),
     onUploadComplete: <TOutput>(
       onUploadComplete: OnUploadCompleteFn<TMiddlewareData, TOutput, TContext>,

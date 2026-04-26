@@ -13,7 +13,7 @@ const expiryListResponseSchema = z.object({
       projectId: z.string(),
       environmentId: z.string(),
       accessKey: z.string(),
-      expiresAt: z.string().datetime().nullable().optional(),
+      expiresAt: z.iso.datetime().nullable().optional(),
       storageKey: z.string().optional(),
       adapterKey: z.string().optional(),
     }),

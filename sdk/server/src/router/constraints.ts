@@ -71,8 +71,7 @@ function bucketMatchesMimeType(
     if (bucket.type === "video") return mimeType.startsWith("video/");
     if (bucket.type === "audio") return mimeType.startsWith("audio/");
     if (bucket.type === "pdf") return mimeType === "application/pdf";
-    if (bucket.type === "text") return mimeType.startsWith("text/");
-    return false;
+    return mimeType.startsWith("text/");
   }
 
   return mimeType === bucket.type;

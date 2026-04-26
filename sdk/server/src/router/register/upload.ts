@@ -68,11 +68,7 @@ async function resolveRouteConfigInput<
   }
 
   if (typeof expects === "function") {
-    const resolved = await expects(data);
-    if (resolved === undefined) {
-      throw new Error("Route expects resolver must return a config.");
-    }
-    return resolved;
+    return expects(data);
   }
 
   return expects;

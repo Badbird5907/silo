@@ -40,6 +40,7 @@ export const fileRouter = {
       return {
         uploadedBy: metadata.userId,
         fileKeyId: file.fileKeyId,
+        expiresAt: file.expiresAt,
         url: await core.generateImageUrl(file.accessKey),
         test: "hello",
       };

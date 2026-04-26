@@ -14,7 +14,6 @@ import type {
   SiloRouteConfig,
   SiloRouteConfigInput,
   SiloRouteExpectBucket,
-  SiloRouteExpectObject,
   SiloRouteExpiryInput,
   SiloRouteFileConstraint,
   SiloRouteTypeKey,
@@ -185,6 +184,23 @@ function isBucketArrayRouteConfigInput(
   );
 }
 
+function normalizeStringRouteConfigInput(
+  routeConfigInput: readonly string[],
+): SiloRouteConfig {
+  return routeConfigInput.map((key) => ({
+    type: normalizeRouteTypeKey(key),
+    maxFileCount: 1,
+  }));
+}
+
+function normalizeBucketRouteConfigInput(
+  routeConfigInput: readonly SiloRouteExpectBucket[],
+): SiloRouteConfig {
+  return routeConfigInput.map((bucket, index) =>
+    normalizeBucketInput(bucket, index),
+  );
+}
+
 export function normalizeFileExpiry(
   fileExpiry: SiloFileExpiryInput,
 ): CoreFileExpiryInput {
@@ -245,15 +261,11 @@ export function normalizeRouteConfigInput(
     }
 
     if (isStringArrayRouteConfigInput(routeConfigInput)) {
-      return routeConfigInput.map((key) => ({
-        type: normalizeRouteTypeKey(key),
-        maxFileCount: 1,
-      }));
+      return normalizeStringRouteConfigInput(routeConfigInput);
     }
 
     if (isBucketArrayRouteConfigInput(routeConfigInput)) {
-      const bucketArray = routeConfigInput as readonly SiloRouteExpectBucket[];
-      return bucketArray.map((bucket, index) => normalizeBucketInput(bucket, index));
+      return normalizeBucketRouteConfigInput(routeConfigInput);
     }
 
     throw new Error(
@@ -262,13 +274,13 @@ export function normalizeRouteConfigInput(
   }
 
   const normalized: ReturnType<typeof normalizeObjectConstraint>[] = [];
-  const routeEntries = Object.entries(routeConfigInput as SiloRouteExpectObject) as [
-    string,
-    SiloRouteFileConstraint | undefined,
-  ][];
-  for (const [key, constraint] of routeEntries) {
+  const routeConfigObject = routeConfigInput;
+  for (const [key, constraint] of Object.entries(routeConfigObject)) {
     normalized.push(
-      normalizeObjectConstraint(normalizeRouteTypeKey(key), constraint),
+      normalizeObjectConstraint(
+        normalizeRouteTypeKey(key),
+        constraint as SiloRouteFileConstraint | undefined,
+      ),
     );
   }
   return normalized;
@@ -283,14 +295,8 @@ export function parseMaxFileSizeBytes(maxFileSize: string): number {
     );
   }
 
-  const sizeRaw = match[1];
-  const unitRaw = match[2];
-  if (!sizeRaw || !unitRaw) {
-    throw new Error(`Invalid maxFileSize value "${maxFileSize}".`);
-  }
-
-  const size = Number.parseFloat(sizeRaw);
-  const unit = unitRaw.toLowerCase();
+  const size = Number.parseFloat(match[1]);
+  const unit = match[2].toLowerCase();
   const multiplier =
     unit === "b"
       ? 1

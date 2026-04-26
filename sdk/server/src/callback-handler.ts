@@ -1,9 +1,7 @@
 import { z } from "zod";
 
-import {
-  verifyAndParseUploadCallback,
-  type UploadCore,
-} from "@silo-storage/sdk-core";
+import { verifyAndParseUploadCallback } from "@silo-storage/sdk-core";
+import type { UploadCore } from "@silo-storage/sdk-core";
 
 import type { FileRouter } from "./router";
 import {
@@ -29,6 +27,7 @@ const uploadCompletedEventDataSchema = z.object({
   hash: z.string().nullable(),
   mimeType: z.string(),
   size: z.number(),
+  expiresAt: z.iso.datetime().nullable(),
   metadata: z.record(z.string(), z.unknown()),
 });
 

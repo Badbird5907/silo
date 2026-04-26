@@ -152,6 +152,7 @@ export interface SiloOnUploadCompleteArgs<
     hash: string | null;
     mimeType: string;
     size: number;
+    expiresAt: string | null;
     metadata: Record<string, unknown>;
   };
   event: {
@@ -169,6 +170,7 @@ export interface SiloOnUploadCompleteArgs<
       hash: string | null;
       mimeType: string;
       size: number;
+      expiresAt: string | null;
       metadata: Record<string, unknown>;
     };
   };
@@ -216,13 +218,13 @@ export interface SiloFileRoute<
   ): Promise<TOutput> | TOutput;
 }
 
-type SiloRouteBuilderBase<
+export interface SiloRouteBuilderBase<
   TRequest,
   TContext,
   TMiddlewareData extends Record<string, unknown>,
   TInput,
   THasExpects extends boolean,
-> = {
+>{
   expects: (
     expects:
       | SiloRouteConfigInput
@@ -279,12 +281,12 @@ type SiloRouteBuilderBase<
   onUploadComplete: <TOutput>(
     onUploadComplete: OnUploadCompleteFn<TMiddlewareData, TOutput, TContext>,
   ) => SiloFileRoute<TRequest, TContext, TMiddlewareData, TOutput, TInput>;
-};
+}
 
 type SiloRouteBuilderMiddlewareMethods<
   TRequest,
   TContext,
-  TMiddlewareData extends Record<string, unknown>,
+  _TMiddlewareData extends Record<string, unknown>,
   TInput,
   THasExpects extends boolean,
 > = THasExpects extends false
@@ -304,7 +306,7 @@ type SiloRouteBuilderMiddlewareMethods<
         false
       >;
     }
-  : {};
+  : Record<never, never>;
 
 export type SiloRouteBuilder<
   TRequest,
@@ -330,7 +332,16 @@ export type SiloRouteBuilder<
 export type FileRouter<
   TRequest = unknown,
   TContext = Record<string, never>,
-> = Record<string, SiloFileRoute<TRequest, TContext, any, any, any>>;
+> = Record<
+  string,
+  SiloFileRoute<
+    TRequest,
+    TContext,
+    Record<string, unknown>,
+    unknown,
+    unknown
+  >
+>;
 
 export type AnyFileRouter = Record<
   string,

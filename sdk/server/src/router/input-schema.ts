@@ -3,18 +3,18 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { SiloRouteInputValidationError } from "../errors";
 
 function normalizeIssuePath(
-  path: ReadonlyArray<
-    PropertyKey | StandardSchemaV1.PathSegment
-  > | undefined,
+  path: readonly unknown[] | undefined,
 ): PropertyKey[] | undefined {
   if (!path || path.length === 0) {
     return undefined;
   }
 
   return path.map((segment) =>
-    typeof segment === "object" && segment !== null && "key" in segment
-      ? segment.key
-      : segment,
+    typeof segment === "object" &&
+    segment !== null &&
+    Object.hasOwn(segment, "key")
+      ? (segment as { key: PropertyKey }).key
+      : (segment as PropertyKey),
   );
 }
 

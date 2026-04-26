@@ -20,6 +20,7 @@ export interface UploadCompletedEventData {
   hash: string | null;
   mimeType: string;
   size: number;
+  expiresAt: string | null;
   metadata: FileKeyMetadata;
 }
 
