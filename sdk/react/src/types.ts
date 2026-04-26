@@ -27,7 +27,7 @@ export interface SiloProgressEvent {
   aggregatePercent: number;
 }
 
-export type UploadAccept = string | (() => Promise<string> | string);
+export type UploadAccept = string | (() => Promise<string> | string) | string[] | (() => Promise<string[]> | string[]);
 
 export type AnyFileRouterLike = Record<
   string,

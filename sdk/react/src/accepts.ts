@@ -10,8 +10,23 @@ export async function resolveAcceptValue(
   accept: UploadAccept | undefined,
 ): Promise<string | undefined> {
   if (typeof accept === "function") {
-    return accept();
+    const value = await accept();
+    if (typeof value === "string") {
+      return value;
+    }
+    if (Array.isArray(value)) {
+      return value.join(",");
+    }
+    return undefined;
   }
 
-  return accept;
+  if (typeof accept === "string") {
+    return accept;
+  }
+
+  if (Array.isArray(accept)) {
+    return accept.join(",");
+  }
+
+  return undefined;
 }
