@@ -44,6 +44,8 @@ await upload.uploadFile(file, { input: { albumId: "abc" } });
 await upload.beginUpload({ multiple: true, input: { albumId: "abc" } });
 ```
 
+If your server route uses a function-based `.expects(...)` resolver, the React SDK cannot infer a stable picker filter from router config alone. Pass `accepts` to `useUpload(...)`, `useStagedUpload(...)`, `UploadButton`, or `UploadDropzone` when you want to control the system file picker's accepted types.
+
 Staged upload (chat/messaging-style UI):
 
 ```ts

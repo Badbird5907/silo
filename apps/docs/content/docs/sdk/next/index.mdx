@@ -187,6 +187,8 @@ export default function RootLayout({
 
 For the client-side hooks and headless components themselves, continue with [React](/docs/sdk/react).
 
+If a route uses a function-based `.expects(...)` resolver, `extractRouterConfig(fileRouter)` cannot expose a static picker filter for that route. In that case, pass `accepts` to the React hook or component that opens the file picker.
+
 ## Completion storage
 
 The Next adapter stores `onUploadComplete` results temporarily so the client can wait for completion after the upload finishes.

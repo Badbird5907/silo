@@ -13,6 +13,10 @@ import type {
   UseUploadResult,
 } from "./types";
 import {
+  resolveAcceptValue,
+  resolveStaticAcceptValue,
+} from "./accepts";
+import {
   buildAcceptAttribute,
   getRouteFileTypeKeys,
   getRouteMaxFileCount,
@@ -139,9 +143,17 @@ export function useUploadInternal<
     () => getRouteFileTypeKeys(effectiveRouterConfig, options.endpoint),
     [effectiveRouterConfig, options.endpoint],
   );
-  const accept = React.useMemo(
+  const routeAccept = React.useMemo(
     () => buildAcceptAttribute(routeFileTypeKeys),
     [routeFileTypeKeys],
+  );
+  const accepts = React.useMemo(
+    () => options.accepts ?? options.accept ?? routeAccept,
+    [options.accepts, options.accept, routeAccept],
+  );
+  const accept = React.useMemo(
+    () => resolveStaticAcceptValue(accepts) ?? routeAccept,
+    [accepts, routeAccept],
   );
   const supportsMultipleByRoute = React.useMemo(
     () => routeAllowsMultipleFiles(effectiveRouterConfig, options.endpoint),
@@ -403,9 +415,12 @@ export function useUploadInternal<
   >(
     async (beginOptions) => {
       try {
+        const pickerAccept = await resolveAcceptValue(
+          beginOptions?.accepts ?? beginOptions?.accept ?? accepts,
+        );
         const selected = await openFilePickerDialog({
           multiple: beginOptions?.multiple ?? supportsMultipleByRoute ?? false,
-          accept: beginOptions?.accept ?? accept,
+          accept: pickerAccept,
           onCancel: options.onFileDialogCancel,
         });
 
@@ -447,7 +462,7 @@ export function useUploadInternal<
       }
     },
     [
-      accept,
+      accepts,
       maxFileCountByRoute,
       options,
       supportsMultipleByRoute,
@@ -474,6 +489,7 @@ export function useUploadInternal<
     error,
     result,
     accept,
+    accepts,
     uploadFiles,
     uploadFile,
     beginUpload,
@@ -519,9 +535,17 @@ export function useStagedUploadInternal<
           options.multiple ??
           supportsMultipleByRoute ??
           false;
+        const pickerAccept = await resolveAcceptValue(
+          pickerOptions?.accepts ??
+            pickerOptions?.accept ??
+            options.accepts ??
+            options.accept ??
+            upload.accepts ??
+            upload.accept,
+        );
         const selected = await openFilePickerDialog({
           multiple: shouldAllowMultiple,
-          accept: pickerOptions?.accept ?? options.accept ?? upload.accept,
+          accept: pickerAccept,
           onCancel: options.onFileDialogCancel,
         });
 
@@ -573,7 +597,13 @@ export function useStagedUploadInternal<
         throw normalized;
       }
     },
-    [maxFileCountByRoute, options, supportsMultipleByRoute, upload.accept],
+    [
+      maxFileCountByRoute,
+      options,
+      supportsMultipleByRoute,
+      upload.accept,
+      upload.accepts,
+    ],
   );
 
   const removeFile = React.useCallback<
@@ -629,6 +659,7 @@ export function useStagedUploadInternal<
     error: upload.error,
     result: upload.result,
     accept: upload.accept,
+    accepts: upload.accepts,
     openFilePicker,
     removeFile,
     clearFiles,

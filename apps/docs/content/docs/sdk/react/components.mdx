@@ -32,6 +32,10 @@ Use it when you want:
 - custom empty states and progress UI
 - the same route typing as `useUpload`
 
+<Callout type="info">
+If your route uses a function-based `.expects(...)` resolver, pass `accepts` to `UploadButton` or `UploadDropzone` when you want the system file picker to use a specific accepted-file filter.
+</Callout>
+
 ## Factory pattern
 
 Both components come from the `createSiloReact(...)` factory, so they stay aligned with the same endpoint and router type as your hooks.

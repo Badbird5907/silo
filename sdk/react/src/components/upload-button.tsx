@@ -4,9 +4,14 @@ import type {
   AnyFileRouterLike,
   RouteInputBySlug,
   RouteSlug,
+  UploadAccepts,
   UseUploadOptions,
   UseUploadResult,
 } from "../types";
+import {
+  resolveAcceptValue,
+  resolveStaticAcceptValue,
+} from "../accepts";
 
 interface UploadButtonBaseProps<
   TRouter extends AnyFileRouterLike,
@@ -14,6 +19,8 @@ interface UploadButtonBaseProps<
 > {
   multiple?: boolean;
   disabled?: boolean;
+  accept?: string;
+  accepts?: UploadAccepts;
   input?: RouteInputBySlug<TRouter, TEndpoint>;
   awaitTimeoutMs?: number;
   concurrency?: number;
@@ -70,6 +77,8 @@ function UploadButtonRoot<
     upload,
     multiple,
     disabled,
+    accept,
+    accepts,
     input,
     awaitTimeoutMs,
     concurrency,
@@ -77,7 +86,18 @@ function UploadButtonRoot<
   } = props;
   const inputRef = React.useRef<HTMLInputElement>(null);
   const isDisabled = disabled === true || upload.isUploading;
-  const handleClick = () => inputRef.current?.click();
+  const pickerAccepts = accepts ?? accept ?? upload.accepts ?? upload.accept;
+  const staticAccept =
+    resolveStaticAcceptValue(pickerAccepts) ?? upload.accept ?? "";
+  const handleClick = React.useCallback(() => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    void (async () => {
+      input.accept = (await resolveAcceptValue(pickerAccepts)) ?? "";
+      input.click();
+    })();
+  }, [pickerAccepts]);
 
   return (
     <>
@@ -86,7 +106,7 @@ function UploadButtonRoot<
         hidden
         type="file"
         multiple={multiple}
-        accept={upload.accept}
+        accept={staticAccept}
         onChange={(event) => {
           const selected = Array.from(event.target.files ?? []);
           if (selected.length === 0) return;
@@ -140,6 +160,8 @@ function UploadButtonWithHook<
     onError,
     onUploadAborted,
     onFileDialogCancel,
+    accept,
+    accepts,
     multiple,
     disabled,
     input,
@@ -149,6 +171,8 @@ function UploadButtonWithHook<
   } = props;
   const upload = useUpload({
     endpoint,
+    accept,
+    accepts,
     onUploadBegin,
     onUploadProgress,
     onComplete,
@@ -162,6 +186,8 @@ function UploadButtonWithHook<
       upload={upload}
       multiple={multiple}
       disabled={disabled}
+      accept={accept}
+      accepts={accepts}
       input={input}
       awaitTimeoutMs={awaitTimeoutMs}
       concurrency={concurrency}
@@ -188,6 +214,8 @@ export function UploadButton<
       upload,
       multiple,
       disabled,
+      accept,
+      accepts,
       input,
       awaitTimeoutMs,
       concurrency,
@@ -199,6 +227,8 @@ export function UploadButton<
         upload={upload}
         multiple={multiple}
         disabled={disabled}
+        accept={accept}
+        accepts={accepts}
         input={input}
         awaitTimeoutMs={awaitTimeoutMs}
         concurrency={concurrency}

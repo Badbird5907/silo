@@ -165,6 +165,8 @@ export const {
 
 The zero-config path is to let the client fetch route config from the adapter's `GET` endpoint on demand. If you already have a server-rendered app shell and want to avoid that first client fetch, you can still call `extractRouterConfig(fileRouter)` and provide it through `SiloRouterConfigProvider`.
 
+If a route uses a function-based `.expects(...)` resolver, that extracted config cannot provide a stable picker filter for the client. Pass `accepts` to the React hook or component that opens the file picker when you need that filter.
+
 ## Completion storage
 
 The Start adapter stores `onUploadComplete` results temporarily so the client can wait for completion after the upload finishes.

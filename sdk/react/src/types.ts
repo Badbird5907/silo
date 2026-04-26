@@ -27,6 +27,8 @@ export interface SiloProgressEvent {
   aggregatePercent: number;
 }
 
+export type UploadAccepts = string | (() => Promise<string> | string);
+
 export type AnyFileRouterLike = Record<
   string,
   {
@@ -85,6 +87,7 @@ export interface UseUploadResult<
   error: SiloUploadError | null;
   result: UploadCompletion<TRouter, TEndpoint>[] | null;
   accept?: string;
+  accepts?: UploadAccepts;
   uploadFiles: (
     files: File[],
     options?: UploadRequestOptions<TRouter, TEndpoint>,
@@ -105,6 +108,8 @@ export interface UseUploadOptions<
   TEndpoint extends RouteSlug<TRouter>,
 > {
   endpoint: TEndpoint;
+  accept?: string;
+  accepts?: UploadAccepts;
   concurrency?: number;
   onUploadBegin?: (file: File, fileIndex: number) => void;
   onUploadProgress?: (event: SiloProgressEvent) => void;
@@ -117,6 +122,7 @@ export interface UseUploadOptions<
 export interface OpenFilePickerOptions {
   multiple?: boolean;
   accept?: string;
+  accepts?: UploadAccepts;
 }
 
 export interface UploadRequestOptions<
@@ -151,6 +157,7 @@ export interface UseStagedUploadResult<
   error: SiloUploadError | null;
   result: UploadCompletion<TRouter, TEndpoint>[] | null;
   accept?: string;
+  accepts?: UploadAccepts;
   openFilePicker: (options?: OpenFilePickerOptions) => Promise<File[]>;
   removeFile: (fileOrIndex: File | number) => void;
   clearFiles: () => void;

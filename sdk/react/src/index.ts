@@ -28,6 +28,7 @@ export type {
   RouteSlug,
   SiloProgressEvent,
   SiloUploadErrorShape,
+  UploadAccepts,
   UploadCompletion,
   UseStagedUploadOptions,
   UseStagedUploadResult,
