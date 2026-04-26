@@ -8,26 +8,13 @@ type UploadContext = {
 const f = createSiloUpload<Request, UploadContext>();
 
 export const fileRouter = {
-  imageOrVideoUploader: f({
-    image: {
-      maxFileSize: "8MB",
-      maxFileCount: 4,
-    },
-    video: {
-      maxFileSize: "256MB",
-      maxFileCount: 1,
-    },
-    "application/x-msdownload": {
-      maxFileSize: "512MB",
-      maxFileCount: 1,
-    },
-  })
-    .input(
-      z.object({
-        folder: z.enum(["avatars", "attachments"]).default("avatars"),
-        public: z.boolean().optional(),
-      }),
-    )
+  imageOrVideoUploader: f(
+    z.object({
+      folder: z.enum(["avatars", "attachments"]).default("avatars"),
+      public: z.boolean().optional(),
+      kind: z.enum(["image", "video", "binary"]).default("image"),
+    }),
+  )
     .middleware(async ({ context, input }) => {
       if (!context?.userId) {
         throw new Error("Unauthorized");
@@ -35,6 +22,33 @@ export const fileRouter = {
       return {
         userId: context.userId,
         folder: input.folder,
+        kind: input.kind,
+      };
+    })
+    .expects(({ input }) => {
+      if (input.kind === "binary") {
+        return [
+          {
+            mimeTypes: ["application/x-msdownload", "application/exe"],
+            maxFileCount: 4,
+            maxFileSize: "512MB",
+          },
+        ];
+      }
+
+      return {
+        image: {
+          maxFileSize: "8MB",
+          maxFileCount: 4,
+          mimeTypes:
+            input.kind === "image"
+              ? ["image/jpeg", "image/png", "image/webp"]
+              : undefined,
+        },
+        video: {
+          maxFileSize: "256MB",
+          maxFileCount: 1,
+        },
       };
     })
     .public(({ input }) => input.public ?? true) // either this, or pass in a function
@@ -49,6 +63,7 @@ export const fileRouter = {
         fileName: file.fileName,
         size: file.size,
         mimeType: file.mimeType,
+        kind: metadata.kind,
       };
     }),
 } satisfies FileRouter<Request, UploadContext>;

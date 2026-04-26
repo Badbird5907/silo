@@ -9,17 +9,12 @@ export interface UploadContext {
 const f = createSiloUpload<Request, UploadContext>();
 
 export const fileRouter = {
-  imageUploader: f({
-    image: {
-      maxFileSize: "5MB",
-      maxFileCount: 2,
-    },
-  })
-    .input(
-      z.object({
-        folder: z.enum(["avatars", "attachments"]).default("avatars"),
-      }),
-    )
+  imageUploader: f(
+    z.object({
+      folder: z.enum(["avatars", "attachments"]).default("avatars"),
+      kind: z.enum(["image", "binary"]).default("image"),
+    }),
+  )
     .middleware(({ context, input }) => {
       if (!context.userId) {
         throw new Error("Unauthorized");
@@ -30,6 +25,23 @@ export const fileRouter = {
         folder: input.folder,
       };
     })
+    .expects(({ input }) =>
+      input.kind === "binary"
+        ? [
+            {
+              mimeTypes: ["application/xyz", "application/abc"],
+              maxFileCount: 4,
+              maxFileSize: "16MB",
+            },
+          ]
+        : {
+            image: {
+              maxFileSize: "5MB",
+              maxFileCount: 2,
+              mimeTypes: ["image/png", "image/jpeg"],
+            },
+          },
+    )
     .expires(({ input }) =>
       input.folder === "avatars" ? "2 minutes" : "10 minutes",
     )

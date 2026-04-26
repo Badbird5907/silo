@@ -22,17 +22,23 @@ Instead of the usual "presigned URL, then hope the client tells your app it fini
 const f = createSiloUpload<Request, UploadContext>();
 
 export const fileRouter = {
-  imageUploader: f({
-    image: {
-      maxFileSize: "8MB",
-      maxFileCount: 4,
-    },
-  })
+  imageUploader: f()
+    .middleware(async ({ context }) => {
+      return { userId: context.userId };
+    })
+    .expects({
+      image: {
+        maxFileSize: "8MB",
+        maxFileCount: 4,
+        mimeTypes: ["image/png", "image/jpeg"],
+      },
+    })
     .expires("30 minutes") // delete after 30 minutes
     .public(false) // do we need a signed url to access?
     .serveImage(true) // serve images from the image CDN (transformations etc)
-    .onUploadComplete(async ({ file, core }) => {
+    .onUploadComplete(async ({ file, core, metadata }) => {
       return {
+        uploadedBy: metadata.userId,
         fileKeyId: file.fileKeyId,
         url: await core.generateImageUrl(file.accessKey),
         test: "hello",

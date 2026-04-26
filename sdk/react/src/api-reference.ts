@@ -8,14 +8,14 @@ import type {
 export type ReactApiReferenceRouter = Record<
   string,
   {
-    routeConfig: unknown;
+    routeConfig?: unknown;
     onUploadComplete(args: unknown): {
       fileKeyId: string;
     };
   }
 >;
 
-export type ReactApiReferenceRouteSlug = keyof ReactApiReferenceRouter  ;
+export type ReactApiReferenceRouteSlug = keyof ReactApiReferenceRouter;
 
 export type ReactUseUploadOptions = UseUploadOptions<
   ReactApiReferenceRouter,

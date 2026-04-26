@@ -1,6 +1,6 @@
 ---
 title: Server
-description: Typed file routes, middleware, and callback dispatch.
+description: Typed file routes, middleware, upload expectations, and callback dispatch.
 ---
 
 `@silo-storage/sdk-server` is the framework-agnostic router layer for Silo uploads.
@@ -43,20 +43,13 @@ export interface UploadContext {
 const f = createSiloUpload<Request, UploadContext>();
 
 export const fileRouter = {
-  avatar: f({
-    image: { maxFileSize: "8MB", maxFileCount: 1 },
-  })
-    .input(
-      z.object({
-        folder: z.enum(["avatars", "attachments"]).default("avatars"),
-        public: z.boolean().optional(),
-      }),
-    )
-    .public(({ input }) => input.public ?? false)
-    .serveImage(({ input }) => input.folder === "avatars")
-    .expires(({ input }) =>
-      input.folder === "avatars" ? "30 days" : "7 days",
-    )
+  avatar: f(
+    z.object({
+      folder: z.enum(["avatars", "attachments"]).default("avatars"),
+      public: z.boolean().optional(),
+      kind: z.enum(["image", "binary"]).default("image"),
+    }),
+  )
     .middleware(async ({ req, context, input }) => {
       const session = req.headers.get("authorization");
       if (!session || !context.userId) {
@@ -67,8 +60,34 @@ export const fileRouter = {
         userId: context.userId,
         plan: context.plan,
         folder: input.folder,
+        kind: input.kind,
       };
     })
+    .expects(({ input, plan }) =>
+      input.kind === "binary"
+        ? [
+            {
+              mimeTypes: ["application/xyz", "application/abc"],
+              maxFileCount: plan === "pro" ? 4 : 2,
+              maxFileSize: "16MB",
+            },
+          ]
+        : {
+            image: {
+              maxFileCount: 4,
+              maxFileSize: "8MB",
+              mimeTypes:
+                input.folder === "avatars"
+                  ? ["image/png", "image/jpeg"]
+                  : ["image/png", "image/jpeg", "image/webp"],
+            },
+          },
+    )
+    .public(({ input }) => input.public ?? false)
+    .serveImage(({ input }) => input.folder === "avatars")
+    .expires(({ input }) =>
+      input.folder === "avatars" ? "30 days" : "7 days",
+    )
     .onUploadComplete(async ({ metadata, file, core }) => {
       return {
         uploadedBy: metadata.userId,
@@ -78,41 +97,6 @@ export const fileRouter = {
         imageUrl: await core.generateImageUrl(file),
       };
     }),
-  attachments: f({
-    "application/pdf": { maxFileSize: "16MB", maxFileCount: 4 },
-    image: { maxFileSize: "8MB", maxFileCount: 4 },
-  })
-    .input(
-      z.object({
-        kind: z.enum(["image", "pdf"]).default("image"),
-      }),
-    )
-    .mimeTypes(async ({ context, input }) => {
-      if (input.kind === "pdf") {
-        return ["application/pdf"];
-      }
-
-      if (context.plan === "pro") {
-        return ["application/pdf", "image/jpeg", "image/png"];
-      }
-
-      return ["image/jpeg", "image/png"];
-    })
-    .middleware(async ({ context }) => {
-      if (!context.userId) {
-        throw new Error("Unauthorized");
-      }
-
-      return {
-        userId: context.userId,
-      };
-    })
-    .onUploadComplete(async ({ metadata, file }) => {
-      return {
-        uploadedBy: metadata.userId,
-        fileName: file.fileName,
-      };
-    }),
 } satisfies FileRouter<Request, UploadContext>;
 ```
 
@@ -120,11 +104,11 @@ export const fileRouter = {
 
 Each call to `f(...)` starts a route definition:
 
-- `f(["image"])` is the shortest form when a broad file group is enough
-- `f({ image: { maxFileSize: "8MB", maxFileCount: 4 } })` gives you per-type constraints
-- `.input(schema)` attaches route-local input validation using Standard Schema v1
-- `.middleware(...)` runs before registration and can reject the upload (throw an error)
-- `.public(...)`, `.serveImage(...)`, `.expires(...)`, and `.mimeTypes(...)` configure per-route behavior
+- `f()` starts a route without app-defined input
+- `f(schema)` attaches route-local input validation using Standard Schema v1
+- `.middleware(...)` runs before registration and can reject the upload
+- `.expects(...)` defines the file expectations for the route
+- `.public(...)`, `.serveImage(...)`, and `.expires(...)` configure per-route behavior
 - `.onUploadComplete(...)` runs after Silo sends the signed callback for a completed upload and receives the route `core` instance
 
 <Callout type="info">
@@ -133,26 +117,16 @@ Each call to `f(...)` starts a route definition:
 If a route allows multiple files and the client uploads `4` files, Silo dispatches `4` completion callbacks and your route's `onUploadComplete(...)` handler runs `4` separate times, once for each file.
 </Callout>
 
-The builder is fully typed. The `context` type comes from `createSiloUpload<Request, UploadContext>()`, and per-route `input` types come from `.input(schema)`.
+The builder is fully typed. The `context` type comes from `createSiloUpload<Request, UploadContext>()`, and the route `input` type comes from the schema you pass to `f(schema)`.
 
 <Callout type="info">
-`.input(schema)` is optional.
+`f(schema)` is optional.
 
-Routes that do not need app-defined input can omit it entirely.
+Routes that do not need app-defined input can call `f()` directly.
 </Callout>
 
 <Callout type="idea">
-You can pass both static values and (optionally) async resolvers to all route builder methods.
-
-For example:
-```ts
-f(["image"])
-  .public(true) // either
-  .public(async ({ context }) => { // or
-    const isPublic = await someQuery(context.userId);
-    return isPublic;
-  })
-```
+You can pass both static values and async resolvers to `.expects(...)`, `.public(...)`, `.serveImage(...)`, and `.expires(...)`.
 </Callout>
 
 ## What middleware does
@@ -169,50 +143,78 @@ This lets you attach application state such as the current user ID or validated 
 
 Middleware must return a plain object. That object becomes file metadata for the upload and is restored for the matching route when `handleUploadCallback(...)` dispatches `onUploadComplete(...)`.
 
-When a route defines `.input(schema)`, middleware and route option resolvers receive the parsed schema output as `input`, including defaults and transforms from libraries like Zod.
+When a route defines `f(schema)`, middleware, expects resolvers, and route option resolvers receive the parsed schema output as `input`, including defaults and transforms from libraries like Zod.
 
-## MIME type configuration
+## File expectations
 
 <Callout type="info">
-MIME types are enforced on the upload endpoint
+File expectations are enforced on the upload endpoint.
 </Callout>
 
-Routes can be declared with coarse file groups:
+Use `.expects(...)` to define the files a route can accept.
+
+### Object shorthand
+
+Use the object form for broad buckets and exact keyed MIME types:
 
 ```ts
-f(["image"])
+f(
+  z.object({
+    kind: z.enum(["image", "pdf"]).default("image"),
+  }),
+)
+  .middleware(async ({ context }) => ({ userId: context.userId }))
+  .expects(({ input }) => ({
+    image: {
+      maxFileCount: 4,
+      maxFileSize: "8MB",
+      mimeTypes: ["image/png", "image/jpeg"],
+    },
+    "application/pdf": {
+      maxFileCount: input.kind === "pdf" ? 4 : 1,
+      maxFileSize: "16MB",
+    },
+  }))
 ```
 
-Or with a more explicit shape:
+This form is concise when the route maps naturally to broad file groups like `image` or to exact keyed MIME types like `application/pdf`.
+
+### Array buckets
+
+Use the array form when several arbitrary MIME types should share the same pool:
 
 ```ts
-f({
-  image: { maxFileSize: "2MB", maxFileCount: 4 },
-  video: { maxFileSize: "256MB", maxFileCount: 1 },
-})
+f()
+  .middleware(async ({ context }) => ({ userId: context.userId }))
+  .expects([
+    {
+      mimeTypes: ["application/xyz", "application/abc"],
+      maxFileCount: 4,
+      maxFileSize: "16MB",
+    },
+  ])
 ```
 
-That route can accept both file categories in the same upload batch. For example, `3` images and `1` video would be valid.
+That is the form to use when one shared `maxFileCount` applies to a custom MIME list.
 
-- up to 4 image files, each no larger than `2MB`, like screenshots, profile photos, or PNG/JPEG attachments
-- up to 1 video file no larger than `256MB`, like a screen recording, product demo clip, or short user-generated video
-
-You can also further constrain accepted types with `.mimeTypes(...)`:
+You can also combine a broad `type` with a narrowed MIME list:
 
 ```ts
-f(["image"])
-  .mimeTypes(["image/jpeg", "image/png"]) // you can pass a static array
-  .mimeTypes("application/pdf") // or a single MIME type
-  .mimeTypes(async ({ context, input }) => {
-    // or you can pass a function
-    if (input?.kind === "pdf") return "application/pdf";
-    const canUploadPdf = await someQuery(context.userId);
-    if (canUploadPdf) return "application/pdf";
-    return ["image/jpeg", "image/png"];
-  })
+f()
+  .middleware(async ({ context }) => ({ userId: context.userId }))
+  .expects([
+    {
+      type: "image",
+      mimeTypes: ["image/png", "image/jpeg"],
+      maxFileCount: 4,
+      maxFileSize: "8MB",
+    },
+  ])
 ```
 
-Use a resolver when allowed MIME types depend on auth, plan, team membership, or other server-side state.
+### Defaults
+
+Routes that omit `.expects(...)` behave like a single-file `blob` route.
 
 ## Register uploads manually
 
@@ -237,7 +239,7 @@ export async function registerUpload(request: Request, context: { userId: string
     routeSlug: "avatar",
     req: request,
     context,
-    input: { folder: "avatars" },
+    input: { folder: "avatars", kind: "image" },
     callbackUrl: "https://app.example.com/api/upload/callback",
     files: [
       {
@@ -256,49 +258,10 @@ export async function registerUpload(request: Request, context: { userId: string
 
 1. resolves the route from `routeSlug`
 2. runs middleware and captures its return value
-3. applies route options such as `public`, `serveImage`, `expires`, and `mimeTypes`
+3. resolves `.expects(...)` and route options such as `public`, `serveImage`, and `expires`
 4. writes internal callback metadata so completion can be dispatched back to the same route later
 
 By default registration uses the core `uploadStrategy: "server"` flow. Pass `uploadStrategy: "self"` only when you explicitly want local signing behavior for that call.
-
-### Set `callbackUrl` manually
-
-When you register uploads yourself, `callbackUrl` should point to the public URL of the server endpoint that will receive Silo's signed callback and call `handleUploadCallback(...)`.
-
-For example, if your callback handler lives at `https://app.example.com/api/upload/callback`, use that exact absolute URL during registration:
-
-```ts
-const result = await registerRouteUpload({
-  core,
-  router: fileRouter,
-  routeSlug: "avatar",
-  req: request,
-  context,
-  input: { folder: "avatars" },
-  callbackUrl: "https://app.example.com/api/upload/callback",
-  files: [
-    {
-      fileName: "avatar.png",
-      size: 1_250_000,
-      mimeType: "image/png",
-    },
-  ],
-});
-```
-
-This is especially useful when:
-
-- your public app URL differs from the current request origin
-- your upload registration endpoint and callback endpoint are different paths
-- you are behind a proxy, tunnel, or load balancer and do not want to infer the public origin from the incoming request
-
-<Callout type="warn">
-In production, the callback URL must be an absolute public URL that the Silo server can reach.
-
-You can provide it either:
-- once in `createSiloCoreFromToken({ callbackUrl: ... })`
-- or per call in `registerRouteUpload(...)` / `prepareRouteUpload(...)`
-</Callout>
 
 ## Prepare a single upload
 
@@ -323,7 +286,7 @@ export async function prepareUpload(request: Request, context: { userId: string;
     routeSlug: "avatar",
     req: request,
     context,
-    input: { folder: "avatars" },
+    input: { folder: "avatars", kind: "image" },
     file: {
       fileName: "avatar.png",
       size: 1_250_000,
@@ -385,13 +348,9 @@ export async function handleCallback(request: Request, context: UploadContext) {
 
 `callbackMetadata.__silo` is reserved for sdk-server internals and should be treated as library-owned state.
 
-Your `callbackUrl` from registration should point at this handler. In other words, the URL you pass during registration and the route that runs `handleUploadCallback(...)` should be the same public endpoint.
-
-For a deeper explanation of the internal envelope and dispatch flow, read [Router Behavior](/docs/sdk/server/router-behavior).
-
 ## Expose safe router config to clients
 
-`extractRouterConfig(...)` returns only the client-safe route config shape. This is useful when a UI layer wants to know route constraints without learning your middleware or server-only logic.
+`extractRouterConfig(...)` returns only the client-safe route config shape for routes with statically known expectations. This is useful when a UI layer wants to know route constraints without learning your middleware or server-only logic.
 
 ```ts title="src/router-config.ts"
 import { extractRouterConfig } from "@silo-storage/sdk-server";

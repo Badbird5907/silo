@@ -4,9 +4,10 @@ import type {
   CoreFileExpiryInput,
   FileRouter,
   InferMiddlewareData,
+  RouteInputBySlug,
+  SiloRouteConfigInput,
   SiloRouteOptionResolver,
   SiloRouteOptionResolverArgs,
-  RouteInputBySlug,
   UploadFileInputWithAcceptedMimeTypes,
 } from "../types";
 import type {
@@ -18,10 +19,9 @@ import type {
 import { buildInternalCallbackMetadata } from "../../envelope";
 import { enforceRouteConfigConstraints } from "../constraints";
 import { parseRouteInput } from "../input-schema";
-import {
-  normalizeResolvedMimeTypesInput,
-  normalizeRouteExpiryInput,
-} from "../normalize";
+import { normalizeRouteConfigInput, normalizeRouteExpiryInput } from "../normalize";
+
+const defaultRouteConfigInput = ["blob"] as const;
 
 function toRecord(value: unknown, message: string): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -48,6 +48,34 @@ function resolveRouteOption<
     return Promise.resolve(resolver(data));
   }
   return Promise.resolve(option);
+}
+
+async function resolveRouteConfigInput<
+  TMiddlewareData extends Record<string, unknown>,
+  TContext,
+  TInput,
+>(
+  expects:
+    | SiloRouteConfigInput
+    | ((
+        data: SiloRouteOptionResolverArgs<TMiddlewareData, TContext, TInput>,
+      ) => Promise<SiloRouteConfigInput> | SiloRouteConfigInput)
+    | undefined,
+  data: SiloRouteOptionResolverArgs<TMiddlewareData, TContext, TInput>,
+): Promise<SiloRouteConfigInput> {
+  if (!expects) {
+    return defaultRouteConfigInput;
+  }
+
+  if (typeof expects === "function") {
+    const resolved = await expects(data);
+    if (resolved === undefined) {
+      throw new Error("Route expects resolver must return a config.");
+    }
+    return resolved;
+  }
+
+  return expects;
 }
 
 export async function registerRouteUpload<
@@ -82,12 +110,6 @@ export async function registerRouteUpload<
     }),
   );
 
-  const derivedMimeTypesByFile = enforceRouteConfigConstraints(
-    input.routeSlug,
-    route.routeConfig,
-    files,
-  );
-
   const middlewareData = route.middleware
     ? toRecord(
         await route.middleware({
@@ -95,7 +117,6 @@ export async function registerRouteUpload<
           context: resolvedContext,
           input: parsedInput,
           files,
-          routeConfig: route.routeConfig,
           routeSlug: input.routeSlug,
         }),
         `Middleware for route "${input.routeSlug}" must return a plain object`,
@@ -120,6 +141,26 @@ export async function registerRouteUpload<
     input: parsedInput,
   };
 
+  const routeConfigInput = await resolveRouteConfigInput(
+    route.expects as
+      | SiloRouteConfigInput
+      | ((
+          data: SiloRouteOptionResolverArgs<
+            Record<string, unknown>,
+            TContext,
+            RouteInputBySlug<TRouter, TRouteSlug>
+          >,
+        ) => Promise<SiloRouteConfigInput> | SiloRouteConfigInput)
+      | undefined,
+    routeOptionData,
+  );
+  const routeConfig = normalizeRouteConfigInput(routeConfigInput);
+  const derivedAcceptedMimeTypesByFile = enforceRouteConfigConstraints(
+    input.routeSlug,
+    routeConfig,
+    files,
+  );
+
   const resolvedIsPublic = await resolveRouteOption(
     route.routeOptions?.isPublic,
     routeOptionData,
@@ -141,28 +182,14 @@ export async function registerRouteUpload<
     }
   }
 
+  for (const [index, file] of files.entries()) {
+    file.acceptedMimeTypes = derivedAcceptedMimeTypesByFile[index];
+  }
+
   const routeFileExpiry = await resolveRouteOption(
     route.routeOptions?.fileExpiry,
     routeOptionData,
   );
-
-  const resolvedMimeTypesInput = await resolveRouteOption(
-    route.routeOptions?.mimeTypes,
-    routeOptionData,
-  );
-  const resolvedMimeTypes = normalizeResolvedMimeTypesInput(
-    resolvedMimeTypesInput,
-  );
-
-  if (resolvedMimeTypes) {
-    for (const file of files) {
-      file.acceptedMimeTypes = resolvedMimeTypes;
-    }
-  } else {
-    for (const [index, file] of files.entries()) {
-      file.acceptedMimeTypes = derivedMimeTypesByFile[index];
-    }
-  }
 
   const resolvedFileExpiry =
     input.fileExpiry !== undefined

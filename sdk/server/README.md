@@ -4,8 +4,8 @@
 
 Framework-agnostic router runtime for Silo uploads.
 
-This package, inspired by the UploadThing SDK, provides a
-framework-agnostic router for defining typed file routes with middleware.
+This package provides a typed router for defining file routes with validated
+input, middleware, upload expectations, and completion callbacks.
 
 ## What it provides
 
@@ -37,52 +37,48 @@ type Context = { userId: string };
 const f = createSiloUpload<Request, Context>();
 
 export const fileRouter = {
-  profilePicture: f(["image"])
-    .input(
-      z.object({
-        folder: z.enum(["avatars", "attachments"]).default("avatars"),
-        public: z.boolean().optional(),
-      }),
-    )
-    .public(({ input }) => input.public ?? false)
-    .serveImage(({ input }) => input.folder === "avatars")
+  profilePicture: f(
+    z.object({
+      folder: z.enum(["avatars", "attachments"]).default("avatars"),
+      public: z.boolean().optional(),
+      kind: z.enum(["image", "binary"]).default("image"),
+    }),
+  )
     .middleware(async ({ req, context, input }) => {
-      const userId = context?.userId ?? req.headers.get("x-user-id");
+      const userId = context.userId ?? req.headers.get("x-user-id");
       if (!userId) throw new Error("Unauthorized");
       return {
         userId,
         folder: input.folder,
+        kind: input.kind,
       };
     })
+    .expects(({ input }) =>
+      input.kind === "binary"
+        ? [
+            {
+              mimeTypes: ["application/xyz", "application/abc"],
+              maxFileCount: 4,
+              maxFileSize: "16MB",
+            },
+          ]
+        : {
+            image: {
+              maxFileCount: 2,
+              maxFileSize: "8MB",
+              mimeTypes: ["image/png", "image/jpeg"],
+            },
+          },
+    )
+    .public(({ input }) => input.public ?? false)
+    .serveImage(({ input }) => input.folder === "avatars")
+    .expires(({ input }) =>
+      input.folder === "avatars" ? "30 days" : "7 days",
+    )
     .onUploadComplete(async ({ metadata, file, core }) => {
       return {
         uploadedBy: metadata.userId,
         folder: metadata.folder,
-        fileId: file.fileId,
-        imageUrl: await core.generateImageUrl(file),
-      };
-    }),
-  mediaPost: f({
-    image: { maxFileSize: "2MB", maxFileCount: 4 },
-    video: { maxFileSize: "256MB", maxFileCount: 1 },
-  })
-    .input(
-      z.object({
-        kind: z.enum(["image", "video"]).default("image"),
-      }),
-    )
-    .mimeTypes(({ input }) =>
-      input.kind === "video" ? ["video"] : ["image/jpeg", "image/png"]
-    )
-    .middleware(async ({ req, context, input }) => {
-      const userId = context?.userId ?? req.headers.get("x-user-id");
-      if (!userId) throw new Error("Unauthorized");
-      return { userId, kind: input.kind };
-    })
-    .onUploadComplete(async ({ metadata, file, core }) => {
-      return {
-        uploadedBy: metadata.userId,
-        kind: metadata.kind,
         fileId: file.fileId,
         imageUrl: await core.generateImageUrl(file),
       };
@@ -93,12 +89,58 @@ export const fileRouter = {
 Middleware return values are persisted as file metadata during registration and
 are provided back to `onUploadComplete` via the callback event file payload.
 
-Use `.input(schema)` when a specific route needs validated input. The schema must
-implement Standard Schema v1, so Zod works directly and the parsed output is
-what middleware and option resolvers receive as `input`.
+The schema you pass to `f(schema)` must implement Standard Schema v1, so Zod
+works directly and the parsed output is what middleware, expects resolvers, and
+route option resolvers receive as `input`.
 
-`mimeTypes(...)` accepts all of these forms:
+## Defining file expectations
 
-- `.mimeTypes("image")`
-- `.mimeTypes(["video", "image/jpeg"])`
-- `.mimeTypes(async ({ context, input }) => (input?.kind === "video" ? "video" : ["image", "application/pdf"]))`
+Use `.expects(...)` to define what a route can upload.
+
+Object shorthand works well for broad buckets and exact keyed MIME types:
+
+```ts
+f()
+  .middleware(async ({ context }) => ({ userId: context.userId }))
+  .expects({
+    image: {
+      maxFileCount: 4,
+      maxFileSize: "8MB",
+      mimeTypes: ["image/png", "image/jpeg"],
+    },
+    "application/pdf": {
+      maxFileCount: 2,
+      maxFileSize: "16MB",
+    },
+  })
+```
+
+Array buckets work well when several arbitrary MIME types should share the same
+pool:
+
+```ts
+f()
+  .middleware(async ({ context }) => ({ userId: context.userId }))
+  .expects([
+    {
+      mimeTypes: ["application/xyz", "application/abc"],
+      maxFileCount: 4,
+      maxFileSize: "16MB",
+    },
+  ])
+```
+
+You can also combine a broad `type` with a narrowed MIME list:
+
+```ts
+f()
+  .middleware(async ({ context }) => ({ userId: context.userId }))
+  .expects([
+    {
+      type: "image",
+      mimeTypes: ["image/png", "image/jpeg"],
+      maxFileCount: 4,
+      maxFileSize: "8MB",
+    },
+  ])
+```

@@ -1,18 +1,189 @@
-import type { FileRouterInputKey } from "@silo-storage/mime-types";
+import type { AllowedFileType } from "@silo-storage/mime-types";
 import type { StringValue } from "ms";
 import ms from "ms";
 
-import { normalizeFileRouterInputKey } from "@silo-storage/mime-types";
+import {
+  isAllowedFileType,
+  isMimeTypeAllowedByKey,
+  stripMimeParameters,
+} from "@silo-storage/mime-types";
 
 import type {
   CoreFileExpiryInput,
   SiloFileExpiryInput,
   SiloRouteConfig,
   SiloRouteConfigInput,
+  SiloRouteExpectBucket,
+  SiloRouteExpectObject,
   SiloRouteExpiryInput,
   SiloRouteFileConstraint,
-  SiloRouteMimeTypesInput,
+  SiloRouteTypeKey,
 } from "./types";
+
+const mimeTypePattern = /^[^/\s]+\/[^/\s]+$/;
+
+function isBroadRouteTypeKey(value: string): value is AllowedFileType {
+  return isAllowedFileType(value);
+}
+
+export function normalizeRouteTypeKey(value: string): SiloRouteTypeKey {
+  const normalized = stripMimeParameters(value);
+
+  if (isBroadRouteTypeKey(normalized)) {
+    return normalized;
+  }
+
+  if (!mimeTypePattern.test(normalized)) {
+    throw new Error(
+      `Invalid file type key "${value}". Expected one of image, video, audio, pdf, text, blob or an exact MIME type like "application/pdf".`,
+    );
+  }
+
+  return normalized as SiloRouteTypeKey;
+}
+
+function normalizeExactMimeTypesInput(
+  input: string | readonly string[],
+  label: string,
+): string[] {
+  const values = typeof input === "string" ? [input] : [...input];
+  if (values.length === 0) {
+    throw new Error(`${label} cannot be an empty array`);
+  }
+
+  const normalized = values.map((value) => {
+    const mimeType = stripMimeParameters(value);
+    if (!mimeTypePattern.test(mimeType)) {
+      throw new Error(
+        `${label} contains invalid MIME type "${value}". Expected a value like "image/png".`,
+      );
+    }
+    return mimeType;
+  });
+
+  return [...new Set(normalized)].sort();
+}
+
+function normalizeConstraintBase<TConstraint extends SiloRouteFileConstraint>(
+  constraint: TConstraint,
+) {
+  return {
+    maxFileSize: constraint.maxFileSize,
+    minFileCount: constraint.minFileCount,
+    maxFileCount: constraint.maxFileCount,
+  };
+}
+
+function normalizeObjectConstraint(
+  routeKey: SiloRouteTypeKey,
+  constraint: SiloRouteFileConstraint | undefined,
+) {
+  const normalizedConstraint = constraint ?? {};
+  const normalizedBucket = {
+    type: routeKey,
+    ...normalizeConstraintBase(normalizedConstraint),
+  };
+
+  if (normalizedConstraint.mimeTypes === undefined) {
+    return normalizedBucket;
+  }
+
+  if (routeKey === "blob") {
+    throw new Error(
+      `Route config bucket "${routeKey}" cannot declare mimeTypes. Use an array bucket with mimeTypes instead.`,
+    );
+  }
+
+  if (!isBroadRouteTypeKey(routeKey)) {
+    throw new Error(
+      `Route config bucket "${routeKey}" cannot declare mimeTypes because it already names an exact MIME type.`,
+    );
+  }
+
+  const mimeTypes = normalizeExactMimeTypesInput(
+    normalizedConstraint.mimeTypes,
+    `Route config bucket "${routeKey}" mimeTypes`,
+  );
+  for (const mimeType of mimeTypes) {
+    if (!isMimeTypeAllowedByKey(mimeType, routeKey)) {
+      throw new Error(
+        `Route config bucket "${routeKey}" cannot include MIME type "${mimeType}" because it does not belong to "${routeKey}".`,
+      );
+    }
+  }
+
+  return {
+    ...normalizedBucket,
+    mimeTypes,
+  };
+}
+
+function normalizeBucketInput(
+  bucket: SiloRouteExpectBucket,
+  index: number,
+) {
+  const label = `Route config bucket at index ${index}`;
+  if (bucket.type === undefined && bucket.mimeTypes === undefined) {
+    throw new Error(`${label} must define at least one of "type" or "mimeTypes".`);
+  }
+
+  const normalizedType =
+    bucket.type === undefined ? undefined : normalizeRouteTypeKey(bucket.type);
+  const normalizedBucket = {
+    type: normalizedType,
+    ...normalizeConstraintBase(bucket),
+  };
+
+  if (bucket.mimeTypes === undefined) {
+    return normalizedBucket;
+  }
+
+  if (normalizedType === "blob") {
+    throw new Error(
+      `${label} cannot combine type "blob" with mimeTypes. Omit "type" and use only mimeTypes for a custom MIME pool.`,
+    );
+  }
+
+  if (normalizedType !== undefined && !isBroadRouteTypeKey(normalizedType)) {
+    throw new Error(
+      `${label} cannot declare mimeTypes because type "${normalizedType}" already names an exact MIME type.`,
+    );
+  }
+
+  const mimeTypes = normalizeExactMimeTypesInput(
+    bucket.mimeTypes,
+    `${label} mimeTypes`,
+  );
+  if (normalizedType !== undefined) {
+    for (const mimeType of mimeTypes) {
+      if (!isMimeTypeAllowedByKey(mimeType, normalizedType)) {
+        throw new Error(
+          `${label} cannot include MIME type "${mimeType}" because it does not belong to "${normalizedType}".`,
+        );
+      }
+    }
+  }
+
+  return {
+    ...normalizedBucket,
+    mimeTypes,
+  };
+}
+
+function isStringArrayRouteConfigInput(
+  routeConfigInput: readonly unknown[],
+): routeConfigInput is readonly string[] {
+  return routeConfigInput.every((value) => typeof value === "string");
+}
+
+function isBucketArrayRouteConfigInput(
+  routeConfigInput: readonly unknown[],
+): routeConfigInput is readonly SiloRouteExpectBucket[] {
+  return routeConfigInput.every(
+    (value) =>
+      !!value && typeof value === "object" && !Array.isArray(value),
+  );
+}
 
 export function normalizeFileExpiry(
   fileExpiry: SiloFileExpiryInput,
@@ -73,45 +244,34 @@ export function normalizeRouteConfigInput(
       throw new Error("Route config array cannot be empty");
     }
 
-    const normalized: SiloRouteConfig = {};
-    for (const key of routeConfigInput) {
-      const normalizedKey = normalizeFileRouterInputKey(key as string);
-      normalized[normalizedKey] = {
+    if (isStringArrayRouteConfigInput(routeConfigInput)) {
+      return routeConfigInput.map((key) => ({
+        type: normalizeRouteTypeKey(key),
         maxFileCount: 1,
-      };
+      }));
     }
-    return normalized;
+
+    if (isBucketArrayRouteConfigInput(routeConfigInput)) {
+      const bucketArray = routeConfigInput as readonly SiloRouteExpectBucket[];
+      return bucketArray.map((bucket, index) => normalizeBucketInput(bucket, index));
+    }
+
+    throw new Error(
+      "Route config array must contain either only string shorthand keys or only bucket objects.",
+    );
   }
 
-  const normalized: SiloRouteConfig = {};
-  const routeEntries = Object.entries(routeConfigInput) as [
+  const normalized: ReturnType<typeof normalizeObjectConstraint>[] = [];
+  const routeEntries = Object.entries(routeConfigInput as SiloRouteExpectObject) as [
     string,
     SiloRouteFileConstraint | undefined,
   ][];
   for (const [key, constraint] of routeEntries) {
-    const normalizedKey = normalizeFileRouterInputKey(key);
-    normalized[normalizedKey] = constraint ?? {};
+    normalized.push(
+      normalizeObjectConstraint(normalizeRouteTypeKey(key), constraint),
+    );
   }
   return normalized;
-}
-
-export function normalizeResolvedMimeTypesInput(
-  input: SiloRouteMimeTypesInput | undefined,
-): FileRouterInputKey[] | undefined {
-  if (input === undefined) {
-    return undefined;
-  }
-
-  if (typeof input === "string") {
-    return [normalizeFileRouterInputKey(input)];
-  }
-
-  if (input.length === 0) {
-    throw new Error("mimeTypes resolver cannot return an empty array");
-  }
-
-  const normalized = input.map((value) => normalizeFileRouterInputKey(value));
-  return [...new Set(normalized)].sort();
 }
 
 export function parseMaxFileSizeBytes(maxFileSize: string): number {

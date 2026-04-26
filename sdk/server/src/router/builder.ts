@@ -7,73 +7,73 @@ import type {
   SiloRouteBuilder,
   SiloRouteConfig,
   SiloRouteConfigInput,
+  SiloRouteExpectResolver,
   SiloRouteOptions,
 } from "./types";
 import { normalizeRouteConfigInput } from "./normalize";
 
+const defaultRouteConfigInput = ["blob"] as const;
+
+function resolveStaticRouteConfig(
+  expects:
+    | SiloRouteConfigInput
+    | SiloRouteExpectResolver<Record<string, unknown>, unknown, unknown>
+    | undefined,
+): SiloRouteConfig | undefined {
+  if (typeof expects === "function") {
+    return undefined;
+  }
+
+  return normalizeRouteConfigInput(expects ?? defaultRouteConfigInput);
+}
+
 function createRouteBuilder<
   TRequest,
   TContext,
-  TRouteConfig extends SiloRouteConfig,
   TMiddlewareData extends Record<string, unknown>,
-  TInput = unknown,
+  TInput,
+  THasExpects extends boolean,
 >(
-  routeConfig: TRouteConfig,
-  routeOptions?: SiloRouteOptions<TMiddlewareData, TContext, TInput>,
-  inputSchema?: SiloInputSchema<unknown, TInput>,
-  middleware?: MiddlewareFn<
-    TRequest,
-    TRouteConfig,
-    TMiddlewareData,
-    TContext,
-    TInput
-  >,
-): SiloRouteBuilder<TRequest, TContext, TRouteConfig, TMiddlewareData, TInput> {
+  routeConfig: SiloRouteConfig | undefined,
+  routeOptions: SiloRouteOptions<TMiddlewareData, TContext, TInput> | undefined,
+  inputSchema: SiloInputSchema<unknown, TInput> | undefined,
+  middleware:
+    | MiddlewareFn<TRequest, TMiddlewareData, TContext, TInput>
+    | undefined,
+  expects:
+    | SiloRouteConfigInput
+    | SiloRouteExpectResolver<TMiddlewareData, TContext, TInput>
+    | undefined,
+  hasExpects: THasExpects,
+): SiloRouteBuilder<
+  TRequest,
+  TContext,
+  TMiddlewareData,
+  TInput,
+  THasExpects
+> {
   const withRouteOptions = (
     nextRouteOptions: SiloRouteOptions<TMiddlewareData, TContext, TInput>,
-  ): SiloRouteBuilder<
-    TRequest,
-    TContext,
-    TRouteConfig,
-    TMiddlewareData,
-    TInput
-  > =>
+  ) =>
     createRouteBuilder<
       TRequest,
       TContext,
-      TRouteConfig,
       TMiddlewareData,
-      TInput
-    >(routeConfig, nextRouteOptions, inputSchema, middleware);
+      TInput,
+      THasExpects
+    >(
+      routeConfig,
+      nextRouteOptions,
+      inputSchema,
+      middleware,
+      expects,
+      hasExpects,
+    );
 
-  return {
-    input: <TSchema extends SiloInputSchema>(schema: TSchema) =>
-      createRouteBuilder<
-        TRequest,
-        TContext,
-        TRouteConfig,
-        TMiddlewareData,
-        StandardSchemaV1.InferOutput<TSchema>
-      >(
-        routeConfig,
-        routeOptions as SiloRouteOptions<
-          TMiddlewareData,
-          TContext,
-          StandardSchemaV1.InferOutput<TSchema>
-        >,
-        schema as SiloInputSchema<unknown, StandardSchemaV1.InferOutput<TSchema>>,
-        middleware as MiddlewareFn<
-          TRequest,
-          TRouteConfig,
-          TMiddlewareData,
-          TContext,
-          StandardSchemaV1.InferOutput<TSchema>
-        > | undefined,
-      ),
+  const builder = {
     middleware: <TNextMiddlewareData extends Record<string, unknown>>(
       nextMiddleware: MiddlewareFn<
         TRequest,
-        TRouteConfig,
         TNextMiddlewareData,
         TContext,
         TInput
@@ -82,9 +82,9 @@ function createRouteBuilder<
       createRouteBuilder<
         TRequest,
         TContext,
-        TRouteConfig,
         TNextMiddlewareData,
-        TInput
+        TInput,
+        THasExpects
       >(
         routeConfig,
         routeOptions as unknown as SiloRouteOptions<
@@ -94,8 +94,32 @@ function createRouteBuilder<
         >,
         inputSchema,
         nextMiddleware,
+        expects as
+          | SiloRouteConfigInput
+          | SiloRouteExpectResolver<TNextMiddlewareData, TContext, TInput>
+          | undefined,
+        hasExpects,
       ),
-    public: (isPublic) =>
+    expects: (
+      nextExpects:
+        | SiloRouteConfigInput
+        | SiloRouteExpectResolver<TMiddlewareData, TContext, TInput>,
+    ) =>
+      createRouteBuilder<TRequest, TContext, TMiddlewareData, TInput, true>(
+        resolveStaticRouteConfig(
+          nextExpects as
+            | SiloRouteConfigInput
+            | SiloRouteExpectResolver<Record<string, unknown>, unknown, unknown>,
+        ),
+        routeOptions,
+        inputSchema,
+        middleware,
+        nextExpects,
+        true,
+      ),
+    public: (
+      isPublic: SiloRouteOptions<TMiddlewareData, TContext, TInput>["isPublic"],
+    ) =>
       withRouteOptions({
         ...routeOptions,
         isPublic:
@@ -105,7 +129,13 @@ function createRouteBuilder<
             TInput
           >["isPublic"],
       }),
-    serveImage: (serveImage) =>
+    serveImage: (
+      serveImage: SiloRouteOptions<
+        TMiddlewareData,
+        TContext,
+        TInput
+      >["serveImage"],
+    ) =>
       withRouteOptions({
         ...routeOptions,
         serveImage:
@@ -115,7 +145,13 @@ function createRouteBuilder<
             TInput
           >["serveImage"],
       }),
-    expires: (fileExpiry) =>
+    expires: (
+      fileExpiry: SiloRouteOptions<
+        TMiddlewareData,
+        TContext,
+        TInput
+      >["fileExpiry"],
+    ) =>
       withRouteOptions({
         ...routeOptions,
         fileExpiry:
@@ -125,76 +161,78 @@ function createRouteBuilder<
             TInput
           >["fileExpiry"],
       }),
-    mimeTypes: (mimeTypes) =>
-      withRouteOptions({
-        ...routeOptions,
-        mimeTypes:
-          mimeTypes as SiloRouteOptions<
-            TMiddlewareData,
-            TContext,
-            TInput
-          >["mimeTypes"],
-      }),
     onUploadComplete: <TOutput>(
       onUploadComplete: OnUploadCompleteFn<TMiddlewareData, TOutput, TContext>,
     ) => ({
       routeConfig,
+      expects,
       routeOptions,
       inputSchema,
       middleware,
       onUploadComplete,
     }),
   };
+
+  return builder as unknown as SiloRouteBuilder<
+    TRequest,
+    TContext,
+    TMiddlewareData,
+    TInput,
+    THasExpects
+  >;
 }
 
 export function createSiloUpload<
   TRequest = Request,
   TContext = Record<string, never>,
->(): <TRouteConfigInput extends SiloRouteConfigInput>(
-  routeConfigInput: TRouteConfigInput,
-  routeOptions?: SiloRouteOptions<Record<string, never>, TContext, undefined>,
-) => SiloRouteBuilder<
-  TRequest,
-  TContext,
-  ReturnType<typeof normalizeRouteConfigInput>,
-  Record<string, never>,
-  undefined
->;
-export function createSiloUpload<
-  TRequest = Request,
-  TContext = Record<string, never>,
-  TLegacyInput = unknown,
->(): <TRouteConfigInput extends SiloRouteConfigInput>(
-  routeConfigInput: TRouteConfigInput,
-  routeOptions?: SiloRouteOptions<
-    Record<string, never>,
+>(): {
+  (): SiloRouteBuilder<
+    TRequest,
     TContext,
-    TLegacyInput
-  >,
-) => SiloRouteBuilder<
-  TRequest,
-  TContext,
-  ReturnType<typeof normalizeRouteConfigInput>,
-  Record<string, never>,
-  TLegacyInput
->;
-export function createSiloUpload<
-  TRequest = Request,
-  TContext = Record<string, never>,
-  TInput = undefined,
->() {
-  return <TRouteConfigInput extends SiloRouteConfigInput>(
-    routeConfigInput: TRouteConfigInput,
-    routeOptions?: SiloRouteOptions<Record<string, never>, TContext, TInput>,
-  ) => {
-    const routeConfig = normalizeRouteConfigInput(routeConfigInput);
-
-    return createRouteBuilder<
+    Record<string, never>,
+    undefined,
+    false
+  >;
+  <TSchema extends SiloInputSchema>(
+    schema: TSchema,
+  ): SiloRouteBuilder<
+    TRequest,
+    TContext,
+    Record<string, never>,
+    StandardSchemaV1.InferOutput<TSchema>,
+    false
+  >;
+} {
+  return ((schema?: SiloInputSchema) =>
+    createRouteBuilder<
       TRequest,
       TContext,
-      typeof routeConfig,
       Record<string, never>,
-      TInput
-    >(routeConfig, routeOptions);
+      unknown,
+      false
+    >(
+      normalizeRouteConfigInput(defaultRouteConfigInput),
+      undefined,
+      schema as SiloInputSchema<unknown, unknown> | undefined,
+      undefined,
+      undefined,
+      false,
+    )) as {
+    (): SiloRouteBuilder<
+      TRequest,
+      TContext,
+      Record<string, never>,
+      undefined,
+      false
+    >;
+    <TSchema extends SiloInputSchema>(
+      schema: TSchema,
+    ): SiloRouteBuilder<
+      TRequest,
+      TContext,
+      Record<string, never>,
+      StandardSchemaV1.InferOutput<TSchema>,
+      false
+    >;
   };
 }

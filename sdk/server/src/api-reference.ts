@@ -9,10 +9,10 @@ import type {
   PrepareRouteUploadInput,
   RegisterRouteUploadInput,
 } from "./router/register/types";
-import type { SiloRouteBuilder, SiloRouteConfig } from "./router/types";
+import type { SiloRouteBuilder } from "./router/types";
 
 /**
- * Generic parameters for `createSiloUpload<TRequest, TContext, TLegacyInput>()`.
+ * Generic parameters for `createSiloUpload<TRequest, TContext>()`.
  */
 export interface ServerCreateSiloUploadGenerics {
   /**
@@ -23,20 +23,12 @@ export interface ServerCreateSiloUploadGenerics {
   TRequest: Request;
 
   /**
-   * Server-resolved context shared with middleware, option resolvers, and callbacks.
+   * Server-resolved context shared with middleware, expects resolvers,
+   * route option resolvers, and callbacks.
    *
    * @default Record<string, never>
    */
   TContext: Record<string, never>;
-
-  /**
-   * Legacy shared route input type.
-   *
-   * Prefer `.input(schema)` on individual routes for new code.
-   *
-   * @default only when explicitly provided
-   */
-  TLegacyInput: unknown;
 }
 
 export interface ServerApiReferenceContext {
@@ -55,7 +47,6 @@ export type ServerApiReferenceRouteSlug = keyof ServerApiReferenceRouter;
 export type ServerRouteBuilderMethods = SiloRouteBuilder<
   Request,
   ServerApiReferenceContext,
-  SiloRouteConfig,
   Record<string, unknown>,
   ServerApiReferenceInput | undefined
 >;

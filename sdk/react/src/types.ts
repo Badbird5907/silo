@@ -30,7 +30,7 @@ export interface SiloProgressEvent {
 export type AnyFileRouterLike = Record<
   string,
   {
-    routeConfig: unknown;
+    routeConfig?: unknown;
     onUploadComplete(args: unknown): unknown;
     readonly "~types"?: {
       input: unknown;

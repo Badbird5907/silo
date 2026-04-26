@@ -28,6 +28,7 @@ npm install @silo-storage/sdk-tanstack-start @silo-storage/sdk-react @silo-stora
 ```ts title="src/upload.ts"
 import type { FileRouter } from "@silo-storage/sdk-server";
 import { createSiloUpload } from "@silo-storage/sdk-server";
+import { z } from "zod";
 
 export interface UploadContext {
   userId: string;
@@ -36,24 +37,42 @@ export interface UploadContext {
 const f = createSiloUpload<Request, UploadContext>();
 
 export const fileRouter = {
-  imageUploader: f({
-    image: {
-      maxFileSize: "8MB",
-      maxFileCount: 4,
-    },
-  })
-    .expires("30 days")
-    .public(false)
-    .serveImage(true)
-    .middleware(async ({ context }) => {
+  imageUploader: f(
+    z.object({
+      folder: z.enum(["avatars", "attachments"]).default("avatars"),
+      kind: z.enum(["image", "binary"]).default("image"),
+    }),
+  )
+    .middleware(async ({ context, input }) => {
       if (!context?.userId) {
         throw new Error("Unauthorized");
       }
 
       return {
         userId: context.userId,
+        folder: input.folder,
       };
     })
+    .expects(({ input }) =>
+      input.kind === "binary"
+        ? [
+            {
+              mimeTypes: ["application/xyz", "application/abc"],
+              maxFileCount: 4,
+              maxFileSize: "16MB",
+            },
+          ]
+        : {
+            image: {
+              maxFileSize: "8MB",
+              maxFileCount: 4,
+              mimeTypes: ["image/png", "image/jpeg"],
+            },
+          },
+    )
+    .public(false)
+    .serveImage(({ input }) => input.folder === "avatars")
+    .expires("30 days")
     .onUploadComplete(async ({ metadata, file }) => {
       return {
         uploadedBy: metadata.userId,
@@ -169,7 +188,7 @@ Use a shared store in production when the upload callback and the polling reques
 
 - Callback verification depends on `core.config.signingSecret`. `createSiloCoreFromToken(...)` fills that from `SILO_TOKEN`, so you usually do not need to pass anything extra into `createRouteHandler(...)`.
 - If you force `completionTransport: "callback-url"` in development, make sure the configured callback endpoint is publicly reachable by Silo.
-- `extractRouterConfig(...)` only exposes the client-safe subset of your router definition.
+- `extractRouterConfig(...)` only exposes the client-safe subset of your router definition for routes with statically known expectations.
 
 ## API reference
 
