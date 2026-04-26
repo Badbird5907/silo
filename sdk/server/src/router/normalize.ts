@@ -1,11 +1,11 @@
-import type { AllowedFileType } from "@silo-storage/mime-types";
+import type { AllowedFileType, FileRouterInputKey } from "@silo-storage/mime-types";
 import type { StringValue } from "ms";
 import ms from "ms";
 
 import {
   isAllowedFileType,
   isMimeTypeAllowedByKey,
-  stripMimeParameters,
+  normalizeFileRouterInputKey,
 } from "@silo-storage/mime-types";
 
 import type {
@@ -19,48 +19,49 @@ import type {
   SiloRouteTypeKey,
 } from "./types";
 
-const mimeTypePattern = /^[^/\s]+\/[^/\s]+$/;
-
 function isBroadRouteTypeKey(value: string): value is AllowedFileType {
   return isAllowedFileType(value);
 }
 
 export function normalizeRouteTypeKey(value: string): SiloRouteTypeKey {
-  const normalized = stripMimeParameters(value);
-
-  if (isBroadRouteTypeKey(normalized)) {
-    return normalized;
-  }
-
-  if (!mimeTypePattern.test(normalized)) {
-    throw new Error(
-      `Invalid file type key "${value}". Expected one of image, video, audio, pdf, text, blob or an exact MIME type like "application/pdf".`,
-    );
-  }
-
-  return normalized as SiloRouteTypeKey;
+  return normalizeFileRouterInputKey(value);
 }
 
-function normalizeExactMimeTypesInput(
-  input: string | readonly string[],
+function normalizeMimeTypeKeysInput(
+  input: FileRouterInputKey | readonly FileRouterInputKey[],
   label: string,
-): string[] {
+): FileRouterInputKey[] {
   const values = typeof input === "string" ? [input] : [...input];
   if (values.length === 0) {
     throw new Error(`${label} cannot be an empty array`);
   }
 
   const normalized = values.map((value) => {
-    const mimeType = stripMimeParameters(value);
-    if (!mimeTypePattern.test(mimeType)) {
+    const mimeTypeKey = normalizeFileRouterInputKey(value);
+    if (mimeTypeKey === "blob") {
       throw new Error(
-        `${label} contains invalid MIME type "${value}". Expected a value like "image/png".`,
+        `${label} contains invalid MIME type "${value}". Expected a shorthand like "image" or an exact MIME type like "image/png".`,
       );
     }
-    return mimeType;
+    return mimeTypeKey;
   });
 
   return [...new Set(normalized)].sort();
+}
+
+function isMimeTypeKeyCompatibleWithType(
+  mimeTypeKey: FileRouterInputKey,
+  routeKey: SiloRouteTypeKey,
+): boolean {
+  if (mimeTypeKey === "blob") {
+    return false;
+  }
+
+  if (isAllowedFileType(mimeTypeKey)) {
+    return isBroadRouteTypeKey(routeKey) && routeKey === mimeTypeKey;
+  }
+
+  return isMimeTypeAllowedByKey(mimeTypeKey, routeKey);
 }
 
 function normalizeConstraintBase<TConstraint extends SiloRouteFileConstraint>(
@@ -99,12 +100,12 @@ function normalizeObjectConstraint(
     );
   }
 
-  const mimeTypes = normalizeExactMimeTypesInput(
+  const mimeTypes = normalizeMimeTypeKeysInput(
     normalizedConstraint.mimeTypes,
     `Route config bucket "${routeKey}" mimeTypes`,
   );
   for (const mimeType of mimeTypes) {
-    if (!isMimeTypeAllowedByKey(mimeType, routeKey)) {
+    if (!isMimeTypeKeyCompatibleWithType(mimeType, routeKey)) {
       throw new Error(
         `Route config bucket "${routeKey}" cannot include MIME type "${mimeType}" because it does not belong to "${routeKey}".`,
       );
@@ -149,13 +150,13 @@ function normalizeBucketInput(
     );
   }
 
-  const mimeTypes = normalizeExactMimeTypesInput(
+  const mimeTypes = normalizeMimeTypeKeysInput(
     bucket.mimeTypes,
     `${label} mimeTypes`,
   );
   if (normalizedType !== undefined) {
     for (const mimeType of mimeTypes) {
-      if (!isMimeTypeAllowedByKey(mimeType, normalizedType)) {
+      if (!isMimeTypeKeyCompatibleWithType(mimeType, normalizedType)) {
         throw new Error(
           `${label} cannot include MIME type "${mimeType}" because it does not belong to "${normalizedType}".`,
         );

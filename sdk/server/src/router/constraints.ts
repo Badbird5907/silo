@@ -1,7 +1,7 @@
 import type { UploadFileInput } from "@silo-storage/sdk-core";
 
 import {
-  isAllowedFileType,
+  isMimeTypeAllowedByKey,
   lookupMimeTypeFromFile,
   stripMimeParameters,
 } from "@silo-storage/mime-types";
@@ -26,7 +26,15 @@ function resolveFileMimeType(file: UploadFileInput): string | undefined {
 
 function bucketRank(bucket: SiloRouteConfigBucket): number {
   if (bucket.type === "blob") return 1;
-  if (bucket.type && isAllowedFileType(bucket.type)) return 2;
+  if (
+    bucket.type === "image" ||
+    bucket.type === "video" ||
+    bucket.type === "audio" ||
+    bucket.type === "pdf" ||
+    bucket.type === "text"
+  ) {
+    return 2;
+  }
   return 3;
 }
 
@@ -54,27 +62,20 @@ function bucketMatchesMimeType(
     return bucket.type === "blob";
   }
 
-  if (bucket.mimeTypes && !bucket.mimeTypes.includes(mimeType)) {
+  if (
+    bucket.mimeTypes &&
+    !bucket.mimeTypes.some((key) => isMimeTypeAllowedByKey(mimeType, key))
+  ) {
     return false;
   }
 
   if (!bucket.type) {
-    return Boolean(bucket.mimeTypes?.includes(mimeType));
+    return Boolean(
+      bucket.mimeTypes?.some((key) => isMimeTypeAllowedByKey(mimeType, key)),
+    );
   }
 
-  if (bucket.type === "blob") {
-    return true;
-  }
-
-  if (isAllowedFileType(bucket.type)) {
-    if (bucket.type === "image") return mimeType.startsWith("image/");
-    if (bucket.type === "video") return mimeType.startsWith("video/");
-    if (bucket.type === "audio") return mimeType.startsWith("audio/");
-    if (bucket.type === "pdf") return mimeType === "application/pdf";
-    return mimeType.startsWith("text/");
-  }
-
-  return mimeType === bucket.type;
+  return isMimeTypeAllowedByKey(mimeType, bucket.type);
 }
 
 export function enforceRouteConfigConstraints(

@@ -1,6 +1,8 @@
 import {
-  isAllowedFileType,
+  expandFileRouterInputKeysToMimeTypes,
+  isMimeTypeAllowedByKey,
   lookupMimeTypeFromFile,
+  normalizeFileRouterInputKey,
   stripMimeParameters,
 } from "@silo-storage/mime-types";
 
@@ -12,19 +14,17 @@ interface RouteConfigBucketLike {
   maxFileCount?: number;
 }
 
-const mimeTypePattern = /^[^/\s]+\/[^/\s]+$/;
-
 function normalizeAcceptPattern(value: string): string | undefined {
-  const normalized = stripMimeParameters(value);
-  if (isAllowedFileType(normalized)) {
-    return normalized;
-  }
+  try {
+    return normalizeFileRouterInputKey(value);
+  } catch {
+    const normalized = stripMimeParameters(value);
+    if (normalized.endsWith("/*")) {
+      return normalized;
+    }
 
-  if (mimeTypePattern.test(normalized)) {
-    return normalized;
+    return undefined;
   }
-
-  return undefined;
 }
 
 function isRouteConfigBucketLike(value: unknown): value is RouteConfigBucketLike {
@@ -142,37 +142,10 @@ export function buildAcceptAttribute(
     return undefined;
   }
 
-  const accepts = new Set<string>();
-  for (const key of fileTypeKeys) {
-    if (key === "image") {
-      accepts.add("image/*");
-      continue;
-    }
-
-    if (key === "video") {
-      accepts.add("video/*");
-      continue;
-    }
-
-    if (key === "audio") {
-      accepts.add("audio/*");
-      continue;
-    }
-
-    if (key === "text") {
-      accepts.add("text/*");
-      continue;
-    }
-
-    if (key === "pdf") {
-      accepts.add("application/pdf");
-      continue;
-    }
-
-    accepts.add(key);
-  }
-
-  return [...accepts].sort().join(",");
+  const accepts = expandFileRouterInputKeysToMimeTypes(fileTypeKeys, {
+    allowWildcard: true,
+  });
+  return accepts.length > 0 ? accepts.join(",") : undefined;
 }
 
 export function isFileAllowedByRouteFileTypes(
@@ -192,7 +165,20 @@ export function isFileAllowedByRouteFileTypes(
     return fileTypeKeys.includes("blob");
   }
 
-  return fileTypeKeys.some((key) => matchesAcceptPattern(fileMimeType, key));
+  return fileTypeKeys.some((key) => {
+    if (key.endsWith("/*")) {
+      return matchesAcceptPattern(fileMimeType, key);
+    }
+
+    try {
+      return isMimeTypeAllowedByKey(
+        fileMimeType,
+        normalizeFileRouterInputKey(key),
+      );
+    } catch {
+      return false;
+    }
+  });
 }
 
 export function routeAllowsMultipleFiles(

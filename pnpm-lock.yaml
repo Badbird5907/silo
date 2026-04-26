@@ -640,6 +640,10 @@ importers:
         version: 5.9.3
 
   packages/shared:
+    dependencies:
+      '@silo-storage/mime-types':
+        specifier: 0.0.0-alpha.0
+        version: link:../mime-types
     devDependencies:
       '@silo-storage/eslint-config':
         specifier: 0.1.0

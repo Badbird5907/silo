@@ -1,4 +1,4 @@
-import type { AllowedFileType } from "@silo-storage/mime-types";
+import type { FileRouterInputKey } from "@silo-storage/mime-types";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import type {
   PrepareUploadInput,
@@ -7,13 +7,13 @@ import type {
 } from "@silo-storage/sdk-core";
 import type { StringValue } from "ms";
 
-export type SiloRouteTypeKey = AllowedFileType | `${string}/${string}`;
+export type SiloRouteTypeKey = FileRouterInputKey;
 
 export interface SiloRouteFileConstraint {
   maxFileSize?: string;
   minFileCount?: number;
   maxFileCount?: number;
-  mimeTypes?: string | readonly string[];
+  mimeTypes?: FileRouterInputKey | readonly FileRouterInputKey[];
 }
 
 export interface SiloRouteExpectBucket extends SiloRouteFileConstraint {
@@ -33,7 +33,7 @@ export type SiloRouteConfigInput =
 
 export interface SiloRouteConfigBucket {
   type?: SiloRouteTypeKey;
-  mimeTypes?: readonly string[];
+  mimeTypes?: readonly FileRouterInputKey[];
   maxFileSize?: string;
   minFileCount?: number;
   maxFileCount?: number;

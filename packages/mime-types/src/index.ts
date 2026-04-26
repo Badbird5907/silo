@@ -40,7 +40,13 @@ export const allowedFileTypes = [
   "blob",
 ] as const;
 export type AllowedFileType = (typeof allowedFileTypes)[number];
-export type FileRouterInputKey = AllowedFileType | MimeType;
+export type ExactMimeType = `${string}/${string}`;
+export type FileRouterInputKey = AllowedFileType | ExactMimeType;
+export type WildcardMimeType = `${Exclude<
+  AllowedFileType,
+  "blob" | "pdf"
+>}/*`;
+export type ExpandedMimeTypePattern = ExactMimeType | WildcardMimeType;
 
 export const mimeTypes = mimes as unknown as Record<
   MimeType,
@@ -51,16 +57,27 @@ const imageMimeTypes = Object.keys(image) as MimeType[];
 const videoMimeTypes = Object.keys(video) as MimeType[];
 const audioMimeTypes = Object.keys(audio) as MimeType[];
 const textMimeTypes = Object.keys(text) as MimeType[];
+const mimeTypePattern = /^[^/\s]+\/[^/\s]+$/;
 
 const shorthandMimeTypes: Record<
   Exclude<AllowedFileType, "blob">,
-  MimeType[]
+  ExactMimeType[]
 > = {
   image: imageMimeTypes,
   video: videoMimeTypes,
   audio: audioMimeTypes,
   pdf: ["application/pdf"],
   text: textMimeTypes,
+};
+
+const shorthandWildcardMimeTypes: Record<
+  Exclude<AllowedFileType, "blob" | "pdf">,
+  WildcardMimeType
+> = {
+  image: "image/*",
+  video: "video/*",
+  audio: "audio/*",
+  text: "text/*",
 };
 
 export function stripMimeParameters(value: string): string {
@@ -75,6 +92,10 @@ export function isMimeType(value: string): value is MimeType {
   return value in mimeTypes;
 }
 
+function isExactMimeType(value: string): value is ExactMimeType {
+  return mimeTypePattern.test(value);
+}
+
 export function normalizeFileRouterInputKey(value: string): FileRouterInputKey {
   const normalized = stripMimeParameters(value);
 
@@ -86,14 +107,18 @@ export function normalizeFileRouterInputKey(value: string): FileRouterInputKey {
     return normalized;
   }
 
+  if (isExactMimeType(normalized)) {
+    return normalized;
+  }
+
   throw new Error(
-    `Invalid file type key "${value}". Expected one of ${allowedFileTypes.join(", ")} or a MIME type from @silo-storage/mime-types.`,
+    `Invalid file type key "${value}". Expected one of ${allowedFileTypes.join(", ")} or an exact MIME type like "application/pdf".`,
   );
 }
 
 export function expandFileRouterInputKeyToMimeTypes(
   key: FileRouterInputKey,
-): MimeType[] {
+): ExactMimeType[] {
   if (key === "blob") {
     return [];
   }
@@ -105,6 +130,34 @@ export function expandFileRouterInputKeyToMimeTypes(
   return [key];
 }
 
+export function expandFileRouterInputKeysToMimeTypes(
+  keys: readonly string[],
+  options?: {
+    allowWildcard?: boolean;
+  },
+): ExpandedMimeTypePattern[] {
+  const allowWildcard = options?.allowWildcard === true;
+  const expanded = keys.flatMap((key) => {
+    const normalizedKey = normalizeFileRouterInputKey(key);
+
+    if (normalizedKey === "blob") {
+      return [];
+    }
+
+    if (!allowWildcard || !isAllowedFileType(normalizedKey)) {
+      return expandFileRouterInputKeyToMimeTypes(normalizedKey);
+    }
+
+    if (normalizedKey === "pdf") {
+      return ["application/pdf"] as const;
+    }
+
+    return [shorthandWildcardMimeTypes[normalizedKey]];
+  });
+
+  return [...new Set(expanded)].sort();
+}
+
 export function isMimeTypeAllowedByKey(
   mimeType: string,
   key: FileRouterInputKey,
@@ -114,14 +167,16 @@ export function isMimeTypeAllowedByKey(
   }
 
   const normalizedMimeType = stripMimeParameters(mimeType);
-  if (!normalizedMimeType || !isMimeType(normalizedMimeType)) {
+  if (!normalizedMimeType || !isExactMimeType(normalizedMimeType)) {
     return false;
   }
 
   if (isAllowedFileType(key)) {
-    return expandFileRouterInputKeyToMimeTypes(key).includes(
-      normalizedMimeType,
-    );
+    if (key === "image") return normalizedMimeType.startsWith("image/");
+    if (key === "video") return normalizedMimeType.startsWith("video/");
+    if (key === "audio") return normalizedMimeType.startsWith("audio/");
+    if (key === "pdf") return normalizedMimeType === "application/pdf";
+    return normalizedMimeType.startsWith("text/");
   }
 
   return normalizedMimeType === key;

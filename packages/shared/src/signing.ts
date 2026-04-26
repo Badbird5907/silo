@@ -15,6 +15,8 @@
  * 3. The server has the keyHash stored, so it can derive the same signingSecret
  */
 
+import { normalizeFileRouterInputKey } from "@silo-storage/mime-types";
+
 export interface SignedUploadUrlParams {
   environmentId: string;
   fileKeyId: string; // client-generated, unique per environment
@@ -96,9 +98,6 @@ export interface SignedUrlRoutingOptions {
   routeMode?: ProjectRouteMode;
 }
 
-const ACCEPTED_MIME_VALUE_REGEX =
-  /^[a-z0-9!#$&^_.+-]+(?:\/[a-z0-9!#$&^_.+-]+)?$/;
-
 const PROJECT_ROUTE_PREFIX = "/p";
 const IMAGE_FORMAT_VALUES = new Set<ImageFormat>([
   "auto",
@@ -166,13 +165,7 @@ function buildProjectScopedUrl(
 }
 
 export function normalizeAcceptedMimeTypePattern(pattern: string): string {
-  const normalized = pattern.trim().toLowerCase();
-  if (!ACCEPTED_MIME_VALUE_REGEX.test(normalized)) {
-    throw new Error(
-      `Invalid accepted MIME type value "${pattern}". Expected shorthand keys (e.g. "image") or MIME types (e.g. "application/pdf").`,
-    );
-  }
-  return normalized;
+  return normalizeFileRouterInputKey(pattern);
 }
 
 export function normalizeAcceptedMimeTypePatterns(
