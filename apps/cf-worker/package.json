@@ -3,8 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build:deps": "pnpm --filter @silo-storage/mime-types --filter @silo-storage/shared build",
+    "prewrangler:dev": "pnpm run build:deps",
+    "prebuild": "pnpm run build:deps",
+    "predeploy": "pnpm run build:deps",
     "wrangler:dev": "wrangler dev",
-    "build": "wrangler deploy --dry-run --outdir=dist",
+    "build": "wrangler deploy --dry-run --outdir=dist --env=\"\"",
     "deploy": "wrangler deploy",
     "clean": "git clean -xdf .cache .turbo dist node_modules .wrangler",
     "format": "prettier --check . --ignore-path ../../.gitignore",
