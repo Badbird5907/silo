@@ -102,6 +102,7 @@ export async function handleImage(c: ImageContext): Promise<Response> {
   const preserveImageExif = c.get("preserveImageExif");
   const signature = c.req.query("sig");
   const expiresAt = c.req.query("expiresAt");
+  const signingKeyId = c.req.query("keyId");
   const isSignedUrl = Boolean(signature && expiresAt);
 
   if (expiresAt) {
@@ -126,7 +127,12 @@ export async function handleImage(c: ImageContext): Promise<Response> {
     );
   }
 
-  const fileKey = await getCachedFileKey(accessKey, projectId, c.env);
+  const fileKey = await getCachedFileKey(
+    accessKey,
+    projectId,
+    signingKeyId,
+    c.env,
+  );
 
   if (
     fileKey.status !== "completed" ||
@@ -156,18 +162,22 @@ export async function handleImage(c: ImageContext): Promise<Response> {
   }
 
   if (visibility.requiresSignature) {
-    if (!signature || !expiresAt) {
+    if (!signature || !expiresAt || !signingKeyId) {
       throw Errors.unauthorized("Signature required for image delivery");
+    }
+    if (!fileKey.downloadSigningSecret) {
+      throw Errors.unauthorized("Signing key is not authorized for this file");
     }
 
     const isValidSignature = await verifyImageSignature({
       accessKey,
       signature,
       expiresAt,
+      keyId: signingKeyId,
       width: c.req.query("w"),
       quality,
       format: requestedFormat,
-      signingSecret: c.env.SIGNING_SECRET,
+      signingSecret: fileKey.downloadSigningSecret,
     });
 
     if (!isValidSignature) {
@@ -259,7 +269,7 @@ export async function handleInternalImageSource(
 ): Promise<Response> {
   const accessKey = c.req.param("accessKey");
   const projectId = c.req.param("projectId");
-  const currentFileKey = await lookupFileKey(accessKey, projectId, c.env);
+  const currentFileKey = await lookupFileKey(accessKey, projectId, null, c.env);
 
   if (
     currentFileKey.status !== "completed" ||

@@ -154,6 +154,7 @@ export async function POST(request: Request) {
         serveImage,
         metadata,
       },
+      apiKeyId: apiKey.id,
     });
 
     const isDevelopment = env.NODE_ENV === "development";

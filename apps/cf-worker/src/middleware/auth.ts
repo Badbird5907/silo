@@ -33,6 +33,7 @@ export async function verifyDownloadSignature(params: {
   accessKey: string;
   signature: string;
   expiresAt: string;
+  keyId?: string | null;
   signingSecret: string;
 }): Promise<boolean> {
   try {
@@ -40,6 +41,9 @@ export async function verifyDownloadSignature(params: {
       accessKey: params.accessKey,
       expiresAt: params.expiresAt,
     };
+    if (params.keyId) {
+      payload.keyId = params.keyId;
+    }
 
     const sortedKeys = Object.keys(payload).sort();
     const message = sortedKeys.map((key) => `${key}=${payload[key]}`).join("&");
@@ -78,6 +82,7 @@ export async function verifyImageSignature(params: {
   accessKey: string;
   signature: string;
   expiresAt: string;
+  keyId?: string | null;
   width: string | number | undefined | null;
   quality: string | number | undefined | null;
   format: string | undefined | null;
@@ -90,6 +95,9 @@ export async function verifyImageSignature(params: {
       expiresAt: params.expiresAt,
       fmt: normalizeImageFormat(params.format),
     };
+    if (params.keyId) {
+      payload.keyId = params.keyId;
+    }
     const width = normalizeImageWidth(params.width);
     const quality = normalizeImageQuality(params.quality);
     if (width !== undefined) {

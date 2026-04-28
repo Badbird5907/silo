@@ -9,10 +9,16 @@ import { lookupFileKey } from "./callback";
 export async function getCachedFileKey(
   accessKey: string,
   projectId: string,
+  signingKeyId: string | null | undefined,
   env: Bindings,
 ): Promise<FileKeyInfo> {
   try {
-    const cached = await getCachedFileKeyValue(accessKey, projectId, env);
+    const cached = await getCachedFileKeyValue(
+      accessKey,
+      projectId,
+      signingKeyId,
+      env,
+    );
     if (cached) {
       return cached;
     }
@@ -20,10 +26,10 @@ export async function getCachedFileKey(
     console.error("Failed to read file key metadata cache:", error);
   }
 
-  const fileKey = await lookupFileKey(accessKey, projectId, env);
+  const fileKey = await lookupFileKey(accessKey, projectId, signingKeyId, env);
 
   try {
-    await cacheFileKey(accessKey, projectId, fileKey, env);
+    await cacheFileKey(accessKey, projectId, signingKeyId, fileKey, env);
   } catch (error) {
     console.error("Failed to write file key metadata cache:", error);
   }

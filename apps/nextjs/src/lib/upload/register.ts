@@ -94,12 +94,7 @@ function mergeCallbackMetadata(
   if (input.callbackUrl) {
     merged.callbackUrl = input.callbackUrl;
   }
-  if (
-    input.apiKeyId &&
-    (input.callbackUrl ||
-      input.callbackMetadata ||
-      Object.keys(existingObject).length > 0)
-  ) {
+  if (input.apiKeyId) {
     merged.apiKeyId = input.apiKeyId;
   }
   if (input.callbackMetadata) {

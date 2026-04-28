@@ -66,6 +66,7 @@ export async function handleDownload(
 
   const signature = c.req.query("sig");
   const expiresAt = c.req.query("expiresAt");
+  const signingKeyId = c.req.query("keyId");
   const isSignedUrl = Boolean(signature && expiresAt);
 
   if (expiresAt) {
@@ -79,7 +80,12 @@ export async function handleDownload(
   const ifNoneMatch = c.req.header("If-None-Match");
   const rangeHeader = c.req.header("Range");
 
-  const fileKey = await getCachedFileKey(accessKey, projectId, c.env);
+  const fileKey = await getCachedFileKey(
+    accessKey,
+    projectId,
+    signingKeyId,
+    c.env,
+  );
 
   if (fileKey.expiresAt) {
     const expiryDate = new Date(fileKey.expiresAt);
@@ -92,15 +98,19 @@ export async function handleDownload(
   }
 
   if (!fileKey.isPublic) {
-    if (!signature || !expiresAt) {
+    if (!signature || !expiresAt || !signingKeyId) {
       throw Errors.unauthorized("Signature required for private files");
+    }
+    if (!fileKey.downloadSigningSecret) {
+      throw Errors.unauthorized("Signing key is not authorized for this file");
     }
 
     const isValidSignature = await verifyDownloadSignature({
       accessKey,
       signature,
       expiresAt,
-      signingSecret: c.env.SIGNING_SECRET,
+      keyId: signingKeyId,
+      signingSecret: fileKey.downloadSigningSecret,
     });
 
     if (!isValidSignature) {

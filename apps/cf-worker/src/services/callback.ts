@@ -111,6 +111,7 @@ export async function sendUploadCallback(
 export async function lookupFileKey(
   accessKey: string,
   projectId: string,
+  signingKeyId: string | null | undefined,
   env: Bindings,
 ): Promise<FileKeyInfo> {
   const response = await fetch(
@@ -120,7 +121,7 @@ export async function lookupFileKey(
       headers: buildNextJsInternalHeaders(env, {
         "Content-Type": "application/json",
       }),
-      body: JSON.stringify({ accessKey, projectId }),
+      body: JSON.stringify({ accessKey, projectId, signingKeyId }),
     },
   );
 

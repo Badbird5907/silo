@@ -725,6 +725,7 @@ export function createSiloCore(config: UploadCoreConfig) {
         accessKey: input.accessKey,
         fileName: input.fileName,
         expiresIn: input.expiresIn,
+        ...(config.keyId ? { keyId: config.keyId } : {}),
       },
       (() => {
         if (!config.signingSecret) {
@@ -791,6 +792,7 @@ export function createSiloCore(config: UploadCoreConfig) {
         width: input.width,
         quality: input.quality,
         format: input.format,
+        ...(config.keyId ? { keyId: config.keyId } : {}),
       },
       (() => {
         if (!config.signingSecret) {

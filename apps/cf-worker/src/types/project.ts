@@ -29,6 +29,7 @@ export interface FileKeyInfo {
   status: "pending" | "completed" | "failed" | "deleted";
   isPublic: boolean;
   serveImage?: boolean | null;
+  downloadSigningSecret?: string | null;
   expiresAt?: string | null;
   file: FileInfo;
 }
@@ -72,6 +73,7 @@ export const fileKeyInfoSchema = z.object({
   status: z.enum(["pending", "completed", "failed", "deleted"]),
   isPublic: z.boolean(),
   serveImage: z.boolean().nullable().optional(),
+  downloadSigningSecret: z.string().nullable().optional(),
   expiresAt: z.string().datetime().nullable().optional(),
   file: fileInfoSchema,
 });

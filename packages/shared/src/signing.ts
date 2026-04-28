@@ -36,6 +36,7 @@ export interface SignedUploadUrlParams {
 export interface SignedDownloadUrlParams {
   fileKeyId: string;
   accessKey: string;
+  keyId?: string;
   fileName?: string; // optional filename for content-disposition header
   expiresIn?: number; // seconds, default 3600 (1 hour)
 }
@@ -45,6 +46,7 @@ export type NormalizedImageFormat = Exclude<ImageFormat, "jpg">;
 
 export interface SignedImageUrlParams {
   accessKey: string;
+  keyId?: string;
   fileName?: string;
   expiresIn?: number;
   width?: number;
@@ -71,6 +73,7 @@ export interface ParsedSignedDownloadUrl {
   type: "download";
   fileKeyId?: string;
   accessKey: string;
+  keyId?: string;
   fileName?: string;
   expiresAt: number;
   signature: string;
@@ -79,6 +82,7 @@ export interface ParsedSignedDownloadUrl {
 export interface ParsedSignedImageUrl {
   type: "image";
   accessKey: string;
+  keyId?: string;
   fileName?: string;
   expiresAt: number;
   width?: number;
@@ -490,6 +494,9 @@ export async function generateSignedDownloadUrl(
     accessKey: params.accessKey,
     expiresAt: expiresAt.toString(),
   };
+  if (params.keyId) {
+    payload.keyId = params.keyId;
+  }
 
   const signature = await createSignature(payload, signingSecret);
 
@@ -501,6 +508,9 @@ export async function generateSignedDownloadUrl(
   );
   url.searchParams.set("expiresAt", expiresAt.toString());
   url.searchParams.set("sig", signature);
+  if (params.keyId) {
+    url.searchParams.set("keyId", params.keyId);
+  }
 
   if (params.fileName) {
     url.searchParams.set("fileName", params.fileName);
@@ -558,6 +568,9 @@ export async function generateSignedImageUrl(
     expiresAt: expiresAt.toString(),
     fmt: format,
   };
+  if (params.keyId) {
+    payload.keyId = params.keyId;
+  }
   if (width !== undefined) {
     payload.w = width.toString();
   }
@@ -576,6 +589,9 @@ export async function generateSignedImageUrl(
   url.searchParams.set("expiresAt", expiresAt.toString());
   url.searchParams.set("sig", signature);
   url.searchParams.set("fmt", format);
+  if (params.keyId) {
+    url.searchParams.set("keyId", params.keyId);
+  }
   if (width !== undefined) {
     url.searchParams.set("w", width.toString());
   }
@@ -764,6 +780,7 @@ export async function verifySignedDownloadUrl(
   }
 
   const expiresAtStr = urlObj.searchParams.get("expiresAt");
+  const keyId = urlObj.searchParams.get("keyId");
   const fileName = urlObj.searchParams.get("fileName");
 
   if (!accessKey || !expiresAtStr) {
@@ -784,6 +801,9 @@ export async function verifySignedDownloadUrl(
     accessKey,
     expiresAt: expiresAtStr,
   };
+  if (keyId) {
+    payload.keyId = keyId;
+  }
 
   const expectedSignature = await createSignature(payload, signingSecret);
   if (!timingSafeEqual(signature, expectedSignature)) {
@@ -794,6 +814,7 @@ export async function verifySignedDownloadUrl(
     type: "download",
     fileKeyId,
     accessKey,
+    keyId: keyId ?? undefined,
     fileName: fileName ?? undefined,
     expiresAt,
     signature,

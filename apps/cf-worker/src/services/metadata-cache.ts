@@ -18,12 +18,16 @@ function createProjectCacheRequest(slug: string, env: Bindings): Request {
 function createFileKeyCacheRequest(
   projectId: string,
   accessKey: string,
+  signingKeyId: string | null | undefined,
   env: Bindings,
 ): Request {
+  const search = signingKeyId
+    ? `?signingKeyId=${encodeURIComponent(signingKeyId)}`
+    : "";
   return new Request(
     buildCacheUrl(
       env,
-      `/__cache/file-key/${encodeURIComponent(projectId)}/${encodeURIComponent(accessKey)}`,
+      `/__cache/file-key/${encodeURIComponent(projectId)}/${encodeURIComponent(accessKey)}${search}`,
     ),
   );
 }
@@ -93,16 +97,30 @@ function shouldCacheFileKey(fileKey: FileKeyInfo): boolean {
 export async function getCachedFileKeyValue(
   accessKey: string,
   projectId: string,
+  signingKeyId: string | null | undefined,
   env: Bindings,
 ): Promise<FileKeyInfo | null> {
-  return await readCachedJson<FileKeyInfo>(
-    createFileKeyCacheRequest(projectId, accessKey, env),
+  const cached = await readCachedJson<FileKeyInfo>(
+    createFileKeyCacheRequest(projectId, accessKey, signingKeyId, env),
   );
+
+  if (!cached) {
+    return null;
+  }
+
+  // Older cached private records may be missing the per-file signing context
+  // now required for private download/image verification.
+  if (!cached.isPublic && !cached.downloadSigningSecret) {
+    return null;
+  }
+
+  return cached;
 }
 
 export async function cacheFileKey(
   accessKey: string,
   projectId: string,
+  signingKeyId: string | null | undefined,
   fileKey: FileKeyInfo,
   env: Bindings,
 ): Promise<void> {
@@ -111,7 +129,7 @@ export async function cacheFileKey(
   }
 
   await writeCachedJson(
-    createFileKeyCacheRequest(projectId, accessKey, env),
+    createFileKeyCacheRequest(projectId, accessKey, signingKeyId, env),
     fileKey,
     FILE_KEY_CACHE_TTL_SECONDS,
   );
