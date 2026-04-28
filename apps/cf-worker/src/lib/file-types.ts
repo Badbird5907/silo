@@ -44,11 +44,20 @@ export function areMimeTypesEquivalent(
 
 export async function detectMimeType(
   data: ArrayBuffer | Uint8Array,
+  fileName?: string,
 ): Promise<string> {
   try {
     const buffer = data instanceof Uint8Array ? data : new Uint8Array(data);
     const result = await fileTypeFromBuffer(buffer);
-    return result?.mime ?? "application/octet-stream";
+    if (result?.mime) {
+      return result.mime;
+    }
+
+    const normalizedFileName = fileName?.trim();
+    const lookedUp = normalizedFileName
+      ? lookupMimeTypeFromFile(normalizedFileName)
+      : undefined;
+    return lookedUp ?? "application/octet-stream";
   } catch (error) {
     console.error("MIME type detection failed:", error);
     return "application/octet-stream";

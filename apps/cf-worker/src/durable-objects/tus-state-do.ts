@@ -880,7 +880,7 @@ export class TusStateDO {
       fileObject.body as ReadableStream<Uint8Array>,
       8192,
     );
-    const actualMimeType = await detectMimeType(headerBytes);
+    const actualMimeType = await detectMimeType(headerBytes, metadata.fileName);
     const actualHash = metadata.claimedHash ?? null;
 
     if (
@@ -991,7 +991,7 @@ export class TusStateDO {
         object.body as ReadableStream<Uint8Array>,
         8192,
       );
-      actualMimeType = await detectMimeType(headerBytes);
+      actualMimeType = await detectMimeType(headerBytes, metadata.fileName);
       actualHash = metadata.claimedHash ?? null;
     }
     await retry(
