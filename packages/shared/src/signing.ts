@@ -69,7 +69,7 @@ export interface ParsedSignedUploadUrl {
 
 export interface ParsedSignedDownloadUrl {
   type: "download";
-  fileKeyId: string;
+  fileKeyId?: string;
   accessKey: string;
   fileName?: string;
   expiresAt: number;
@@ -742,16 +742,27 @@ export async function verifySignedDownloadUrl(
   }
 
   const pathParts = urlObj.pathname.split("/").filter(Boolean);
-  if (pathParts.length < 2 || pathParts[0] !== "download") {
+  const isProjectScopedFileRoute =
+    pathParts.length >= 2 && pathParts[pathParts.length - 2] === "f";
+  const isLegacyDownloadRoute =
+    pathParts.length >= 2 && pathParts[0] === "download";
+
+  let fileKeyId: string | undefined;
+  let accessKey: string | null = null;
+
+  if (isProjectScopedFileRoute) {
+    accessKey = pathParts[pathParts.length - 1] ?? null;
+    const accessKeyParam = urlObj.searchParams.get("accessKey");
+    if (accessKeyParam && accessKeyParam !== accessKey) {
+      throw new Error("Mismatched accessKey in URL");
+    }
+  } else if (isLegacyDownloadRoute) {
+    fileKeyId = pathParts[1];
+    accessKey = urlObj.searchParams.get("accessKey");
+  } else {
     throw new Error("Invalid download URL path");
   }
-  const fileKeyId = pathParts[1];
 
-  if (!fileKeyId) {
-    throw new Error("Missing fileKeyId in URL path");
-  }
-
-  const accessKey = urlObj.searchParams.get("accessKey");
   const expiresAtStr = urlObj.searchParams.get("expiresAt");
   const fileName = urlObj.searchParams.get("fileName");
 
@@ -770,12 +781,9 @@ export async function verifySignedDownloadUrl(
   }
 
   const payload: Record<string, string> = {
-    type: "download",
-    fileKeyId,
     accessKey,
     expiresAt: expiresAtStr,
   };
-  if (fileName) payload.fileName = fileName;
 
   const expectedSignature = await createSignature(payload, signingSecret);
   if (!timingSafeEqual(signature, expectedSignature)) {
