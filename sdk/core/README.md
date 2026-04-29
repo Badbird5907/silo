@@ -12,7 +12,7 @@ Use `createSiloCoreFromToken` to:
 - prepare uploads through one endpoint (`/api/v1/upload`) by default
 - optionally use register + self-sign flow (`/api/v1/upload/register`)
 - enable dev streaming mode (`dev: true`)
-- configure callback URL behavior for production
+- optionally configure callback URL behavior for production
 - power framework runtimes such as `@silo-storage/sdk-server`
 
 ## Upload Strategies
@@ -34,7 +34,7 @@ const uploadCore = createSiloCoreFromToken({
   token: process.env.SILO_TOKEN!,
   cdnHost: process.env.SILO_CDN ?? process.env.NEXT_PUBLIC_SILO_CDN!,
   uploadStrategy: "server", // optional default
-  callbackUrl: "https://app.example.com/api/silo/callback",
+  callbackUrl: "https://app.example.com/api/silo/callback", // optional
 });
 
 await uploadCore.prepareUpload({
@@ -56,7 +56,7 @@ const uploadCore = createSiloCoreFromToken({
   url: process.env.SILO_URL!,
   token: process.env.SILO_TOKEN!,
   cdnHost: process.env.SILO_CDN ?? process.env.NEXT_PUBLIC_SILO_CDN!,
-  callbackUrl: "https://app.example.com/api/silo/callback",
+  callbackUrl: "https://app.example.com/api/silo/callback", // optional
 });
 
 const prepared = await uploadCore.prepareUpload({

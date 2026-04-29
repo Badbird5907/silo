@@ -48,7 +48,7 @@ const imageFromFile = await core.generateImageUrl(prepared.file);
 
 ## Callback URLs
 
-`sdk-core` expects an absolute `callbackUrl`. It does not resolve relative paths for you.
+`sdk-core` only accepts absolute `callbackUrl` values when you provide one. It does not resolve relative paths for you, and you can omit `callbackUrl` entirely if you do not need upload callbacks.
 
 ```ts
 const core = createSiloCoreFromToken({

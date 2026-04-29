@@ -289,15 +289,10 @@ export function createSiloCore(config: UploadCoreConfig) {
         : resolvedUploadStrategy;
 
     const callbackUrlInput = input.callbackUrl ?? config.callbackUrl;
-    let callbackUrl: string | undefined;
-    if (!input.dev) {
-      if (!callbackUrlInput) {
-        throw new Error(
-          "Missing callbackUrl for production upload registration. Provide callbackUrl in createSiloCore config or per request.",
-        );
-      }
-      callbackUrl = requireAbsoluteCallbackUrl(callbackUrlInput);
-    }
+    const callbackUrl =
+      !input.dev && callbackUrlInput
+        ? requireAbsoluteCallbackUrl(callbackUrlInput)
+        : undefined;
 
     if (effectiveUploadStrategy === "server") {
       const preparedFiles: PreparedUploadFile[] = [];

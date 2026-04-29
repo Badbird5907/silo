@@ -140,7 +140,7 @@ const registered = await core.registerUploadBatch({
 });
 ```
 
-In production, `callbackUrl` must be an absolute public URL. You can pass it once when creating the core client, or override it per request.
+If you provide `callbackUrl` in production, it must be an absolute public URL. You can pass it once when creating the core client, override it per request, or omit it entirely if you do not need upload callbacks.
 
 The result shape depends on the mode:
 
