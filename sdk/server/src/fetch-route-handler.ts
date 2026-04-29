@@ -5,6 +5,7 @@ import {
 import type {
   DevSseChunkEvent,
   UploadCore,
+  UploadMethod,
   UploadFileInput,
 } from "@silo-storage/sdk-core";
 import { z } from "zod";
@@ -21,6 +22,7 @@ const registerRequestSchema = z.object({
   input: z.unknown().optional(),
   expiresIn: z.number().int().positive().optional(),
   protocol: z.enum(["http", "https"]).optional(),
+  uploadMethod: z.enum(["tus", "put"]).optional(),
   files: z
     .object({
       fileName: z.string().min(1),
@@ -488,6 +490,7 @@ export function createFetchRouteHandler<
         callbackUrl,
         dev: shouldUseDevelopmentMode,
         files: toUploadFiles(action.files),
+        uploadMethod: action.uploadMethod as UploadMethod | undefined,
       });
 
       if (registerResult.registerResult.mode === "development") {
@@ -519,6 +522,7 @@ export function createFetchRouteHandler<
           fileKeyId: file.fileKeyId,
           accessKey: file.accessKey,
           uploadUrl: file.uploadUrl,
+          uploadMethod: file.uploadMethod,
           fileName: file.fileName,
           size: file.size,
           hash: file.hash,

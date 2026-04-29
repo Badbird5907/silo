@@ -68,6 +68,7 @@ export interface UploadCompletion<
   routeSlug: TEndpoint;
   accessKey?: string;
   uploadUrl?: string;
+  uploadMethod?: "tus" | "put";
   result: RouteOutputBySlug<TRouter, TEndpoint>;
 }
 
@@ -129,6 +130,7 @@ export interface UploadRequestOptions<
   input?: RouteInputBySlug<TRouter, TEndpoint>;
   expiresIn?: number;
   protocol?: "http" | "https";
+  uploadMethod?: "tus" | "put";
   awaitTimeoutMs?: number;
   concurrency?: number;
 }

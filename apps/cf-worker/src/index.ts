@@ -14,6 +14,7 @@ import {
 } from "./middleware/project";
 import { handleDevR2ListAll } from "./routes/dev/r2-list-all";
 import { handleDownload } from "./routes/download";
+import { handleDirectUpload } from "./routes/direct-upload";
 import { handleImage, handleInternalImageSource } from "./routes/image";
 import { handleInternalDelete } from "./routes/internal/delete";
 import { handleInternalDeletePrefix } from "./routes/internal/delete-prefix";
@@ -45,6 +46,7 @@ app.get("/dev/r2/list-all", requireDevelopment, handleDevR2ListAll);
 app.options("/ingest/tus", requireProject, handleTusOptions);
 app.options("/ingest/tus/:uploadId", requireProject, handleTusOptions);
 app.post("/ingest/tus", requireProject, handleTusCreate);
+app.put("/ingest/put", requireProject, handleDirectUpload);
 // Some runtimes/proxies can normalize HEAD to GET before Hono routing.
 // Mirror HEAD handling on GET so resumable uploads do not restart on 404.
 app.get("/ingest/tus/:uploadId", requireProject, handleTusHead);
@@ -70,6 +72,11 @@ app.post(
   "/:projectRoutePrefix/:projectSlug/ingest/tus",
   requireProject,
   handleTusCreate,
+);
+app.put(
+  "/:projectRoutePrefix/:projectSlug/ingest/put",
+  requireProject,
+  handleDirectUpload,
 );
 app.get(
   "/:projectRoutePrefix/:projectSlug/ingest/tus/:uploadId",
@@ -150,7 +157,8 @@ app.get(
 
 app.onError((err, c) => {
   console.error("Unhandled error:", err);
-  const response = createErrorResponse(err);
+  const isTusRequest = c.req.path.includes("/ingest/tus");
+  const response = createErrorResponse(err, isTusRequest);
 
   // TUS spec requires Cache-Control: no-store on all HEAD responses
   if (c.req.method === "HEAD") {

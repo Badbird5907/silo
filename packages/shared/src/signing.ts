@@ -31,6 +31,7 @@ export interface SignedUploadUrlParams {
   /** Used when `workerDomain` has no scheme; ignored if `workerDomain` is `http://...` or `https://...`. */
   protocol?: "http" | "https";
   acceptedMimeTypes?: string[]; // optional - shorthand keys or exact MIME values
+  uploadMethod?: UploadMethod;
 }
 
 export interface SignedDownloadUrlParams {
@@ -66,6 +67,7 @@ export interface ParsedSignedUploadUrl {
   expiresAt?: number;
   keyId: string;
   acceptedMimeTypes?: string[];
+  uploadMethod: UploadMethod;
   signature: string;
 }
 
@@ -97,6 +99,7 @@ export type ParsedSignedUrl =
   | ParsedSignedImageUrl;
 
 export type ProjectRouteMode = "subdomain" | "path";
+export type UploadMethod = "tus" | "put";
 
 export interface SignedUrlRoutingOptions {
   routeMode?: ProjectRouteMode;
@@ -170,6 +173,16 @@ function buildProjectScopedUrl(
 
 export function normalizeAcceptedMimeTypePattern(pattern: string): string {
   return normalizeFileRouterInputKey(pattern);
+}
+
+export function normalizeUploadMethod(
+  value: string | undefined | null,
+): UploadMethod {
+  const normalized = value?.trim().toLowerCase() ?? "tus";
+  if (normalized === "tus" || normalized === "put") {
+    return normalized;
+  }
+  throw new Error(`Invalid upload method "${value}"`);
 }
 
 export function normalizeAcceptedMimeTypePatterns(
@@ -393,6 +406,7 @@ export async function generateSignedUploadUrlWithSecret(
   signingSecret: string,
   routing?: SignedUrlRoutingOptions,
 ): Promise<string> {
+  const uploadMethod = normalizeUploadMethod(params.uploadMethod);
   const payload: Record<string, string> = {
     type: "upload",
     environmentId: params.environmentId,
@@ -401,6 +415,7 @@ export async function generateSignedUploadUrlWithSecret(
     fileName: params.fileName,
     size: params.size.toString(),
     keyId: params.keyId,
+    uploadMethod,
   };
 
   if (params.hash) {
@@ -428,7 +443,7 @@ export async function generateSignedUploadUrlWithSecret(
   const url = buildProjectScopedUrl(
     workerDomain,
     projectSlug,
-    "/ingest/tus",
+    uploadMethod === "put" ? "/ingest/put" : "/ingest/tus",
     routing,
     params.protocol,
   );
@@ -678,6 +693,9 @@ export async function verifySignedUploadUrl(
   const hash = urlObj.searchParams.get("hash");
   const mimeType = urlObj.searchParams.get("mimeType");
   const expiresAtStr = urlObj.searchParams.get("expiresAt");
+  const uploadMethod = normalizeUploadMethod(
+    urlObj.searchParams.get("uploadMethod"),
+  );
   const acceptedMimeTypesParam = urlObj.searchParams.get("acceptedMimeTypes");
   const acceptedMimeTypes = parseAcceptedMimeTypePatterns(
     acceptedMimeTypesParam,
@@ -714,6 +732,7 @@ export async function verifySignedUploadUrl(
     fileName,
     size: sizeStr,
     keyId,
+    uploadMethod,
   };
   if (hash) payload.hash = hash;
   if (mimeType) payload.mimeType = mimeType;
@@ -739,6 +758,7 @@ export async function verifySignedUploadUrl(
     expiresAt,
     keyId,
     acceptedMimeTypes,
+    uploadMethod,
     signature,
   };
 }

@@ -187,6 +187,9 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
           ...(c.req.query("isPublic") && {
             isPublic: c.req.query("isPublic") ?? undefined,
           }),
+          ...(c.req.query("uploadMethod") && {
+            uploadMethod: c.req.query("uploadMethod") ?? undefined,
+          }),
         },
       },
       c.env,
@@ -194,6 +197,12 @@ export async function handleTusCreate(c: AppContext): Promise<Response> {
 
     if (!verificationResult.valid) {
       throw Errors.signatureInvalid();
+    }
+
+    if (verificationResult.uploadMethod !== "tus") {
+      throw Errors.invalidRequest(
+        "Signed upload URL is not valid for the TUS ingest endpoint",
+      );
     }
 
     if (

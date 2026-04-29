@@ -214,6 +214,7 @@ export async function registerRouteUpload<
     callbackMetadata,
     fileExpiry: resolvedFileExpiry,
     uploadStrategy: input.uploadStrategy ?? "server",
+    uploadMethod: input.uploadMethod,
     dev: input.dev,
     expiresIn: input.expiresIn,
     protocol: input.protocol,

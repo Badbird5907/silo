@@ -9,6 +9,7 @@ import {
 } from "@silo-storage/db/schema";
 import { normalizeFileRouterInputKey } from "@silo-storage/mime-types";
 import {
+  normalizeUploadMethod,
   parseAcceptedMimeTypePatterns,
   serializeAcceptedMimeTypePatterns,
 } from "@silo-storage/shared/signing";
@@ -42,6 +43,7 @@ const schema = z.object({
     acceptedMimeTypes: z.string().optional(),
     expiresAt: z.string().optional(),
     isPublic: z.string().optional(),
+    uploadMethod: z.string().optional(),
   }),
 });
 
@@ -167,6 +169,25 @@ export async function POST(request: Request) {
     }
 
     const { keyId, signature, payload } = parsed.data;
+    let uploadMethod: "tus" | "put";
+    try {
+      uploadMethod = normalizeUploadMethod(payload.uploadMethod);
+    } catch (error) {
+      console.log("[verify-signature] Invalid uploadMethod", {
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+      return new Response(
+        JSON.stringify({
+          error:
+            error instanceof Error ? error.message : "Invalid uploadMethod",
+          valid: false,
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
 
     let acceptedMimeTypes: string[] | undefined;
     try {
@@ -264,6 +285,7 @@ export async function POST(request: Request) {
       fileName: payload.fileName,
       size: payload.size,
       keyId: payload.keyId,
+      uploadMethod,
     };
     if (payload.hash) payloadForSigning.hash = payload.hash;
     if (payload.mimeType) payloadForSigning.mimeType = payload.mimeType;
@@ -560,6 +582,7 @@ export async function POST(request: Request) {
         claimedMimeType: payload.mimeType ?? null,
         acceptedMimeTypes: acceptedMimeTypes ?? null,
         isPublic: payload.isPublic === "true",
+        uploadMethod,
       }),
       {
         status: 200,

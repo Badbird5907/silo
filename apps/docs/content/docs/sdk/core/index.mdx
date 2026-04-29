@@ -96,6 +96,7 @@ const prepared = await core.prepareUpload({
 The returned `prepared.file` includes the values your client needs to actually upload the file:
 
 - `uploadUrl`
+- `uploadMethod`
 - `accessKey`
 - `fileKeyId`
 - `expiresAt`
@@ -109,6 +110,27 @@ await core.prepareUpload({
     fileName: "photo.png",
     size: 1234,
   },
+});
+```
+
+### Direct `fetch()` uploads
+
+Upload URLs default to the resumable `tus` ingest path. If you want a plain signed URL for `fetch(...)`, pass `uploadMethod: "put"`:
+
+```ts
+const prepared = await core.prepareUpload({
+  uploadMethod: "put",
+  file: {
+    fileName: file.name,
+    size: file.size,
+    mimeType: file.type || undefined,
+  },
+});
+
+await fetch(prepared.file.uploadUrl, {
+  method: "PUT",
+  headers: file.type ? { "Content-Type": file.type } : undefined,
+  body: file,
 });
 ```
 

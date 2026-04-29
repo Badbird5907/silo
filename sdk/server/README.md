@@ -24,6 +24,10 @@ By default, router registration uses core `uploadStrategy: "server"` (combined
 `/api/v1/upload` registration + URL signing). You can opt into
 `uploadStrategy: "self"` per call when you need local signing behavior.
 
+Registration also supports `uploadMethod: "tus" | "put"`. Leave it as the
+default `tus` for resumable uploads, or pass `put` when the client should
+receive a direct signed `PUT` URL instead.
+
 ## Example
 
 ```ts

@@ -29,6 +29,7 @@ import {
   generateSignedDownloadUrl,
   generateSignedUploadUrlWithSecret,
 } from "../signing";
+import type { UploadMethod } from "../signing";
 import {
   createUpdateFileAccessRequestBody,
   updateFileAccessResultSchema,
@@ -283,6 +284,7 @@ export function createSiloCore(config: UploadCoreConfig) {
     const expiresIn = input.expiresIn ?? 3600;
     const resolvedUploadStrategy: UploadStrategy =
       input.uploadStrategy ?? config.uploadStrategy ?? "server";
+    const resolvedUploadMethod: UploadMethod = input.uploadMethod ?? "tus";
     const effectiveUploadStrategy: UploadStrategy =
       resolvedUploadStrategy === "server" && input.dev === true
         ? "self"
@@ -312,6 +314,7 @@ export function createSiloCore(config: UploadCoreConfig) {
           callbackUrl,
           callbackMetadata: input.callbackMetadata ?? {},
           dev: input.dev === true,
+          uploadMethod: resolvedUploadMethod,
         };
         applyFileExpiryToRegisterBody(requestBody, input.fileExpiry);
 
@@ -336,6 +339,7 @@ export function createSiloCore(config: UploadCoreConfig) {
           fileKeyId: parsed.fileKeyId,
           accessKey: parsed.accessKey,
           uploadUrl: parsed.uploadUrl,
+          uploadMethod: parsed.uploadMethod,
           fileName: file.fileName,
           size: file.size,
           hash: file.hash,
@@ -388,6 +392,7 @@ export function createSiloCore(config: UploadCoreConfig) {
       preparedFilesWithoutUrl.push({
         fileKeyId,
         accessKey,
+        uploadMethod: resolvedUploadMethod,
         fileName: file.fileName,
         size: file.size,
         hash: file.hash,
@@ -441,6 +446,7 @@ export function createSiloCore(config: UploadCoreConfig) {
           keyId: selfKeyId,
           expiresIn,
           protocol,
+          uploadMethod: resolvedUploadMethod,
         },
         selfSigningSecret,
         { routeMode: resolvedRouteMode },
@@ -449,6 +455,7 @@ export function createSiloCore(config: UploadCoreConfig) {
       return {
         ...file,
         uploadUrl,
+        uploadMethod: resolvedUploadMethod,
       };
     }
 

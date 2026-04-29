@@ -57,6 +57,15 @@ await upload.uploadFiles(files, {
 });
 ```
 
+If you want a single signed upload request instead of the default resumable TUS flow, pass `uploadMethod: "put"`:
+
+```ts
+await upload.uploadFile(file, {
+  input: { albumId: "abc" },
+  uploadMethod: "put",
+});
+```
+
 ### Multi-file callback behavior
 
 When you call `upload.uploadFiles(files, ...)`, each file uploads and completes independently.

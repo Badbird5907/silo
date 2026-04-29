@@ -235,6 +235,7 @@ export function useUploadInternal<
             input: uploadOptions?.input,
             expiresIn: uploadOptions?.expiresIn,
             protocol: uploadOptions?.protocol,
+            uploadMethod: uploadOptions?.uploadMethod,
             files: files.map((file) => ({
               fileName: file.name,
               size: file.size,
@@ -277,6 +278,7 @@ export function useUploadInternal<
             try {
               await uploadFileWithProgress(
                 registration.uploadUrl,
+                registration.uploadMethod ?? "tus",
                 file,
                 (loaded, total) => {
                   const previousLoaded = loadedByIndex.get(index) ?? 0;
@@ -321,6 +323,7 @@ export function useUploadInternal<
                 routeSlug: completion.routeSlug as TEndpoint,
                 accessKey: String(registration.accessKey),
                 uploadUrl: String(registration.uploadUrl),
+                uploadMethod: registration.uploadMethod ?? "tus",
                 result: completion.onUploadCompleteResult as UploadCompletion<
                   TRouter,
                   TEndpoint
@@ -437,6 +440,7 @@ export function useUploadInternal<
           input: beginOptions?.input,
           expiresIn: beginOptions?.expiresIn,
           protocol: beginOptions?.protocol,
+          uploadMethod: beginOptions?.uploadMethod,
           awaitTimeoutMs: beginOptions?.awaitTimeoutMs,
           concurrency: beginOptions?.concurrency,
         });
@@ -621,6 +625,7 @@ export function useStagedUploadInternal<
         input: requestOptions?.input ?? options.input,
         expiresIn: requestOptions?.expiresIn ?? options.expiresIn,
         protocol: requestOptions?.protocol ?? options.protocol,
+        uploadMethod: requestOptions?.uploadMethod ?? options.uploadMethod,
         awaitTimeoutMs:
           requestOptions?.awaitTimeoutMs ?? options.awaitTimeoutMs,
         concurrency: requestOptions?.concurrency ?? options.concurrency,

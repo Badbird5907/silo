@@ -151,6 +151,7 @@ export interface SignatureVerificationRequest {
     acceptedMimeTypes?: string;
     expiresAt?: string;
     isPublic?: string;
+    uploadMethod?: string;
   };
 }
 
@@ -166,5 +167,6 @@ export interface SignatureVerificationResponse {
   claimedMimeType?: string | null;
   acceptedMimeTypes?: string[] | null;
   isPublic?: boolean;
+  uploadMethod?: "tus" | "put";
   error?: string;
 }

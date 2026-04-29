@@ -74,6 +74,32 @@ const downloadUrl = await uploadCore.generateDownloadUrl({
 });
 ```
 
+## Upload Methods
+
+Signed upload URLs can target either:
+
+- `tus` (default): resumable uploads through the TUS ingest endpoint
+- `put`: a single-request direct upload you can call with `fetch()`
+
+Use `uploadMethod: "put"` when you want a plain signed URL for `fetch`:
+
+```ts
+const prepared = await uploadCore.prepareUpload({
+  uploadMethod: "put",
+  file: {
+    fileName: "photo.png",
+    size: file.size,
+    mimeType: file.type || undefined,
+  },
+});
+
+await fetch(prepared.file.uploadUrl, {
+  method: "PUT",
+  headers: file.type ? { "Content-Type": file.type } : undefined,
+  body: file,
+});
+```
+
 ## URL Generation
 
 

@@ -264,6 +264,8 @@ export async function registerUpload(request: Request, context: { userId: string
 
 By default registration uses the core `uploadStrategy: "server"` flow. Pass `uploadStrategy: "self"` only when you explicitly want local signing behavior for that call.
 
+You can also pass `uploadMethod: "put"` when the client should receive a direct signed `PUT` URL instead of the default resumable TUS URL.
+
 ## Prepare a single upload
 
 Use `prepareRouteUpload(...)` when you want the convenience of single-file registration plus a response shaped like `core.prepareUpload(...)`.
@@ -293,6 +295,7 @@ export async function prepareUpload(request: Request, context: { userId: string;
       size: 1_250_000,
       mimeType: "image/png",
     },
+    uploadMethod: "put",
   });
 
   return result.prepareResult;

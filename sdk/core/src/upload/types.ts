@@ -1,4 +1,5 @@
 import type { FileExpiryInput } from "./expiry";
+import type { UploadMethod } from "../signing";
 
 export type UploadStrategy = "server" | "self";
 
@@ -79,6 +80,7 @@ export interface UploadFileInput {
 export interface RegisterUploadBatchInput {
   files: UploadFileInput[];
   uploadStrategy?: UploadStrategy;
+  uploadMethod?: UploadMethod;
   callbackMetadata?: Record<string, unknown>;
   callbackUrl?: string;
   dev?: boolean;
@@ -180,6 +182,7 @@ export interface PreparedUploadFile {
   fileKeyId: string;
   accessKey: string;
   uploadUrl: string;
+  uploadMethod: UploadMethod;
   fileName: string;
   size: number;
   hash?: string;

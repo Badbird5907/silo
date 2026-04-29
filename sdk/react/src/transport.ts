@@ -10,6 +10,7 @@ interface RegisterResponse {
     fileKeyId: string;
     accessKey: string;
     uploadUrl: string;
+    uploadMethod?: "tus" | "put";
     fileName: string;
     size: number;
     mimeType?: string;
@@ -80,6 +81,7 @@ export async function registerUpload<
     input?: RouteInputBySlug<TRouter, TEndpoint>;
     expiresIn?: number;
     protocol?: "http" | "https";
+    uploadMethod?: "tus" | "put";
     files: {
       fileName: string;
       size: number;
@@ -173,10 +175,99 @@ export async function awaitCompletion(
 
 export async function uploadFileWithProgress(
   uploadUrl: string,
+  uploadMethod: "tus" | "put",
   file: File,
   onProgress: (loaded: number, total: number) => void,
   signal: AbortSignal,
 ): Promise<void> {
+  if (uploadMethod === "put") {
+    await new Promise<void>((resolve, reject) => {
+      let settled = false;
+      let aborted = false;
+      const xhr = new XMLHttpRequest();
+
+      const cleanup = () => {
+        signal.removeEventListener("abort", abortListener);
+      };
+      const finishResolve = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve();
+      };
+      const finishReject = (error: SiloUploadError) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(error);
+      };
+      const abortListener = () => {
+        aborted = true;
+        xhr.abort();
+        finishReject(
+          new SiloUploadError({
+            code: "UPLOAD_ABORTED",
+            message: "Upload aborted",
+          }),
+        );
+      };
+
+      xhr.open("PUT", uploadUrl);
+      if (file.type) {
+        xhr.setRequestHeader("Content-Type", file.type);
+      }
+
+      xhr.upload.onprogress = (event) => {
+        if (!event.lengthComputable) return;
+        onProgress(event.loaded, event.total);
+      };
+      xhr.onerror = () => {
+        finishReject(
+          new SiloUploadError({
+            code: "UPLOAD_FAILED",
+            message: `File upload failed for "${file.name}"`,
+          }),
+        );
+      };
+      xhr.onabort = () => {
+        if (aborted) return;
+        finishReject(
+          new SiloUploadError({
+            code: "UPLOAD_ABORTED",
+            message: "Upload aborted",
+          }),
+        );
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          onProgress(file.size, file.size);
+          finishResolve();
+          return;
+        }
+
+        finishReject(
+          new SiloUploadError({
+            code: "UPLOAD_FAILED",
+            message: `File upload failed for "${file.name}"`,
+            cause: {
+              status: xhr.status,
+              responseText: xhr.responseText,
+            },
+          }),
+        );
+      };
+
+      if (signal.aborted) {
+        abortListener();
+        return;
+      }
+
+      signal.addEventListener("abort", abortListener, { once: true });
+      xhr.send(file);
+    });
+    return;
+  }
+
   await new Promise<void>((resolve, reject) => {
     let settled = false;
     const finishResolve = () => {

@@ -3,7 +3,7 @@ import { cors as honoCors } from "hono/cors";
 
 export const cors: MiddlewareHandler = honoCors({
   origin: "*",
-  allowMethods: ["GET", "POST", "PATCH", "DELETE", "HEAD", "OPTIONS"],
+  allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"],
   allowHeaders: [
     "Content-Type",
     "Authorization",

@@ -1,7 +1,10 @@
 import { nanoid } from "nanoid";
 import { z } from "zod";
 
-import { generateSignedUploadUrl } from "@silo-storage/shared/signing";
+import {
+  generateSignedUploadUrl,
+  normalizeUploadMethod,
+} from "@silo-storage/shared/signing";
 
 import { env } from "@/env";
 import {
@@ -43,6 +46,7 @@ const schema = z.object({
     ])
     .optional(),
   dev: z.boolean().optional(),
+  uploadMethod: z.enum(["tus", "put"]).optional(),
 });
 
 export async function POST(request: Request) {
@@ -100,6 +104,7 @@ export async function POST(request: Request) {
     callbackMetadata,
     fileExpiry,
     dev: isDev,
+    uploadMethod: requestedUploadMethod,
   } = result.data;
 
   const resolvedExpiresAt =
@@ -133,6 +138,7 @@ export async function POST(request: Request) {
   try {
     const fileKeyId = providedFileKeyId ?? nanoid(16);
     const resolvedIsPublic = isPublic ?? project.defaultFileAccess === "public";
+    const uploadMethod = normalizeUploadMethod(requestedUploadMethod);
 
     const protocol = env.NODE_ENV === "development" ? "http" : "https";
 
@@ -152,6 +158,7 @@ export async function POST(request: Request) {
         keyId: apiKeyId,
         expiresIn: 3600,
         protocol,
+        uploadMethod,
       },
       apiKey,
       env.SIGNING_SECRET,
@@ -209,6 +216,7 @@ export async function POST(request: Request) {
         fileKeyId,
         accessKey,
         expiresAt: new Date(Date.now() + 3600 * 1000).toISOString(),
+        uploadMethod,
       }),
       {
         status: 200,
