@@ -171,6 +171,17 @@ function buildProjectScopedUrl(
   );
 }
 
+function inferUploadMethodFromPath(pathname: string): UploadMethod {
+  const normalizedPath = pathname.toLowerCase();
+  if (
+    normalizedPath.endsWith("/ingest/put") ||
+    normalizedPath.includes("/ingest/put?")
+  ) {
+    return "put";
+  }
+  return "tus";
+}
+
 export function normalizeAcceptedMimeTypePattern(pattern: string): string {
   return normalizeFileRouterInputKey(pattern);
 }
@@ -343,6 +354,7 @@ export async function generateSignedUploadUrl(
   routing?: SignedUrlRoutingOptions,
 ): Promise<string> {
   const signingSecret = await deriveSigningSecret(apiKey, masterSigningSecret);
+  const uploadMethod = normalizeUploadMethod(params.uploadMethod);
 
   const payload: Record<string, string> = {
     type: "upload",
@@ -379,7 +391,7 @@ export async function generateSignedUploadUrl(
   const url = buildProjectScopedUrl(
     workerDomain,
     projectSlug,
-    "/ingest/tus",
+    uploadMethod === "put" ? "/ingest/put" : "/ingest/tus",
     routing,
     params.protocol,
   );
@@ -415,7 +427,6 @@ export async function generateSignedUploadUrlWithSecret(
     fileName: params.fileName,
     size: params.size.toString(),
     keyId: params.keyId,
-    uploadMethod,
   };
 
   if (params.hash) {
@@ -693,9 +704,9 @@ export async function verifySignedUploadUrl(
   const hash = urlObj.searchParams.get("hash");
   const mimeType = urlObj.searchParams.get("mimeType");
   const expiresAtStr = urlObj.searchParams.get("expiresAt");
-  const uploadMethod = normalizeUploadMethod(
-    urlObj.searchParams.get("uploadMethod"),
-  );
+  const uploadMethod = urlObj.searchParams.has("uploadMethod")
+    ? normalizeUploadMethod(urlObj.searchParams.get("uploadMethod"))
+    : inferUploadMethodFromPath(urlObj.pathname);
   const acceptedMimeTypesParam = urlObj.searchParams.get("acceptedMimeTypes");
   const acceptedMimeTypes = parseAcceptedMimeTypePatterns(
     acceptedMimeTypesParam,
@@ -732,7 +743,6 @@ export async function verifySignedUploadUrl(
     fileName,
     size: sizeStr,
     keyId,
-    uploadMethod,
   };
   if (hash) payload.hash = hash;
   if (mimeType) payload.mimeType = mimeType;

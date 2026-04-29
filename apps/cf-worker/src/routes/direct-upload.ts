@@ -71,7 +71,7 @@ async function sendUploadFailedCallback(
 export async function handleDirectUpload(c: AppContext): Promise<Response> {
   assertProjectUploadWritable(c);
 
-  const projectId = c.get("projectId");
+  const projectId: string = c.get("projectId");
   const environmentId = c.req.query("environmentId");
   const fileKeyId = c.req.query("fileKeyId");
   const accessKey = c.req.query("accessKey");
@@ -84,7 +84,6 @@ export async function handleDirectUpload(c: AppContext): Promise<Response> {
   const acceptedMimeTypes = c.req.query("acceptedMimeTypes") ?? undefined;
   const expiresAt = c.req.query("expiresAt") ?? undefined;
   const isPublic = c.req.query("isPublic") ?? undefined;
-  const uploadMethod = c.req.query("uploadMethod") ?? undefined;
 
   if (
     !environmentId ||
@@ -117,7 +116,6 @@ export async function handleDirectUpload(c: AppContext): Promise<Response> {
         ...(acceptedMimeTypes ? { acceptedMimeTypes } : {}),
         ...(expiresAt ? { expiresAt } : {}),
         ...(isPublic ? { isPublic } : {}),
-        ...(uploadMethod ? { uploadMethod } : {}),
       },
     },
     c.env,
@@ -125,12 +123,6 @@ export async function handleDirectUpload(c: AppContext): Promise<Response> {
 
   if (!verificationResult.valid) {
     throw Errors.signatureInvalid();
-  }
-
-  if (verificationResult.uploadMethod !== "put") {
-    throw Errors.invalidRequest(
-      "Signed upload URL is not valid for the direct ingest endpoint",
-    );
   }
 
   if (
@@ -160,7 +152,7 @@ export async function handleDirectUpload(c: AppContext): Promise<Response> {
 
   const storageKey = `${projectId}/${environmentId}/${crypto.randomUUID()}`;
   const uploadId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
-  const clientIp = getClientIpFromHeaders(c.req.raw.headers);
+  const clientIp: string | null = getClientIpFromHeaders(c.req.raw.headers);
 
   await registerUploadSession(
     {
