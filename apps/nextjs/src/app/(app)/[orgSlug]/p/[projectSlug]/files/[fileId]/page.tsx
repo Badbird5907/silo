@@ -61,6 +61,7 @@ import { FileStatusBadge } from "@/components/file-status-badge";
 import { useOrganization } from "@/hooks/use-organization";
 import { useTRPC } from "@/trpc/react";
 import { EnvBadge } from "@/components/env-badge";
+import { MimeTypeText } from "../mime-type-display";
 
 interface FileDetailPageProps {
   params: Promise<{
@@ -446,7 +447,12 @@ export default function FileDetailPage({ params }: FileDetailPageProps) {
               </h1>
               <p className="text-muted-foreground text-sm">
                 {formatFileSize(size)}
-                {mimeType && ` • ${mimeType}`}
+                {mimeType ? (
+                  <>
+                    {" • "}
+                    <MimeTypeText mimeType={mimeType} />
+                  </>
+                ) : null}
               </p>
             </div>
           </div>
@@ -493,7 +499,14 @@ export default function FileDetailPage({ params }: FileDetailPageProps) {
                   <File className="text-muted-foreground h-4 w-4" />
                   <span className="text-muted-foreground">Type</span>
                 </div>
-                <span className="text-sm font-medium">{mimeType ?? "-"}</span>
+                {mimeType ? (
+                  <MimeTypeText
+                    mimeType={mimeType}
+                    className="text-sm font-medium"
+                  />
+                ) : (
+                  <span className="text-sm font-medium">-</span>
+                )}
               </div>
               {hash && (
                 <div className="flex items-center justify-between">

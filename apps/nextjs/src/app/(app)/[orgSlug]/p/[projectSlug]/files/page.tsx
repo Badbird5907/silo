@@ -80,6 +80,7 @@ import { UploadDialog } from "@/components/upload-dialog";
 import { useOrganization } from "@/hooks/use-organization";
 import { useTRPC } from "@/trpc/react";
 import { EnvBadge } from "@/components/env-badge";
+import { MimeTypeBadge } from "./mime-type-display";
 
 interface FilesPageProps {
   params: Promise<{
@@ -658,7 +659,7 @@ export default function FilesPage({ params }: FilesPageProps) {
         cell: ({ row }) => {
           const fk = row.original;
           return fk.mimeType ? (
-            <Badge variant="outline">{fk.mimeType}</Badge>
+            <MimeTypeBadge mimeType={fk.mimeType} />
           ) : (
             <span className="text-muted-foreground">-</span>
           );
