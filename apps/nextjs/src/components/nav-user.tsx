@@ -1,15 +1,13 @@
 "use client";
 
-import {
-  ChevronsUpDown,
-  LogOut,
-  Monitor,
-  Moon,
-  Sun,
-} from "lucide-react";
+import { ChevronsUpDown, LogOut, Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@silo-storage/ui/components/avatar";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@silo-storage/ui/components/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,

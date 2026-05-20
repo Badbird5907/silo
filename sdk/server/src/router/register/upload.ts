@@ -6,9 +6,9 @@ import type {
   InferMiddlewareData,
   RouteInputBySlug,
   SiloRouteConfigInput,
-  SiloRouteOptions,
   SiloRouteOptionResolver,
   SiloRouteOptionResolverArgs,
+  SiloRouteOptions,
   UploadFileInputWithAcceptedMimeTypes,
 } from "../types";
 import type {
@@ -20,7 +20,10 @@ import type {
 import { buildInternalCallbackMetadata } from "../../envelope";
 import { enforceRouteConfigConstraints } from "../constraints";
 import { parseRouteInput } from "../input-schema";
-import { normalizeRouteConfigInput, normalizeRouteExpiryInput } from "../normalize";
+import {
+  normalizeRouteConfigInput,
+  normalizeRouteExpiryInput,
+} from "../normalize";
 
 const defaultRouteConfigInput = ["blob"] as const;
 
@@ -91,13 +94,13 @@ export async function registerRouteUpload<
   }
 
   const resolvedContext = (input.context ?? {}) as TContext;
-  const parsedInput = await parseRouteInput<RouteInputBySlug<TRouter, TRouteSlug>>(
-    {
-      routeSlug: input.routeSlug,
-      schema: route.inputSchema as never,
-      rawInput: input.input,
-    },
-  );
+  const parsedInput = await parseRouteInput<
+    RouteInputBySlug<TRouter, TRouteSlug>
+  >({
+    routeSlug: input.routeSlug,
+    schema: route.inputSchema as never,
+    rawInput: input.input,
+  });
   const routeOptions = route.routeOptions as
     | SiloRouteOptions<
         Record<string, unknown>,

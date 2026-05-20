@@ -49,7 +49,10 @@ function filterSelectChildren(
     }
 
     if (child.type === React.Fragment) {
-      const result = filterSelectChildren(child.props.children, normalizedQuery);
+      const result = filterSelectChildren(
+        child.props.children,
+        normalizedQuery,
+      );
 
       if (result.hasMatch) {
         filteredChildren.push(...pendingDecorators.splice(0));
@@ -73,7 +76,10 @@ function filterSelectChildren(
     }
 
     if (child.type === SelectGroup || child.type === SelectPrimitive.Group) {
-      const result = filterSelectChildren(child.props.children, normalizedQuery);
+      const result = filterSelectChildren(
+        child.props.children,
+        normalizedQuery,
+      );
 
       if (result.hasMatch) {
         filteredChildren.push(...pendingDecorators.splice(0));

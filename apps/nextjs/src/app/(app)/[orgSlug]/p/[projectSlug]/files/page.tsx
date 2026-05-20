@@ -75,11 +75,11 @@ import { StorageChart } from "@/app/(app)/[orgSlug]/p/[projectSlug]/files/chart"
 import { StoredFilesChart } from "@/app/(app)/[orgSlug]/p/[projectSlug]/files/stored-files-chart";
 import { UploadActivityChart } from "@/app/(app)/[orgSlug]/p/[projectSlug]/files/upload-chart";
 import { UploadOutcomeRateChart } from "@/app/(app)/[orgSlug]/p/[projectSlug]/files/upload-outcome-rate-chart";
+import { EnvBadge } from "@/components/env-badge";
 import { FileStatusBadge } from "@/components/file-status-badge";
 import { UploadDialog } from "@/components/upload-dialog";
 import { useOrganization } from "@/hooks/use-organization";
 import { useTRPC } from "@/trpc/react";
-import { EnvBadge } from "@/components/env-badge";
 import { MimeTypeBadge } from "./mime-type-display";
 
 interface FilesPageProps {
@@ -175,7 +175,7 @@ function FilesTableCardSkeleton() {
     <Card className="min-w-0">
       <CardHeader>
         <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center">
-          <div className="flex min-w-0 flex-col-reverse gap-4 md:flex-row md:flex-1">
+          <div className="flex min-w-0 flex-col-reverse gap-4 md:flex-1 md:flex-row">
             <Skeleton className="h-10 w-full rounded-md md:max-w-md" />
             <div className="flex flex-wrap items-center gap-2">
               <Skeleton className="h-6 w-28 rounded-full" />
@@ -198,11 +198,11 @@ function FilesTableCardSkeleton() {
               <Skeleton className="h-3.5 w-20" />
             </div>
             <div className="ml-auto flex flex-wrap items-center justify-end gap-2 sm:gap-3">
-              <Skeleton className="h-3.5 w-14 hidden sm:block" />
-              <Skeleton className="h-5 w-16 rounded-full hidden md:block" />
-              <Skeleton className="h-5 w-14 rounded-full hidden lg:block" />
-              <Skeleton className="h-3.5 w-10 hidden lg:block" />
-              <Skeleton className="h-3.5 w-28 hidden xl:block" />
+              <Skeleton className="hidden h-3.5 w-14 sm:block" />
+              <Skeleton className="hidden h-5 w-16 rounded-full md:block" />
+              <Skeleton className="hidden h-5 w-14 rounded-full lg:block" />
+              <Skeleton className="hidden h-3.5 w-10 lg:block" />
+              <Skeleton className="hidden h-3.5 w-28 xl:block" />
               <Skeleton className="h-8 w-8 shrink-0 rounded-md" />
             </div>
           </div>
@@ -218,11 +218,11 @@ function FilesTableCardSkeleton() {
                   <Skeleton className="h-4 w-full max-w-[min(100%,280px)]" />
                   <Skeleton className="h-3 w-28 max-w-full" />
                 </div>
-                <Skeleton className="h-5 w-16 shrink-0 rounded-full hidden sm:block" />
-                <Skeleton className="h-5 w-20 shrink-0 rounded-full hidden md:block" />
-                <Skeleton className="h-5 w-14 shrink-0 rounded-full hidden lg:block" />
-                <Skeleton className="h-3.5 w-10 shrink-0 hidden xl:block" />
-                <Skeleton className="h-3.5 w-24 shrink-0 hidden xl:block" />
+                <Skeleton className="hidden h-5 w-16 shrink-0 rounded-full sm:block" />
+                <Skeleton className="hidden h-5 w-20 shrink-0 rounded-full md:block" />
+                <Skeleton className="hidden h-5 w-14 shrink-0 rounded-full lg:block" />
+                <Skeleton className="hidden h-3.5 w-10 shrink-0 xl:block" />
+                <Skeleton className="hidden h-3.5 w-24 shrink-0 xl:block" />
                 <Skeleton className="size-8 shrink-0 rounded-md md:ml-auto" />
               </div>
             ))}
@@ -1355,67 +1355,67 @@ export default function FilesPage({ params }: FilesPageProps) {
             : "pointer-events-none translate-y-4 opacity-0"
         }`}
       >
-          <span className="text-sm font-medium">
-            {multiselect.selectedIds.length} selected
-          </span>
-          <div className="bg-border mx-1 h-4 w-px" />
-          {(() => {
-            const selectedRows = multiselect.getSelectedRows(fileKeys);
-            const canBulkDelete =
-              selectedRows.length > 0 &&
-              selectedRows.every(
-                (row) => row.status === "completed" || row.status === "failed",
-              );
-            const canBulkMarkFailed =
-              selectedRows.length > 0 &&
-              selectedRows.every((row) => row.status === "pending");
-            return (
-              <>
-                {canBulkDelete && (
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => setBulkAction("delete")}
-                  >
-                    <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                    Delete
-                  </Button>
-                )}
-                {canBulkMarkFailed && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-orange-600 hover:text-orange-600"
-                    onClick={() => setBulkAction("markFailed")}
-                  >
-                    <Ban className="mr-1.5 h-3.5 w-3.5" />
-                    Mark Failed
-                  </Button>
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setBulkAction("makePublic")}
-                >
-                  <Eye className="mr-1.5 h-3.5 w-3.5" />
-                  Make Public
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setBulkAction("makePrivate")}
-                >
-                  <EyeOff className="mr-1.5 h-3.5 w-3.5" />
-                  Make Private
-                </Button>
-              </>
+        <span className="text-sm font-medium">
+          {multiselect.selectedIds.length} selected
+        </span>
+        <div className="bg-border mx-1 h-4 w-px" />
+        {(() => {
+          const selectedRows = multiselect.getSelectedRows(fileKeys);
+          const canBulkDelete =
+            selectedRows.length > 0 &&
+            selectedRows.every(
+              (row) => row.status === "completed" || row.status === "failed",
             );
-          })()}
-          <div className="bg-border mx-1 h-4 w-px" />
-          <Button variant="ghost" size="icon-sm" onClick={clearSelection}>
-            <X className="h-3.5 w-3.5" />
-          </Button>
-        </div>
+          const canBulkMarkFailed =
+            selectedRows.length > 0 &&
+            selectedRows.every((row) => row.status === "pending");
+          return (
+            <>
+              {canBulkDelete && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setBulkAction("delete")}
+                >
+                  <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                  Delete
+                </Button>
+              )}
+              {canBulkMarkFailed && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-orange-600 hover:text-orange-600"
+                  onClick={() => setBulkAction("markFailed")}
+                >
+                  <Ban className="mr-1.5 h-3.5 w-3.5" />
+                  Mark Failed
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setBulkAction("makePublic")}
+              >
+                <Eye className="mr-1.5 h-3.5 w-3.5" />
+                Make Public
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setBulkAction("makePrivate")}
+              >
+                <EyeOff className="mr-1.5 h-3.5 w-3.5" />
+                Make Private
+              </Button>
+            </>
+          );
+        })()}
+        <div className="bg-border mx-1 h-4 w-px" />
+        <Button variant="ghost" size="icon-sm" onClick={clearSelection}>
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      </div>
     </>
   );
 }

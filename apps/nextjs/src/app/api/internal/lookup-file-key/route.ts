@@ -3,8 +3,8 @@ import { db } from "@silo-storage/db/client";
 import { apiKeys, fileKeys } from "@silo-storage/db/schema";
 import { deriveSigningSecretFromHash } from "@silo-storage/shared/signing";
 
-import { isCallbackAuthorized } from "@/lib/internal/callback-auth";
 import { env } from "@/env";
+import { isCallbackAuthorized } from "@/lib/internal/callback-auth";
 
 export async function POST(request: Request) {
   if (!isCallbackAuthorized(request)) {

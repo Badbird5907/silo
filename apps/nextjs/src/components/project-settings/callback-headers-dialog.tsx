@@ -122,16 +122,22 @@ export function CallbackHeadersDialog({
               Callback headers
             </DialogTitle>
             <DialogDescription>
-              HTTP headers included whenb calling back to your application on environment
-              <strong>{` ${environment?.name}`}</strong>. Silo signing headers always
-              take precedence over duplicates.
+              HTTP headers included whenb calling back to your application on
+              environment
+              <strong>{` ${environment?.name}`}</strong>. Silo signing headers
+              always take precedence over duplicates.
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-3 py-4">
             <div className="flex items-center justify-between gap-2">
               <Label className="text-sm font-medium">Headers</Label>
-              <Button type="button" variant="outline" size="sm" onClick={addRow}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addRow}
+              >
                 <Plus className="mr-1.5 h-3.5 w-3.5" />
                 Add header
               </Button>
@@ -170,7 +176,7 @@ export function CallbackHeadersDialog({
                     onClick={() => removeRow(index)}
                     aria-label="Remove header"
                   >
-                    <Trash2 className="h-4 w-4 text-muted-foreground" />
+                    <Trash2 className="text-muted-foreground h-4 w-4" />
                   </Button>
                 </div>
               ))}

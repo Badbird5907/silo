@@ -1,5 +1,8 @@
-import { send } from "@vercel/queue";
 import type { Db } from "@silo-storage/db/client";
+import type { UploadEventEnvelope } from "@silo-storage/shared";
+import { send } from "@vercel/queue";
+import { z } from "zod";
+
 import { and, eq } from "@silo-storage/db";
 import {
   callbackAttempts,
@@ -7,8 +10,6 @@ import {
   projectEnvironments,
   webhookAttempts,
 } from "@silo-storage/db/schema";
-import type { UploadEventEnvelope } from "@silo-storage/shared";
-import { z } from "zod";
 
 const WEBHOOK_TOPIC = "upload-webhooks";
 const DEFAULT_MAX_ATTEMPTS = 8;
@@ -53,7 +54,9 @@ function getStringField(value: unknown, key: string): string | null {
     return null;
   }
   const candidate = (value as Record<string, unknown>)[key];
-  return typeof candidate === "string" && candidate.length > 0 ? candidate : null;
+  return typeof candidate === "string" && candidate.length > 0
+    ? candidate
+    : null;
 }
 
 function getObjectField(value: unknown): Record<string, unknown> {
@@ -96,7 +99,10 @@ export async function getFileCallbackTargetForEvent(
   }
 
   const fileKey = await db.query.fileKeys.findFirst({
-    where: and(eq(fileKeys.id, fileKeyId), eq(fileKeys.projectId, input.projectId)),
+    where: and(
+      eq(fileKeys.id, fileKeyId),
+      eq(fileKeys.projectId, input.projectId),
+    ),
     columns: {
       callbackMetadata: true,
     },
@@ -113,7 +119,6 @@ export async function getFileCallbackTargetForEvent(
     callbackMetadata: getObjectField(fileKey?.callbackMetadata),
   };
 }
-
 
 function environmentAllowsEvent(
   environment: WebhookEnvironmentConfig,
@@ -136,7 +141,6 @@ function environmentAllowsEvent(
   console.log("event allowed", eventType, allowed);
   return allowed;
 }
-
 
 export async function enqueueUploadWebhookEvent(
   db: Db,
@@ -163,7 +167,10 @@ export async function enqueueUploadWebhookEvent(
 
   if (!env) {
     console.log("environment not found", input.environmentId);
-    return { enqueued: false as const, reason: "environment_not_found" as const };
+    return {
+      enqueued: false as const,
+      reason: "environment_not_found" as const,
+    };
   }
 
   const parsedType = parseEnvironmentType(env.type);
@@ -178,7 +185,10 @@ export async function enqueueUploadWebhookEvent(
     webhookEvents: Array.isArray(env.webhookEvents) ? env.webhookEvents : [],
   };
 
-  const webhookAllowed = environmentAllowsEvent(normalizedEnvironment, input.event.type);
+  const webhookAllowed = environmentAllowsEvent(
+    normalizedEnvironment,
+    input.event.type,
+  );
   const callbackTarget = await getFileCallbackTargetForEvent(db, {
     projectId: input.projectId,
     eventData: input.event.data,
@@ -202,16 +212,13 @@ export async function enqueueUploadWebhookEvent(
 
   console.log("enqueueing webhook event", input);
 
-  await send(
-    WEBHOOK_TOPIC,
-    {
-      idempotencyKey: input.idempotencyKey ?? input.event.id,
-      environmentId: input.environmentId,
-      projectId: input.projectId,
-      maxAttempts: input.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
-      event: input.event,
-    } satisfies z.infer<typeof queuedWebhookMessageSchema>,
-  );
+  await send(WEBHOOK_TOPIC, {
+    idempotencyKey: input.idempotencyKey ?? input.event.id,
+    environmentId: input.environmentId,
+    projectId: input.projectId,
+    maxAttempts: input.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
+    event: input.event,
+  } satisfies z.infer<typeof queuedWebhookMessageSchema>);
 
   return { enqueued: true as const };
 }
@@ -274,10 +281,7 @@ export async function recordCallbackAttempt(
   await db.insert(callbackAttempts).values(input);
 }
 
-export async function getLatestWebhookAttempt(
-  db: Db,
-  eventId: string,
-) {
+export async function getLatestWebhookAttempt(db: Db, eventId: string) {
   const [lastAttempt] = await db.query.webhookAttempts.findMany({
     where: eq(webhookAttempts.eventId, eventId),
     orderBy: (attempts, { desc: byDesc }) => [byDesc(attempts.attemptNumber)],
@@ -286,18 +290,12 @@ export async function getLatestWebhookAttempt(
   return lastAttempt ?? null;
 }
 
-export async function getNextAttemptNumber(
-  db: Db,
-  eventId: string,
-) {
+export async function getNextAttemptNumber(db: Db, eventId: string) {
   const lastAttempt = await getLatestWebhookAttempt(db, eventId);
   return (lastAttempt?.attemptNumber ?? 0) + 1;
 }
 
-export async function getLatestCallbackAttempt(
-  db: Db,
-  eventId: string,
-) {
+export async function getLatestCallbackAttempt(db: Db, eventId: string) {
   const [lastAttempt] = await db.query.callbackAttempts.findMany({
     where: eq(callbackAttempts.eventId, eventId),
     orderBy: (attempts, { desc: byDesc }) => [byDesc(attempts.attemptNumber)],
@@ -306,10 +304,7 @@ export async function getLatestCallbackAttempt(
   return lastAttempt ?? null;
 }
 
-export async function getNextCallbackAttemptNumber(
-  db: Db,
-  eventId: string,
-) {
+export async function getNextCallbackAttemptNumber(db: Db, eventId: string) {
   const lastAttempt = await getLatestCallbackAttempt(db, eventId);
   return (lastAttempt?.attemptNumber ?? 0) + 1;
 }

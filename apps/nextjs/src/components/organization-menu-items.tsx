@@ -1,5 +1,6 @@
 "use client";
 
+import type { Organization } from "@/hooks/use-organization-switcher";
 import Link from "next/link";
 import { Building2, Check, Plus, Settings } from "lucide-react";
 
@@ -10,8 +11,6 @@ import {
 } from "@silo-storage/ui/components/dropdown-menu";
 
 import { env } from "@/env";
-
-import type { Organization } from "@/hooks/use-organization-switcher";
 
 interface OrganizationMenuItemsProps {
   organizations: Organization[];

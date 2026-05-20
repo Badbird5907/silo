@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { buildNextJsInternalHeaders } from "../lib/nextjs-internal";
 import type { Bindings } from "../types/bindings";
+import { buildNextJsInternalHeaders } from "../lib/nextjs-internal";
 import { reportMissingObject } from "./callback";
 import { deleteObject } from "./r2/upload";
 

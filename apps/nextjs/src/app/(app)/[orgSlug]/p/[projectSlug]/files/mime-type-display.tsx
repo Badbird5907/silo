@@ -40,7 +40,7 @@ function MimeTypeTooltip({
           {children}
         </span>
       </TooltipTrigger>
-      <TooltipContent className="max-w-[min(32rem,calc(100vw-2rem))] break-all text-left">
+      <TooltipContent className="max-w-[min(32rem,calc(100vw-2rem))] text-left break-all">
         {mimeType}
       </TooltipContent>
     </Tooltip>

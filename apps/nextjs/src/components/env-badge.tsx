@@ -1,13 +1,7 @@
 import { Badge } from "@silo-storage/ui/components/badge";
 import { cn } from "@silo-storage/ui/lib/utils";
 
-export function EnvBadge({
-  name,
-  type,
-}: {
-  name: string;
-  type: string;
-}) {
+export function EnvBadge({ name, type }: { name: string; type: string }) {
   return (
     <Badge
       className={cn(

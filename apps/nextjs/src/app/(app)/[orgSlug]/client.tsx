@@ -94,19 +94,16 @@ export function ProjectsPageClient() {
   const projects = projectsQuery.data;
   const totalProjects = projects?.length ?? 0;
   const normalizedSearch = searchQuery.trim().toLowerCase();
-  const filteredProjects = React.useMemo(
-    () => {
-      if (!projects) return [];
-      return projects.filter((project) => {
-        if (!normalizedSearch) return true;
-        return (
-          project.name.toLowerCase().includes(normalizedSearch) ||
-          project.slug.toLowerCase().includes(normalizedSearch)
-        );
-      });
-    },
-    [projects, normalizedSearch],
-  );
+  const filteredProjects = React.useMemo(() => {
+    if (!projects) return [];
+    return projects.filter((project) => {
+      if (!normalizedSearch) return true;
+      return (
+        project.name.toLowerCase().includes(normalizedSearch) ||
+        project.slug.toLowerCase().includes(normalizedSearch)
+      );
+    });
+  }, [projects, normalizedSearch]);
 
   const showProjectsSkeleton =
     organizationLoading ||

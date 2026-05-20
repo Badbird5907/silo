@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
 import { Check, Loader2, UserMinus, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -30,11 +30,15 @@ import {
   TableHeader,
   TableRow,
 } from "@silo-storage/ui/components/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@silo-storage/ui/components/tooltip";
 
 import type { Organization } from "./types";
 import { authClient } from "@/auth/client";
 import { useTRPC } from "@/trpc/react";
-import { Tooltip,TooltipContent,TooltipTrigger } from "@silo-storage/ui/components/tooltip";
 
 export function OrganizationsSettingsCard() {
   const trpc = useTRPC();
@@ -49,9 +53,7 @@ export function OrganizationsSettingsCard() {
     [organizationsQuery.data],
   );
 
-  const [leaveTarget, setLeaveTarget] = useState<Organization | null>(
-    null,
-  );
+  const [leaveTarget, setLeaveTarget] = useState<Organization | null>(null);
 
   const roleQueries = useQueries({
     queries: organizations.map((organization) =>

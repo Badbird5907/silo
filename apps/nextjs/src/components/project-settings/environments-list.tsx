@@ -55,13 +55,17 @@ import {
   TableHeader,
   TableRow,
 } from "@silo-storage/ui/components/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@silo-storage/ui/components/tooltip";
 
 import { useTRPC } from "@/trpc/react";
+import { EnvBadge } from "../env-badge";
 import { CallbackHeadersDialog } from "./callback-headers-dialog";
 import { CreateEnvironmentDialog } from "./create-environment-dialog";
 import { ManageEnvironmentWebhookDialog } from "./manage-environment-webhook-dialog";
-import { Tooltip,TooltipContent,TooltipTrigger } from "@silo-storage/ui/components/tooltip";
-import { EnvBadge } from "../env-badge";
 
 interface EnvironmentsListProps {
   projectId: string;
@@ -72,7 +76,11 @@ type EnvironmentType = "development" | "staging" | "production";
 type WebhookEvent = "upload.completed" | "upload.failed";
 
 function parseEnvironmentType(value: string): EnvironmentType {
-  if (value === "development" || value === "staging" || value === "production") {
+  if (
+    value === "development" ||
+    value === "staging" ||
+    value === "production"
+  ) {
     return value;
   }
   return "development";
@@ -114,9 +122,8 @@ export function EnvironmentsList({
     type: EnvironmentType;
   } | null>(null);
   const [editName, setEditName] = React.useState("");
-  const [editType, setEditType] = React.useState<
-    EnvironmentType
-  >("development");
+  const [editType, setEditType] =
+    React.useState<EnvironmentType>("development");
   const [webhookTarget, setWebhookTarget] = React.useState<{
     id: string;
     name: string;
@@ -265,11 +272,15 @@ export function EnvironmentsList({
                       {env.webhookEnabled && !env.webhookSecretSet ? (
                         <Tooltip>
                           <TooltipTrigger>
-                            <Badge className="ml-2 border-yellow-500 text-yellow-500 bg-yellow-500/10">!</Badge>
+                            <Badge className="ml-2 border-yellow-500 bg-yellow-500/10 text-yellow-500">
+                              !
+                            </Badge>
                           </TooltipTrigger>
                           <TooltipContent className="text-center">
-                            Webhook secret not set.<br />
-                            Webhook delivery will not work until a secret is set.
+                            Webhook secret not set.
+                            <br />
+                            Webhook delivery will not work until a secret is
+                            set.
                           </TooltipContent>
                         </Tooltip>
                       ) : null}
@@ -281,7 +292,9 @@ export function EnvironmentsList({
                       <EnvBadge name={env.type} type={env.type} />
                     </TableCell>
                     <TableCell>
-                      <Badge variant={env.ownerUserId ? "secondary" : "outline"}>
+                      <Badge
+                        variant={env.ownerUserId ? "secondary" : "outline"}
+                      >
                         {env.ownerUserId ? "Personal" : "Shared"}
                       </Badge>
                     </TableCell>

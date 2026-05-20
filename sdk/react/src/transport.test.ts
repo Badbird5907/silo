@@ -1,9 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  resolveResumableUploadUrl,
-  uploadFileWithProgress,
-} from "./transport";
+import { resolveResumableUploadUrl, uploadFileWithProgress } from "./transport";
 
 describe("resolveResumableUploadUrl", () => {
   it("appends the upload id before existing query params", () => {
@@ -48,7 +45,9 @@ describe("uploadFileWithProgress (resumable)", () => {
   it("returns delivered:true when the worker reports completionDelivered", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(jsonResponse({ ok: true, uploadId: "u1", offset: 0 }))
+      .mockResolvedValueOnce(
+        jsonResponse({ ok: true, uploadId: "u1", offset: 0 }),
+      )
       .mockResolvedValueOnce(
         jsonResponse({
           ok: true,
@@ -88,7 +87,9 @@ describe("uploadFileWithProgress (resumable)", () => {
     // worker-side response carries no onUploadCompleteResult. The client
     // must fall back to awaitCompletion which reads from the SSE-fed store.
     vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(jsonResponse({ ok: true, uploadId: "u1", offset: 0 }))
+      .mockResolvedValueOnce(
+        jsonResponse({ ok: true, uploadId: "u1", offset: 0 }),
+      )
       .mockResolvedValueOnce(
         jsonResponse({
           ok: true,
@@ -122,7 +123,9 @@ describe("uploadFileWithProgress (resumable)", () => {
 
   it("returns delivered:false when completionDelivered is absent", async () => {
     vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(jsonResponse({ ok: true, uploadId: "u1", offset: 0 }))
+      .mockResolvedValueOnce(
+        jsonResponse({ ok: true, uploadId: "u1", offset: 0 }),
+      )
       .mockResolvedValueOnce(
         jsonResponse({
           ok: true,
@@ -149,7 +152,9 @@ describe("uploadFileWithProgress (resumable)", () => {
 
   it("returns delivered:false when completionDelivered is explicitly false", async () => {
     vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(jsonResponse({ ok: true, uploadId: "u1", offset: 0 }))
+      .mockResolvedValueOnce(
+        jsonResponse({ ok: true, uploadId: "u1", offset: 0 }),
+      )
       .mockResolvedValueOnce(
         jsonResponse({
           ok: true,
@@ -173,11 +178,9 @@ describe("uploadFileWithProgress (resumable)", () => {
   });
 
   it("falls back to status GET when no chunk reported complete", async () => {
-    const fullFile = new File(
-      [new Uint8Array(0)],
-      "empty.bin",
-      { type: "application/octet-stream" },
-    );
+    const fullFile = new File([new Uint8Array(0)], "empty.bin", {
+      type: "application/octet-stream",
+    });
 
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(

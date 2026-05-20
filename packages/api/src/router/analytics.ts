@@ -1,9 +1,9 @@
+import type { Db } from "@silo-storage/db/client";
 import type { TRPCRouterRecord } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq, gte, isNotNull, lt, lte, sql, sum } from "drizzle-orm";
 import { z } from "zod/v4";
 
-import type { Db } from "@silo-storage/db/client";
 import {
   fileKeys,
   files,
@@ -354,7 +354,9 @@ async function getStoredFilesTimeline(
     db
       .select({ count: sql<number>`count(*)::int` })
       .from(fileKeys)
-      .where(and(...baseConditions, lt(fileKeys.uploadCompletedAt, startDateTime))),
+      .where(
+        and(...baseConditions, lt(fileKeys.uploadCompletedAt, startDateTime)),
+      ),
     db
       .select({
         date: sql<string>`${fileKeys.uploadCompletedAt}::date::text`,
@@ -447,48 +449,47 @@ export const analyticsRouter = {
         totals,
         storageResult,
         fileCountResult,
-      ] =
-        await Promise.all([
-          getProjectDailyCounters(ctx.db, input, startDate, endDate),
-          getProjectStorageTimeline(ctx.db, input, startDate, endDate),
-          input.includeStoredFiles
-            ? getStoredFilesTimeline(ctx.db, input, startDate, endDate)
-            : Promise.resolve([]),
-          ctx.db
-            .select({
-              totalUploadsStarted: sum(usageDaily.uploadsStarted),
-              totalUploadsCompleted: sum(usageDaily.uploadsCompleted),
-              totalUploadsFailed: sum(usageDaily.uploadsFailed),
-              totalDownloads: sum(usageDaily.downloads),
-              totalBytesUploaded: sum(usageDaily.bytesUploaded),
-              totalBytesDownloaded: sum(usageDaily.bytesDownloaded),
-            })
-            .from(usageDaily)
-            .where(
-              and(
-                eq(usageDaily.projectId, input.projectId),
-                ...(input.environmentId
-                  ? [eq(usageDaily.environmentId, input.environmentId)]
-                  : []),
-                gte(usageDaily.date, startDate),
-                lte(usageDaily.date, endDate),
-              ),
+      ] = await Promise.all([
+        getProjectDailyCounters(ctx.db, input, startDate, endDate),
+        getProjectStorageTimeline(ctx.db, input, startDate, endDate),
+        input.includeStoredFiles
+          ? getStoredFilesTimeline(ctx.db, input, startDate, endDate)
+          : Promise.resolve([]),
+        ctx.db
+          .select({
+            totalUploadsStarted: sum(usageDaily.uploadsStarted),
+            totalUploadsCompleted: sum(usageDaily.uploadsCompleted),
+            totalUploadsFailed: sum(usageDaily.uploadsFailed),
+            totalDownloads: sum(usageDaily.downloads),
+            totalBytesUploaded: sum(usageDaily.bytesUploaded),
+            totalBytesDownloaded: sum(usageDaily.bytesDownloaded),
+          })
+          .from(usageDaily)
+          .where(
+            and(
+              eq(usageDaily.projectId, input.projectId),
+              ...(input.environmentId
+                ? [eq(usageDaily.environmentId, input.environmentId)]
+                : []),
+              gte(usageDaily.date, startDate),
+              lte(usageDaily.date, endDate),
             ),
-          ctx.db
-            .select({
-              totalBytes: sum(files.size),
-            })
-            .from(files)
-            .where(fileFilters),
-          input.includeFileCount
-            ? ctx.db
-                .select({
-                  fileCount: sql<number>`count(*)::int`,
-                })
-                .from(files)
-                .where(fileFilters)
-            : Promise.resolve([]),
-        ]);
+          ),
+        ctx.db
+          .select({
+            totalBytes: sum(files.size),
+          })
+          .from(files)
+          .where(fileFilters),
+        input.includeFileCount
+          ? ctx.db
+              .select({
+                fileCount: sql<number>`count(*)::int`,
+              })
+              .from(files)
+              .where(fileFilters)
+          : Promise.resolve([]),
+      ]);
 
       const totalStorage = storageResult[0]?.totalBytes ?? 0;
       const fileCount = input.includeFileCount
@@ -508,13 +509,15 @@ export const analyticsRouter = {
         endDate,
       );
 
-      const dailyStatsWithBackfill = backfilledCounterStats.map((row, index) => ({
-        ...row,
-        storageBytes: dailyStorageStats[index]?.storageBytes ?? null,
-        ...(input.includeStoredFiles
-          ? { storedFiles: dailyStoredFilesStats[index]?.storedFiles ?? 0 }
-          : {}),
-      }));
+      const dailyStatsWithBackfill = backfilledCounterStats.map(
+        (row, index) => ({
+          ...row,
+          storageBytes: dailyStorageStats[index]?.storageBytes ?? null,
+          ...(input.includeStoredFiles
+            ? { storedFiles: dailyStoredFilesStats[index]?.storedFiles ?? 0 }
+            : {}),
+        }),
+      );
 
       return {
         daily: dailyStatsWithBackfill,

@@ -111,26 +111,38 @@ export function StoredFilesChart({
 
   return (
     <ChartContainer
-      config={{ storedFiles: { label: "Stored files", color: "var(--chart-4)" } }}
+      config={{
+        storedFiles: { label: "Stored files", color: "var(--chart-4)" },
+      }}
       className="aspect-auto h-[110px]"
     >
       <AreaChart data={dailyData}>
         <defs>
           <linearGradient id={areaGradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--color-storedFiles)" stopOpacity={0.28} />
+            <stop
+              offset="0%"
+              stopColor="var(--color-storedFiles)"
+              stopOpacity={0.28}
+            />
             <stop
               offset="55%"
               stopColor="var(--color-storedFiles)"
               stopOpacity={0.08}
             />
-            <stop offset="100%" stopColor="var(--color-storedFiles)" stopOpacity={0} />
+            <stop
+              offset="100%"
+              stopColor="var(--color-storedFiles)"
+              stopOpacity={0}
+            />
           </linearGradient>
         </defs>
         <ChartTooltip
           content={
             <ChartTooltipContent
               labelFormatter={(_value, payload) => {
-                const data = payload[0]?.payload as StoredFilesDatum | undefined;
+                const data = payload[0]?.payload as
+                  | StoredFilesDatum
+                  | undefined;
                 if (data?.date) {
                   return formatChartDate(data.date);
                 }
@@ -140,7 +152,9 @@ export function StoredFilesChart({
                 <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
                   <span className="text-muted-foreground">{name}</span>
                   <span className="text-foreground font-mono font-medium tabular-nums">
-                    {typeof value === "number" ? `${value.toLocaleString()} files` : "-"}
+                    {typeof value === "number"
+                      ? `${value.toLocaleString()} files`
+                      : "-"}
                   </span>
                 </div>
               )}

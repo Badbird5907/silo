@@ -76,7 +76,10 @@ type UploadDropzoneHookComponentProps<
 type UploadDropzoneExternalComponentProps<
   TRouter extends AnyFileRouterLike,
   TEndpoint extends RouteSlug<TRouter>,
-> = Omit<UploadDropzoneWithExternalUploadProps<TRouter, TEndpoint>, "useUpload">;
+> = Omit<
+  UploadDropzoneWithExternalUploadProps<TRouter, TEndpoint>,
+  "useUpload"
+>;
 
 type UploadDropzoneComponentProps<
   TRouter extends AnyFileRouterLike,
@@ -144,7 +147,7 @@ export function createSiloReact<TRouter extends AnyFileRouterLike>(
       UploadButtonProps<TRouter, TEndpoint>
     >;
     return React.createElement(component, {
-      ...(props),
+      ...props,
       useUpload,
     } as UploadButtonProps<TRouter, TEndpoint>);
   }
@@ -162,7 +165,7 @@ export function createSiloReact<TRouter extends AnyFileRouterLike>(
       UploadDropzoneProps<TRouter, TEndpoint>
     >;
     return React.createElement(component, {
-      ...(props),
+      ...props,
       useUpload,
     } as UploadDropzoneProps<TRouter, TEndpoint>);
   }

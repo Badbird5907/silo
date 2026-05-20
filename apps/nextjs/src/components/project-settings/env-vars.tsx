@@ -1,7 +1,7 @@
 "use client";
 
-import * as React from "react";
 import type { ReactNode } from "react";
+import * as React from "react";
 import { Check, Copy, Terminal } from "lucide-react";
 import { toast } from "sonner";
 
@@ -9,6 +9,7 @@ import { Button } from "@silo-storage/ui/components/button";
 import { Label } from "@silo-storage/ui/components/label";
 import { Tabs, TabsList, TabsTrigger } from "@silo-storage/ui/components/tabs";
 import { cn } from "@silo-storage/ui/lib/utils";
+
 import { env } from "@/env";
 
 export type SiloEnvFramework = "next" | "vite" | "generic";
@@ -17,9 +18,10 @@ export function siloEnvSnippet(
   siloToken: string,
   framework: SiloEnvFramework = "generic",
 ): string {
-  const origin =
-    typeof window !== "undefined" ? window.location.origin : "";
-  const cdn = env.SILO_CDN.endsWith("/") ? env.SILO_CDN.substring(0, env.SILO_CDN.length - 1) : env.SILO_CDN;
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const cdn = env.SILO_CDN.endsWith("/")
+    ? env.SILO_CDN.substring(0, env.SILO_CDN.length - 1)
+    : env.SILO_CDN;
   // return `${keys.url}=${origin}\n${keys.cdn}=${cdn}\n${keys.token}=${siloToken}`;
   let cdnPrefix = "";
   if (framework === "next") {
@@ -53,13 +55,18 @@ export function EnvironmentVariableRow({
       <div className="flex min-w-0 items-center gap-2">
         <code
           className={cn(
-            "bg-muted max-w-full min-w-0 flex-1 overflow-x-auto rounded-md border px-3 py-2 font-mono text-xs whitespace-pre wrap-normal",
+            "bg-muted max-w-full min-w-0 flex-1 overflow-x-auto rounded-md border px-3 py-2 font-mono text-xs wrap-normal whitespace-pre",
             codeClassName,
           )}
         >
           {value}
         </code>
-        <Button variant="outline" size="icon" onClick={onCopy} className="shrink-0">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={onCopy}
+          className="shrink-0"
+        >
           {copied ? (
             <Check className="h-4 w-4 text-green-500" />
           ) : (
@@ -131,10 +138,11 @@ export interface SiloEnvSnippetSectionProps {
   siloToken: string;
 }
 
-export function SiloEnvSnippetSection({ siloToken }: SiloEnvSnippetSectionProps) {
-  const [envFramework, setEnvFramework] = React.useState<SiloEnvFramework>(
-    "next",
-  );
+export function SiloEnvSnippetSection({
+  siloToken,
+}: SiloEnvSnippetSectionProps) {
+  const [envFramework, setEnvFramework] =
+    React.useState<SiloEnvFramework>("next");
   const [copied, setCopied] = React.useState(false);
 
   const handleCopy = async () => {
@@ -152,8 +160,8 @@ export function SiloEnvSnippetSection({ siloToken }: SiloEnvSnippetSectionProps)
         <div className="bg-primary/10 text-primary flex h-9 w-9 shrink-0 items-center justify-center rounded-md">
           <Terminal className="h-4 w-4" aria-hidden />
         </div>
-        <div className="min-w-0 space-y-1 flex items-center justify-center">
-          <h3 className="text-sm font-medium leading-snug">
+        <div className="flex min-w-0 items-center justify-center space-y-1">
+          <h3 className="text-sm leading-snug font-medium">
             Add to your environment
           </h3>
         </div>
@@ -180,7 +188,11 @@ export function SiloEnvSnippetSection({ siloToken }: SiloEnvSnippetSectionProps)
       </Tabs>
       {envFramework === "generic" && (
         <div className="text-muted-foreground text-xs leading-relaxed">
-          It is safe to expose <code className="bg-background/80 rounded px-1 py-0.5 text-[0.7rem]">SILO_CDN</code> to the client.
+          It is safe to expose{" "}
+          <code className="bg-background/80 rounded px-1 py-0.5 text-[0.7rem]">
+            SILO_CDN
+          </code>{" "}
+          to the client.
         </div>
       )}
       <SiloEnvVarsPanel

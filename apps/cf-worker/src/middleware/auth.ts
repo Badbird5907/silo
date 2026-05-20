@@ -3,8 +3,8 @@ import type { MiddlewareHandler } from "hono";
 import {
   createSignature,
   normalizeImageFormat,
-  normalizeImageWidth,
   normalizeImageQuality,
+  normalizeImageWidth,
 } from "@silo-storage/shared";
 
 import type { Bindings, Variables } from "../types/bindings";

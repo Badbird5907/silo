@@ -313,7 +313,7 @@ export function ProjectGeneralSettings({
                   }}
                   className="w-full pr-16"
                 />
-                <span className="text-muted-foreground pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs">
+                <span className="text-muted-foreground pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs">
                   minutes
                 </span>
               </div>
@@ -354,7 +354,10 @@ export function ProjectGeneralSettings({
                 )
               }
             >
-              <SelectTrigger id="image-delivery-policy" className="w-full sm:max-w-sm">
+              <SelectTrigger
+                id="image-delivery-policy"
+                className="w-full sm:max-w-sm"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -463,11 +466,14 @@ export function ProjectGeneralSettings({
               </SelectContent>
             </Select>
             <p className="text-muted-foreground text-xs leading-relaxed">
-              Controls whether file and image downloads are written to the
-              audit log.
+              Controls whether file and image downloads are written to the audit
+              log.
             </p>
             {auditLogDownloadPolicy === "always" && (
-              <Badge variant="outline" className="border-orange-500/30 text-orange-500">
+              <Badge
+                variant="outline"
+                className="border-orange-500/30 text-orange-500"
+              >
                 Not recommended for high-traffic files
               </Badge>
             )}
@@ -489,10 +495,7 @@ export function ProjectGeneralSettings({
                   step={1}
                   value={auditLogRetentionDays}
                   onChange={(event) => {
-                    const nextValue = Number.parseInt(
-                      event.target.value,
-                      10,
-                    );
+                    const nextValue = Number.parseInt(event.target.value, 10);
                     if (Number.isNaN(nextValue)) return;
                     setAuditLogRetentionDays(
                       Math.min(3650, Math.max(1, nextValue)),
@@ -500,7 +503,7 @@ export function ProjectGeneralSettings({
                   }}
                   className="w-full pr-12"
                 />
-                <span className="text-muted-foreground pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs">
+                <span className="text-muted-foreground pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs">
                   days
                 </span>
               </div>
@@ -519,10 +522,7 @@ export function ProjectGeneralSettings({
                   step={1}
                   value={usageEventRetentionDays}
                   onChange={(event) => {
-                    const nextValue = Number.parseInt(
-                      event.target.value,
-                      10,
-                    );
+                    const nextValue = Number.parseInt(event.target.value, 10);
                     if (Number.isNaN(nextValue)) return;
                     setUsageEventRetentionDays(
                       Math.min(3650, Math.max(1, nextValue)),
@@ -530,7 +530,7 @@ export function ProjectGeneralSettings({
                   }}
                   className="w-full pr-12"
                 />
-                <span className="text-muted-foreground pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs">
+                <span className="text-muted-foreground pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs">
                   days
                 </span>
               </div>
@@ -547,9 +547,7 @@ export function ProjectGeneralSettings({
             : "pointer-events-none translate-y-4 opacity-0"
         }`}
       >
-        <span className="text-muted-foreground text-sm">
-          Unsaved changes
-        </span>
+        <span className="text-muted-foreground text-sm">Unsaved changes</span>
         <div className="bg-border mx-1 h-4 w-px" />
         <Button
           onClick={handleSave}

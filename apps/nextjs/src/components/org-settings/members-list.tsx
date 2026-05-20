@@ -10,7 +10,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@silo-storage/ui/components/avatar";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@silo-storage/ui/components/avatar";
 import { Badge } from "@silo-storage/ui/components/badge";
 import { Button } from "@silo-storage/ui/components/button";
 import {

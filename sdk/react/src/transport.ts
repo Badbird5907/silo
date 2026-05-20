@@ -375,7 +375,8 @@ async function uploadResumableFileWithProgress(
       return {
         delivered: data.completionDelivered === true,
         onUploadCompleteResult:
-          data.onUploadCompleteResult ?? data.completion?.onUploadCompleteResult,
+          data.onUploadCompleteResult ??
+          data.completion?.onUploadCompleteResult,
       };
     }
   }

@@ -1,10 +1,7 @@
 import type { Bindings } from "../types/bindings";
 import type { FileKeyInfo } from "../types/project";
-import {
-  cacheFileKey,
-  getCachedFileKeyValue,
-} from "./metadata-cache";
 import { lookupFileKey } from "./callback";
+import { cacheFileKey, getCachedFileKeyValue } from "./metadata-cache";
 
 export async function getCachedFileKey(
   accessKey: string,

@@ -5,7 +5,6 @@ import { Redis } from "@upstash/redis";
 import { env } from "./env";
 
 declare global {
-   
   var redis: Redis | undefined;
 }
 

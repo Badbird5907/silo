@@ -37,7 +37,9 @@ export interface UploadEventDataByType {
   "upload.failed": UploadFailedEventData;
 }
 
-export interface UploadEventEnvelope<TType extends UploadEventType = UploadEventType> {
+export interface UploadEventEnvelope<
+  TType extends UploadEventType = UploadEventType,
+> {
   id: string;
   type: TType;
   version: 1;

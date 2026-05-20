@@ -173,10 +173,9 @@ export default function ProjectPage({ params }: ProjectPageProps) {
   };
 
   const analyticsQuery = useQuery(
-    trpc.analytics.getProjectStats.queryOptions(
-      analyticsInput,
-      { enabled: !!organizationId && !!projectId },
-    ),
+    trpc.analytics.getProjectStats.queryOptions(analyticsInput, {
+      enabled: !!organizationId && !!projectId,
+    }),
   );
 
   const recentEventsQuery = useQuery(
@@ -315,9 +314,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
               <p className="mt-3 text-3xl font-bold tracking-tight">
                 {stats.totals.downloads}
               </p>
-              <p className="text-muted-foreground mt-1 text-sm">
-                Last 30 days
-              </p>
+              <p className="text-muted-foreground mt-1 text-sm">Last 30 days</p>
             </>
           </CardContent>
         </Card>
@@ -346,7 +343,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                       {formatBytes(downloadBytes)} down
                     </span>
                   </div>
-                  <div className="bg-blue-500 h-1.5 overflow-hidden rounded-full">
+                  <div className="h-1.5 overflow-hidden rounded-full bg-blue-500">
                     <div
                       className="h-full bg-green-500"
                       style={{ width: `${Math.max(uploadPercent, 5)}%` }}
@@ -515,8 +512,8 @@ export default function ProjectPage({ params }: ProjectPageProps) {
         </div>
 
         {/* Recent Activity (right column) */}
-        <Card className="lg:col-span-3 gap-2">
-          <CardHeader className="flex flex-row items-center justify-between mb-2">
+        <Card className="gap-2 lg:col-span-3">
+          <CardHeader className="mb-2 flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-base">Recent Activity</CardTitle>
               <CardDescription className="text-xs">

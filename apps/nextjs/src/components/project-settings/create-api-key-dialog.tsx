@@ -27,9 +27,7 @@ import {
   SelectValue,
 } from "@silo-storage/ui/components/select";
 
-import {
-  ApiKeySecretsSection,
-} from "@/components/project-settings/api-key-secrets-section";
+import { ApiKeySecretsSection } from "@/components/project-settings/api-key-secrets-section";
 import { useTRPC } from "@/trpc/react";
 
 interface CreateApiKeyDialogProps {
@@ -187,9 +185,7 @@ export function CreateApiKeyDialog({
           Create API Key
         </Button>
       </DialogTrigger>
-      <DialogContent
-        className={createdKey ? "gap-0 sm:max-w-xl" : undefined}
-      >
+      <DialogContent className={createdKey ? "gap-0 sm:max-w-xl" : undefined}>
         {createdKey ? (
           <>
             <DialogHeader className="space-y-2">

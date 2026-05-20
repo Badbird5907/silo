@@ -1,7 +1,8 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import type { PermissionCheck } from "@silo-storage/auth/permissions";
+import { useQuery } from "@tanstack/react-query";
+
 import { roleHasPermissions } from "@silo-storage/auth/permissions";
 
 import { useOrganization } from "@/hooks/use-organization";
@@ -20,8 +21,7 @@ export function useOrganizationPermission(permissions: PermissionCheck) {
   );
 
   const hasPermission =
-    !!roleQuery.data &&
-    roleHasPermissions(roleQuery.data.role, permissions);
+    !!roleQuery.data && roleHasPermissions(roleQuery.data.role, permissions);
 
   return {
     organizationId,

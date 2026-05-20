@@ -2,14 +2,11 @@ import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { isMarkdownPreferred, rewritePath } from "fumadocs-core/negotiation";
 
-const { rewrite: rewriteLLM } = rewritePath(
-  "/docs{/*path}",
-  "/llms.mdx/docs{/*path}",
-);
+const llmRewriter = rewritePath("/docs{/*path}", "/llms.mdx/docs{/*path}");
 
-export default clerkMiddleware(async (_auth, request) => {
+export default clerkMiddleware((_auth, request) => {
   if (isMarkdownPreferred(request)) {
-    const result = rewriteLLM(request.nextUrl.pathname);
+    const result = llmRewriter.rewrite(request.nextUrl.pathname);
 
     if (result) {
       return NextResponse.rewrite(new URL(result, request.nextUrl));

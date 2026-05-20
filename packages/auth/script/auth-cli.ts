@@ -26,6 +26,6 @@ export const auth = initAuth({
     github: {
       clientId: "1234567890",
       clientSecret: "1234567890",
-    }
-  }
+    },
+  },
 });

@@ -19,7 +19,6 @@ export const permissionStatements = {
 
 const accessControl = createAccessControl(permissionStatements);
 
-
 const adminRole = accessControl.newRole({
   ...adminAc.statements,
   project: ["create", "read", "update", "delete"],
@@ -67,7 +66,9 @@ export function roleHasPermissions(
   permissions: PermissionCheck,
 ): boolean {
   const resolvedRole =
-    role in organizationRoles ? organizationRoles[role as RoleName] : memberRole;
+    role in organizationRoles
+      ? organizationRoles[role as RoleName]
+      : memberRole;
   const roleStatements = resolvedRole.statements as Record<string, string[]>;
 
   return Object.entries(permissions).every(([resource, requiredActions]) => {

@@ -3,7 +3,7 @@ export interface Organization {
   name: string;
   slug: string;
   logo?: string | null;
-};
+}
 
 export interface UserInvitation {
   id: string;
@@ -14,10 +14,10 @@ export interface UserInvitation {
   role?: string;
   status?: string;
   expiresAt?: string | Date;
-};
+}
 
 export interface LinkedAccount {
   id?: string;
   accountId?: string;
   providerId?: string;
-};
+}

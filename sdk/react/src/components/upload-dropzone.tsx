@@ -27,7 +27,9 @@ interface UploadDropzoneBaseProps<
 export interface UploadDropzoneWithHookProps<
   TRouter extends AnyFileRouterLike,
   TEndpoint extends RouteSlug<TRouter>,
-> extends UploadDropzoneBaseProps<TRouter, TEndpoint>,
+>
+  extends
+    UploadDropzoneBaseProps<TRouter, TEndpoint>,
     UseUploadOptions<TRouter, TEndpoint> {
   upload?: never;
   useUpload: (
@@ -108,7 +110,10 @@ function UploadDropzoneRoot<
       onDragLeave={(event) => {
         event.preventDefault();
         const nextTarget = event.relatedTarget;
-        if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) {
+        if (
+          nextTarget instanceof Node &&
+          event.currentTarget.contains(nextTarget)
+        ) {
           return;
         }
         setIsDragging(false);

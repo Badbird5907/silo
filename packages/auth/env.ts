@@ -17,7 +17,8 @@ export function authEnv() {
     runtimeEnv: {
       ...process.env,
       DISABLE_SIGNUP: process.env.DISABLE_SIGNUP === "true",
-      DISABLE_ORG_CREATION: process.env.NEXT_PUBLIC_DISABLE_ORG_CREATION === "true",
+      DISABLE_ORG_CREATION:
+        process.env.NEXT_PUBLIC_DISABLE_ORG_CREATION === "true",
     },
     skipValidation:
       !!process.env.CI || process.env.npm_lifecycle_event === "lint",

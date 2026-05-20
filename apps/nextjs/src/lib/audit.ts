@@ -1,13 +1,13 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import { TrashIcon } from "lucide-react";
 import {
   DownloadIcon,
   FolderIcon,
   KeyRound,
   SettingsIcon,
   Shield,
+  TrashIcon,
   UploadIcon,
 } from "lucide-react";
 
@@ -32,16 +32,13 @@ export function formatRelativeTime(date: Date): string {
 }
 
 export function formatAuditTimestamp(date: Date): string {
-  return new Date(date).toLocaleString(
-    "en-US",
-    {
-      // year: "numeric", // Disabled year
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    },
-  );
+  return new Date(date).toLocaleString("en-US", {
+    // year: "numeric", // Disabled year
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export function formatBytes(bytes: number): string {
@@ -113,7 +110,10 @@ export function getAuditEventBgColor(eventCode: string): string {
 }
 
 export function getAuditCategoryLabel(category: string) {
-  return auditCategoryLabels[category as keyof typeof auditCategoryLabels] || category;
+  return (
+    auditCategoryLabels[category as keyof typeof auditCategoryLabels] ||
+    category
+  );
 }
 
 export function getAuditResourceTypeLabel(resourceType: string) {
@@ -128,7 +128,9 @@ export function formatAuditValue(value: unknown): string {
   if (value == null) return "—";
   if (typeof value === "boolean") return value ? "True" : "False";
   if (typeof value === "string") return value;
-  if (typeof value === "number") return Number.isFinite(value) ? `${value}` : "—";
-  if (Array.isArray(value)) return value.map((item) => formatAuditValue(item)).join(", ");
+  if (typeof value === "number")
+    return Number.isFinite(value) ? `${value}` : "—";
+  if (Array.isArray(value))
+    return value.map((item) => formatAuditValue(item)).join(", ");
   return JSON.stringify(value, null, 2);
 }

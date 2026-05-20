@@ -1,7 +1,7 @@
 import type { Bindings } from "../types/bindings";
 import type { ProjectInfo } from "../types/project";
-import { projectInfoSchema } from "../types/project";
 import { cacheProject, getCachedProject } from "../services/metadata-cache";
+import { projectInfoSchema } from "../types/project";
 import { Errors, UploadError } from "../utils/errors";
 import { buildNextJsInternalHeaders } from "./nextjs-internal";
 

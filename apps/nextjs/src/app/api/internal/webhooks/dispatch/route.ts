@@ -1,3 +1,5 @@
+import { handleCallback } from "@vercel/queue";
+
 import {
   deriveSigningSecretFromApiKeyHash,
   getFileCallbackTargetForEvent,
@@ -7,16 +9,15 @@ import {
   getNextCallbackAttemptNumber,
   getWebhookTargetForEvent,
   normalizeEnvironmentCallbackHeaders,
+  queuedWebhookMessageSchema,
   recordCallbackAttempt,
-  webhookAttempt,
   shouldRetryAttempt,
   signWebhookPayload,
+  webhookAttempt,
 } from "@silo-storage/api/service/webhook";
 import { eq } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import { apiKeys, projectEnvironments } from "@silo-storage/db/schema";
-import { handleCallback } from "@vercel/queue";
-import { queuedWebhookMessageSchema } from "@silo-storage/api/service/webhook";
 
 import { env } from "@/env";
 
@@ -39,9 +40,7 @@ interface DeliveryAttemptWrite {
   latencyMs: number;
 }
 
-type SecretResolution =
-  | { secret: string }
-  | { error: string };
+type SecretResolution = { secret: string } | { error: string };
 
 interface DeliveryChannel {
   url: string;
@@ -80,7 +79,10 @@ async function deliverChannel(
       return false;
     }
 
-    const signed = await signWebhookPayload(channel.payload, resolvedSecret.secret);
+    const signed = await signWebhookPayload(
+      channel.payload,
+      resolvedSecret.secret,
+    );
     const response = await fetch(channel.url, {
       method: "POST",
       headers: {
@@ -105,7 +107,11 @@ async function deliverChannel(
       return false;
     }
 
-    const retry = shouldRetryAttempt(attemptNumber, input.maxAttempts, response.status);
+    const retry = shouldRetryAttempt(
+      attemptNumber,
+      input.maxAttempts,
+      response.status,
+    );
     await channel.recordAttempt({
       attemptNumber,
       status: retry ? "retry" : "failed",

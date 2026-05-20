@@ -35,9 +35,9 @@ import { DateRangePicker } from "@silo-storage/ui/components/date-range-picker";
 import { Skeleton } from "@silo-storage/ui/components/skeleton";
 
 import { useOrganization } from "@/hooks/use-organization";
+import { formatDateParam } from "@/lib/format";
 import { useTRPC } from "@/trpc/react";
 import { StatCard } from "./stat-card";
-import { formatDateParam } from "@/lib/format";
 
 interface AnalyticsPageProps {
   params: Promise<{
@@ -265,7 +265,7 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
       <div className="flex flex-1 flex-col gap-4 p-4">
         <div className="flex w-full">
           <h1 className="text-2xl font-bold">Analytics</h1>
-          <div className="flex justify-end ml-auto">
+          <div className="ml-auto flex justify-end">
             <DateRangePicker
               className="w-[320px]"
               value={dateRange}
@@ -327,7 +327,7 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
               ) : dailyData.length > 0 ? (
                 <ChartContainer
                   config={uploadActivityChartConfig}
-                  className="h-[200px] aspect-auto"
+                  className="aspect-auto h-[200px]"
                 >
                   <BarChart data={dailyData}>
                     <CartesianGrid
@@ -341,7 +341,9 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
                       axisLine={false}
                       tickMargin={8}
                       className="fill-muted-foreground text-xs"
-                      tickFormatter={(value) => formatChartDate(value as string)}
+                      tickFormatter={(value) =>
+                        formatChartDate(value as string)
+                      }
                     />
                     <YAxis
                       tickLine={false}
@@ -351,9 +353,7 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
                     />
                     <ChartTooltip
                       cursor={false}
-                      content={
-                        <ChartTooltipContent />
-                      }
+                      content={<ChartTooltipContent />}
                     />
                     <Bar
                       dataKey="uploadsCompleted"
@@ -388,7 +388,7 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
               ) : dailyData.length > 0 ? (
                 <ChartContainer
                   config={secondaryAnalyticsChartConfig}
-                  className="h-[200px] aspect-auto"
+                  className="aspect-auto h-[200px]"
                 >
                   <AreaChart data={dailyData}>
                     <CartesianGrid
@@ -402,7 +402,9 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
                       axisLine={false}
                       tickMargin={8}
                       className="fill-muted-foreground text-xs"
-                      tickFormatter={(value) => formatChartDate(value as string)}
+                      tickFormatter={(value) =>
+                        formatChartDate(value as string)
+                      }
                     />
                     <YAxis
                       tickLine={false}
@@ -410,11 +412,7 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
                       tickMargin={8}
                       className="fill-muted-foreground text-xs"
                     />
-                    <ChartTooltip
-                      content={
-                        <ChartTooltipContent />
-                      }
-                    />
+                    <ChartTooltip content={<ChartTooltipContent />} />
                     <Area
                       type="monotone"
                       dataKey="downloads"
@@ -436,9 +434,7 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
         <Card>
           <CardHeader>
             <CardTitle>Storage</CardTitle>
-            <CardDescription>
-              Total storage over time
-            </CardDescription>
+            <CardDescription>Total storage over time</CardDescription>
           </CardHeader>
           <CardContent>
             {analyticsQuery.isLoading ? (
@@ -446,7 +442,7 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
             ) : hasStorageHistory ? (
               <ChartContainer
                 config={secondaryAnalyticsChartConfig}
-                className="h-[240px] aspect-auto"
+                className="aspect-auto h-[240px]"
               >
                 <AreaChart data={dailyData}>
                   <CartesianGrid
@@ -527,7 +523,7 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
             ) : dailyData.length > 0 ? (
               <ChartContainer
                 config={secondaryAnalyticsChartConfig}
-                className="h-[400px] aspect-auto"
+                className="aspect-auto h-[400px]"
               >
                 <AreaChart data={dailyData}>
                   <CartesianGrid
@@ -536,12 +532,12 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
                     className="stroke-border"
                   />
                   <XAxis
-                  dataKey="date"
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                  className="fill-muted-foreground text-xs"
-                  tickFormatter={(value) => formatChartDate(value as string)}
+                    dataKey="date"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    className="fill-muted-foreground text-xs"
+                    tickFormatter={(value) => formatChartDate(value as string)}
                   />
                   <YAxis
                     tickLine={false}
@@ -550,11 +546,7 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
                     className="fill-muted-foreground text-xs"
                     tickFormatter={(value) => formatBytes(value as number)}
                   />
-                  <ChartTooltip
-                    content={
-                      <ChartTooltipContent />
-                    }
-                  />
+                  <ChartTooltip content={<ChartTooltipContent />} />
                   <Area
                     type="monotone"
                     dataKey="bytesUploaded"

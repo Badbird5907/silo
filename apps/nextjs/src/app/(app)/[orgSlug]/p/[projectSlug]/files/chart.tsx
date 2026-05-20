@@ -1,16 +1,17 @@
 "use client";
 
-import { useTRPC } from "@/trpc/react";
+import { useId } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Area, AreaChart, XAxis } from "recharts";
+
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
 } from "@silo-storage/ui/components/chart";
 import { Skeleton } from "@silo-storage/ui/components/skeleton";
-import { useQuery } from "@tanstack/react-query";
-import { useId } from "react";
-import { Area, AreaChart, XAxis } from "recharts";
 
+import { useTRPC } from "@/trpc/react";
 import { getFilesDashboardDateRange } from "./chart-timeframe";
 
 interface StorageChartProps {
@@ -110,10 +111,7 @@ export function StorageChart({
   }
 
   return (
-    <ChartContainer
-      config={chartConfig}
-      className="aspect-auto h-[110px]"
-    >
+    <ChartContainer config={chartConfig} className="aspect-auto h-[110px]">
       <AreaChart data={dailyData}>
         <defs>
           <linearGradient

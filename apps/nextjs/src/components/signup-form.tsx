@@ -1,14 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+
 import { Button } from "@silo-storage/ui/components/button";
 import { Input } from "@silo-storage/ui/components/input";
 import { Label } from "@silo-storage/ui/components/label";
 import { Separator } from "@silo-storage/ui/components/separator";
 
 import { authClient } from "@/auth/client";
-import Link from "next/link";
 
 export function SignUpForm() {
   const router = useRouter();
@@ -48,7 +49,9 @@ export function SignUpForm() {
         callbackURL: "/",
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to sign in with GitHub");
+      setError(
+        err instanceof Error ? err.message : "Failed to sign in with GitHub",
+      );
       setIsLoading(false);
     }
   };
@@ -105,7 +108,7 @@ export function SignUpForm() {
 
       <div className="relative my-6">
         <Separator />
-        <span className="bg-card text-muted-foreground absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 px-2 text-xs">
+        <span className="bg-card text-muted-foreground absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-2 text-xs">
           OR
         </span>
       </div>
@@ -141,6 +144,3 @@ export function SignUpForm() {
     </div>
   );
 }
-
-
-
