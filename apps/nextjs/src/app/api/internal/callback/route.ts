@@ -152,6 +152,9 @@ async function deliverSdkCallbackNow(input: {
   const startedAt = Date.now();
   const attemptNumber = await getNextCallbackAttemptNumber(db, input.eventId);
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+
   try {
     const response = await fetch(callbackUrl, {
       method: "POST",
@@ -165,7 +168,9 @@ async function deliverSdkCallbackNow(input: {
         "X-Silo-Timestamp": String(signed.timestamp),
       },
       body: payload,
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
     const text = await response.text().catch(() => "");
     await recordCallbackAttempt(db, {
       eventId: input.eventId,
@@ -182,19 +187,27 @@ async function deliverSdkCallbackNow(input: {
     });
     if (!response.ok) return undefined;
 
-    const parsed = text ? (JSON.parse(text) as unknown) : null;
-    if (
-      parsed &&
-      typeof parsed === "object" &&
-      "callback" in parsed &&
-      parsed.callback &&
-      typeof parsed.callback === "object" &&
-      "onUploadCompleteResult" in parsed.callback
-    ) {
-      return (parsed.callback as { onUploadCompleteResult?: unknown })
-        .onUploadCompleteResult;
+    try {
+      const parsed = text ? (JSON.parse(text) as unknown) : null;
+      if (
+        parsed &&
+        typeof parsed === "object" &&
+        "callback" in parsed &&
+        parsed.callback &&
+        typeof parsed.callback === "object" &&
+        "onUploadCompleteResult" in parsed.callback
+      ) {
+        return (parsed.callback as { onUploadCompleteResult?: unknown })
+          .onUploadCompleteResult;
+      }
+    } catch (parseError) {
+      console.error("Failed to parse callback response JSON:", parseError);
+      return undefined;
     }
   } catch (error) {
+    clearTimeout(timeoutId);
+    const isTimeout =
+      error instanceof Error && error.name === "AbortError";
     await recordCallbackAttempt(db, {
       eventId: input.eventId,
       idempotencyKey: input.idempotencyKey,
@@ -203,7 +216,11 @@ async function deliverSdkCallbackNow(input: {
       callbackUrl,
       attemptNumber,
       status: "retry",
-      error: error instanceof Error ? error.message : String(error),
+      error: isTimeout
+        ? "Request timeout (5s)"
+        : error instanceof Error
+          ? error.message
+          : String(error),
       latencyMs: Date.now() - startedAt,
     });
   }
@@ -716,12 +733,15 @@ export async function POST(request: Request) {
             source: "nextjs.internal.callback",
             routeSlug: "upload.completed",
             completedAt: Date.now(),
-            onUploadCompleteResult: onUploadCompleteResult ?? {
-              event: uploadCompletedEvent,
-              fileKeyId: fileKey.id,
-              fileId: file.id,
-              accessKey: fileKey.accessKey,
-            },
+            onUploadCompleteResult:
+              onUploadCompleteResult === undefined
+                ? {
+                    event: uploadCompletedEvent,
+                    fileKeyId: fileKey.id,
+                    fileId: file.id,
+                    accessKey: fileKey.accessKey,
+                  }
+                : onUploadCompleteResult,
           },
         });
       } catch (completionStoreError) {

@@ -148,6 +148,11 @@ export async function handleUploadCreate(c: AppContext): Promise<Response> {
     throw Errors.invalidRequest("Signed upload URL is missing a file size");
   }
   const maxSize = Number.parseInt(c.env.UPLOAD_MAX_SIZE, 10);
+  if (!Number.isFinite(maxSize) || maxSize <= 0) {
+    throw new Error(
+      `Server configuration error: UPLOAD_MAX_SIZE is not a valid positive integer (got: ${c.env.UPLOAD_MAX_SIZE})`,
+    );
+  }
   if (size > maxSize) {
     throw Errors.uploadTooLarge(size, maxSize);
   }
@@ -247,13 +252,27 @@ export async function handleUploadStatus(c: AppContext): Promise<Response> {
   );
   if (!response.ok) return response;
 
+  const rawOffset = response.headers.get(UPLOAD_OFFSET_HEADER);
+  const parsedOffset = rawOffset == null ? 0 : Number(rawOffset);
+  if (!Number.isFinite(parsedOffset)) {
+    throw new Error(
+      `Invalid ${UPLOAD_OFFSET_HEADER} header from storage: ${rawOffset}`,
+    );
+  }
+
+  const rawSize = response.headers.get(UPLOAD_LENGTH_HEADER);
+  const parsedSize = rawSize == null ? null : Number(rawSize);
+  if (rawSize != null && !Number.isFinite(parsedSize)) {
+    throw new Error(
+      `Invalid ${UPLOAD_LENGTH_HEADER} header from storage: ${rawSize}`,
+    );
+  }
+
   return c.json({
     ok: true,
     uploadId,
-    offset: Number(response.headers.get(UPLOAD_OFFSET_HEADER) ?? "0"),
-    size: response.headers.get(UPLOAD_LENGTH_HEADER)
-      ? Number(response.headers.get(UPLOAD_LENGTH_HEADER))
-      : null,
+    offset: parsedOffset,
+    size: parsedSize,
   });
 }
 
