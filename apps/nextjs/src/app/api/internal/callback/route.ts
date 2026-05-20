@@ -206,8 +206,7 @@ async function deliverSdkCallbackNow(input: {
     }
   } catch (error) {
     clearTimeout(timeoutId);
-    const isTimeout =
-      error instanceof Error && error.name === "AbortError";
+    const isTimeout = error instanceof Error && error.name === "AbortError";
     await recordCallbackAttempt(db, {
       eventId: input.eventId,
       idempotencyKey: input.idempotencyKey,

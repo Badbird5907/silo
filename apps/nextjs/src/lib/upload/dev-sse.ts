@@ -129,9 +129,9 @@ export async function createDevUploadEventStream(
             const chunk = await toDevChunk(event);
             controller.enqueue(encoder.encode(toSseFrame("chunk", chunk)));
 
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
             if (
               event.type === "upload.completed" ||
+              // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
               event.type === "upload.failed"
             ) {
               close();
