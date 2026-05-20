@@ -2,7 +2,7 @@ import { Hono } from "hono";
 
 import type { DeletePrefixQueueMessage } from "./services/r2/delete-prefix";
 import type { Bindings, Variables } from "./types/bindings";
-import { TusStateDO } from "./durable-objects/tus-state-do";
+import { UploadStateDO } from "./durable-objects/upload-state-do";
 import { requireCallbackSecret } from "./middleware/auth";
 import { cors } from "./middleware/cors";
 import { requireDevelopment } from "./middleware/dev-only";
@@ -21,13 +21,13 @@ import { handleInternalDeletePrefix } from "./routes/internal/delete-prefix";
 import { handleInternalList } from "./routes/internal/list";
 import { handleInternalMetadata } from "./routes/internal/metadata";
 import { handleInternalMultipartAbort } from "./routes/internal/multipart-abort";
-import { handleInternalTusDelete } from "./routes/internal/tus-delete";
+import { handleInternalUploadDelete } from "./routes/internal/upload-delete";
 import {
-  handleResumableCreate,
-  handleResumableDelete,
-  handleResumablePut,
-  handleResumableStatus,
-} from "./routes/resumable-upload";
+  handleUploadCreate,
+  handleUploadDelete,
+  handleUploadPut,
+  handleUploadStatus,
+} from "./routes/upload";
 import { runExpiryCleanup } from "./services/expiry-cleanup";
 import { runLifecycleJobs } from "./services/lifecycle-job-runner";
 import { runPendingUploadCleanup } from "./services/pending-upload-cleanup";
@@ -46,14 +46,10 @@ app.options("/ingest/resumable", requireProject, (c) => c.body(null, 204));
 app.options("/ingest/resumable/:uploadId", requireProject, (c) =>
   c.body(null, 204),
 );
-app.post("/ingest/resumable", requireProject, handleResumableCreate);
-app.get("/ingest/resumable/:uploadId", requireProject, handleResumableStatus);
-app.put("/ingest/resumable/:uploadId", requireProject, handleResumablePut);
-app.delete(
-  "/ingest/resumable/:uploadId",
-  requireProject,
-  handleResumableDelete,
-);
+app.post("/ingest/resumable", requireProject, handleUploadCreate);
+app.get("/ingest/resumable/:uploadId", requireProject, handleUploadStatus);
+app.put("/ingest/resumable/:uploadId", requireProject, handleUploadPut);
+app.delete("/ingest/resumable/:uploadId", requireProject, handleUploadDelete);
 app.put("/ingest/put", requireProject, handleDirectUpload);
 app.get("/f/:accessKey", requireProject, handleDownload);
 app.get("/i/:accessKey", requireProject, handleImage);
@@ -72,22 +68,22 @@ app.options(
 app.post(
   "/:projectRoutePrefix/:projectSlug/ingest/resumable",
   requireProject,
-  handleResumableCreate,
+  handleUploadCreate,
 );
 app.get(
   "/:projectRoutePrefix/:projectSlug/ingest/resumable/:uploadId",
   requireProject,
-  handleResumableStatus,
+  handleUploadStatus,
 );
 app.put(
   "/:projectRoutePrefix/:projectSlug/ingest/resumable/:uploadId",
   requireProject,
-  handleResumablePut,
+  handleUploadPut,
 );
 app.delete(
   "/:projectRoutePrefix/:projectSlug/ingest/resumable/:uploadId",
   requireProject,
-  handleResumableDelete,
+  handleUploadDelete,
 );
 app.put(
   "/:projectRoutePrefix/:projectSlug/ingest/put",
@@ -137,10 +133,10 @@ app.post(
   handleInternalMultipartAbort,
 );
 app.post(
-  "/internal/tus/:uploadId/delete",
+  "/internal/uploads/:uploadId/delete",
   requireMainDomain,
   requireCallbackSecret,
-  handleInternalTusDelete,
+  handleInternalUploadDelete,
 );
 app.get(
   "/internal/image-source/:projectId/:accessKey",
@@ -151,12 +147,9 @@ app.get(
 
 app.onError((err, c) => {
   console.error("Unhandled error:", err);
-  const isProtocolRequest =
-    c.req.path.includes("/ingest/tus") ||
-    c.req.path.includes("/ingest/resumable");
+  const isProtocolRequest = c.req.path.includes("/ingest/resumable");
   const response = createErrorResponse(err, isProtocolRequest);
 
-  // TUS spec requires Cache-Control: no-store on all HEAD responses
   if (c.req.method === "HEAD") {
     const headers = new Headers(response.headers);
     headers.set("Cache-Control", "no-store");
@@ -272,4 +265,4 @@ export default {
   },
 };
 
-export { TusStateDO };
+export { UploadStateDO };

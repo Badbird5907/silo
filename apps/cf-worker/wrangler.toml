@@ -11,12 +11,19 @@ bucket_name = "silo-uploads"
 preview_bucket_name = "silo-uploads-preview"
 
 [[durable_objects.bindings]]
-name = "TUS_STATE_DO"
-class_name = "TusStateDO"
+name = "UPLOAD_STATE_DO"
+class_name = "UploadStateDO"
 
 [[migrations]]
 tag = "v1-tus-state-do"
 new_sqlite_classes = ["TusStateDO"]
+
+[[migrations]]
+tag = "v2-upload-state-do"
+
+  [[migrations.renamed_classes]]
+  from = "TusStateDO"
+  to = "UploadStateDO"
 
 [[queues.producers]]
 binding = "DELETE_PREFIX_QUEUE"
@@ -41,10 +48,10 @@ crons = ["*/5 * * * *"]
 [vars]
 WORKER_DOMAIN = "cdn.evanyu.dev"
 NEXTJS_CALLBACK_URL = "http://localhost:3000"
-TUS_MAX_SIZE = "106300440576"  # 99GB in bytes
-# TUS_MAX_PATCH_SIZE = "536870912"  # 512MB per PATCH in bytes
-TUS_MAX_PATCH_SIZE = "106300440576"  # 99GB per PATCH in bytes (need to tune!)
-TUS_EXPIRATION_HOURS = "24"
+UPLOAD_MAX_SIZE = "106300440576"  # 99GB in bytes
+# UPLOAD_MAX_PART_SIZE = "536870912"  # 512MB per upload part in bytes
+UPLOAD_MAX_PART_SIZE = "106300440576"  # 99GB per upload part in bytes (need to tune!)
+UPLOAD_EXPIRATION_HOURS = "24"
 EXPIRY_CLEANUP_BATCH_SIZE = "100"
 EXPIRY_CLEANUP_MAX_BATCHES = "10"
 PENDING_UPLOAD_CLEANUP_BATCH_SIZE = "100"
@@ -66,9 +73,9 @@ name = "silo-worker"
 vars.WORKER_DOMAIN = "cdn.evanyu.dev"
 vars.NEXTJS_CALLBACK_URL = "https://fs.evanyu.dev"  # TODO: Set your production URL
 vars.ENV = "production"
-vars.TUS_MAX_SIZE = "106300440576"  # 99GB in bytes
-vars.TUS_MAX_PATCH_SIZE = "106300440576"  # 99GB per PATCH in bytes (need to tune!)
-vars.TUS_EXPIRATION_HOURS = "24"
+vars.UPLOAD_MAX_SIZE = "106300440576"  # 99GB in bytes
+vars.UPLOAD_MAX_PART_SIZE = "106300440576"  # 99GB per upload part in bytes (need to tune!)
+vars.UPLOAD_EXPIRATION_HOURS = "24"
 vars.EXPIRY_CLEANUP_BATCH_SIZE = "100"
 vars.EXPIRY_CLEANUP_MAX_BATCHES = "10"
 vars.PENDING_UPLOAD_CLEANUP_BATCH_SIZE = "100"
@@ -83,8 +90,8 @@ bucket_name = "silo-uploads"
 preview_bucket_name = "silo-uploads-preview"
 
 [[env.production.durable_objects.bindings]]
-name = "TUS_STATE_DO"
-class_name = "TusStateDO"
+name = "UPLOAD_STATE_DO"
+class_name = "UploadStateDO"
 
 [[env.production.queues.producers]]
 binding = "DELETE_PREFIX_QUEUE"

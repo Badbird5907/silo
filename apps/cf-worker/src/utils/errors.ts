@@ -1,11 +1,11 @@
 import {
   ERROR_CODES,
   HTTP_STATUS,
-  TUS_SUPPORTED_VERSIONS_STRING,
-  TUS_VERSION,
+  UPLOAD_PROTOCOL_VERSION,
+  UPLOAD_SUPPORTED_PROTOCOL_VERSIONS_STRING,
 } from "./constants";
 
-export class TusError extends Error {
+export class UploadError extends Error {
   constructor(
     public readonly code: keyof typeof ERROR_CODES,
     public readonly statusCode: number,
@@ -13,25 +13,26 @@ export class TusError extends Error {
     public readonly details?: Record<string, unknown>,
   ) {
     super(message);
-    this.name = "TusError";
+    this.name = "UploadError";
   }
 }
 
 export function createErrorResponse(
-  error: TusError | Error,
-  tusResumable = true,
+  error: UploadError | Error,
+  uploadVersion = true,
 ): Response {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
 
-  if (tusResumable) {
-    headers["Tus-Resumable"] = TUS_VERSION;
+  if (uploadVersion) {
+    headers["X-Silo-Upload-Version"] = UPLOAD_PROTOCOL_VERSION;
   }
 
-  if (error instanceof TusError) {
-    if (error.code === "INVALID_TUS_VERSION") {
-      headers["Tus-Version"] = TUS_SUPPORTED_VERSIONS_STRING;
+  if (error instanceof UploadError) {
+    if (error.code === "INVALID_UPLOAD_PROTOCOL_VERSION") {
+      headers["X-Silo-Upload-Versions"] =
+        UPLOAD_SUPPORTED_PROTOCOL_VERSIONS_STRING;
     }
 
     return new Response(
@@ -60,16 +61,16 @@ export function createErrorResponse(
 }
 
 export const Errors = {
-  invalidTusVersion: (expected: string, received?: string) =>
-    new TusError(
-      "INVALID_TUS_VERSION",
+  invalidUploadProtocolVersion: (expected: string, received?: string) =>
+    new UploadError(
+      "INVALID_UPLOAD_PROTOCOL_VERSION",
       HTTP_STATUS.PRECONDITION_FAILED,
-      `Unsupported TUS version. Expected ${expected}${received ? `, received ${received}` : ""}`,
+      `Unsupported upload protocol version. Expected ${expected}${received ? `, received ${received}` : ""}`,
       { expected, received },
     ),
 
   invalidContentType: (expected: string, received?: string) =>
-    new TusError(
+    new UploadError(
       "INVALID_CONTENT_TYPE",
       HTTP_STATUS.UNSUPPORTED_MEDIA_TYPE,
       `Invalid Content-Type. Expected ${expected}${received ? `, received ${received}` : ""}`,
@@ -77,7 +78,7 @@ export const Errors = {
     ),
 
   offsetMismatch: (expected: number, received: number) =>
-    new TusError(
+    new UploadError(
       "OFFSET_MISMATCH",
       HTTP_STATUS.CONFLICT,
       `Upload-Offset mismatch. Expected ${expected}, got ${received}`,
@@ -85,7 +86,7 @@ export const Errors = {
     ),
 
   uploadNotFound: (uploadId: string) =>
-    new TusError(
+    new UploadError(
       "UPLOAD_NOT_FOUND",
       HTTP_STATUS.NOT_FOUND,
       "Upload not found",
@@ -93,36 +94,36 @@ export const Errors = {
     ),
 
   uploadExpired: (uploadId: string) =>
-    new TusError("UPLOAD_EXPIRED", HTTP_STATUS.GONE, "Upload has expired", {
+    new UploadError("UPLOAD_EXPIRED", HTTP_STATUS.GONE, "Upload has expired", {
       uploadId,
     }),
 
   fileNotFound: (identifier: string) =>
-    new TusError("FILE_NOT_FOUND", HTTP_STATUS.NOT_FOUND, "File not found", {
+    new UploadError("FILE_NOT_FOUND", HTTP_STATUS.NOT_FOUND, "File not found", {
       identifier,
     }),
 
   fileExpired: (identifier: string) =>
-    new TusError("FILE_EXPIRED", HTTP_STATUS.GONE, "File has expired", {
+    new UploadError("FILE_EXPIRED", HTTP_STATUS.GONE, "File has expired", {
       identifier,
     }),
 
   signatureInvalid: () =>
-    new TusError(
+    new UploadError(
       "SIGNATURE_INVALID",
       HTTP_STATUS.UNAUTHORIZED,
       "Invalid signature",
     ),
 
   unauthorized: (reason?: string) =>
-    new TusError(
+    new UploadError(
       "UNAUTHORIZED",
       HTTP_STATUS.UNAUTHORIZED,
       reason ?? "Unauthorized",
     ),
 
   projectNotFound: (slug: string) =>
-    new TusError(
+    new UploadError(
       "PROJECT_NOT_FOUND",
       HTTP_STATUS.NOT_FOUND,
       "Project not found",
@@ -130,7 +131,7 @@ export const Errors = {
     ),
 
   hashMismatch: (claimed: string, actual: string) =>
-    new TusError(
+    new UploadError(
       "HASH_MISMATCH",
       HTTP_STATUS.BAD_REQUEST,
       "File hash does not match claimed value",
@@ -138,7 +139,7 @@ export const Errors = {
     ),
 
   mimeTypeMismatch: (claimed: string, actual: string) =>
-    new TusError(
+    new UploadError(
       "MIME_TYPE_MISMATCH",
       HTTP_STATUS.BAD_REQUEST,
       "File MIME type does not match claimed value",
@@ -146,7 +147,7 @@ export const Errors = {
     ),
 
   mimeTypeNotAllowed: (actual: string, allowed: string[]) =>
-    new TusError(
+    new UploadError(
       "MIME_TYPE_NOT_ALLOWED",
       HTTP_STATUS.BAD_REQUEST,
       "File MIME type is not allowed for this upload",
@@ -154,7 +155,7 @@ export const Errors = {
     ),
 
   sizeMismatch: (claimed: number, actual: number) =>
-    new TusError(
+    new UploadError(
       "SIZE_MISMATCH",
       HTTP_STATUS.BAD_REQUEST,
       "File size does not match claimed value",
@@ -162,7 +163,7 @@ export const Errors = {
     ),
 
   uploadTooLarge: (size: number, maxSize: number) =>
-    new TusError(
+    new UploadError(
       "UPLOAD_TOO_LARGE",
       HTTP_STATUS.REQUEST_ENTITY_TOO_LARGE,
       `Upload size ${size} exceeds maximum allowed size ${maxSize}`,
@@ -170,5 +171,5 @@ export const Errors = {
     ),
 
   invalidRequest: (reason: string) =>
-    new TusError("INVALID_REQUEST", HTTP_STATUS.BAD_REQUEST, reason),
+    new UploadError("INVALID_REQUEST", HTTP_STATUS.BAD_REQUEST, reason),
 };

@@ -1,5 +1,5 @@
 import { HTTP_STATUS } from "../../utils/constants";
-import { TusError } from "../../utils/errors";
+import { UploadError } from "../../utils/errors";
 
 export interface ParsedContentRange {
   start: number;
@@ -14,7 +14,7 @@ export function parseContentRangeHeader(
   value: string | null | undefined,
 ): ParsedContentRange {
   if (!value) {
-    throw new TusError(
+    throw new UploadError(
       "INVALID_REQUEST",
       HTTP_STATUS.BAD_REQUEST,
       "Content-Range header is required",
@@ -23,7 +23,7 @@ export function parseContentRangeHeader(
 
   const match = CONTENT_RANGE_PATTERN.exec(value.trim());
   if (!match) {
-    throw new TusError(
+    throw new UploadError(
       "INVALID_REQUEST",
       HTTP_STATUS.BAD_REQUEST,
       'Content-Range must use "bytes <start>-<end>/<total>"',
@@ -32,7 +32,7 @@ export function parseContentRangeHeader(
 
   const [, startRaw, endRaw, totalRaw] = match;
   if (!startRaw || !endRaw || !totalRaw) {
-    throw new TusError(
+    throw new UploadError(
       "INVALID_REQUEST",
       HTTP_STATUS.BAD_REQUEST,
       'Content-Range must use "bytes <start>-<end>/<total>"',
@@ -52,7 +52,7 @@ export function parseContentRangeHeader(
     total <= 0 ||
     end >= total
   ) {
-    throw new TusError(
+    throw new UploadError(
       "INVALID_REQUEST",
       HTTP_STATUS.BAD_REQUEST,
       "Content-Range has invalid byte positions",

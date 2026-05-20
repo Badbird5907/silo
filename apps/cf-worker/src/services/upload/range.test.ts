@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildContentRangeHeader, parseContentRangeHeader } from "./range";
 
-describe("resumable range helpers", () => {
+describe("upload range helpers", () => {
   it("parses valid byte ranges", () => {
     expect(parseContentRangeHeader("bytes 5-9/20")).toEqual({
       start: 5,

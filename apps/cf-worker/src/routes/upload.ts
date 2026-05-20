@@ -3,7 +3,7 @@ import type { Context } from "hono";
 import { getClientIpFromHeaders } from "@silo-storage/shared";
 
 import type { Bindings, Variables } from "../types/bindings";
-import type { TusUploadMetadata } from "../types/tus";
+import type { UploadStateMetadata } from "../types/upload-state";
 import {
   detectProjectRouteModeFromPath,
   toProjectScopedPath,
@@ -12,23 +12,23 @@ import {
   registerUploadSession,
   verifyUploadSignature,
 } from "../services/callback";
-import { parseContentRangeHeader } from "../services/resumable/range";
-import { generateExpirationDate } from "../services/tus/metadata";
+import { generateExpirationDate } from "../services/upload-state/metadata";
+import { parseContentRangeHeader } from "../services/upload/range";
 import {
   CONTENT_TYPE_OCTET_STREAM,
   HTTP_STATUS,
-  TUS_VERSION,
   UPLOAD_LENGTH_HEADER,
   UPLOAD_OFFSET_HEADER,
+  UPLOAD_PROTOCOL_VERSION,
 } from "../utils/constants";
-import { Errors, TusError } from "../utils/errors";
+import { Errors, UploadError } from "../utils/errors";
 import { parseNonNegativeInt } from "../utils/validation";
 
 type AppContext = Context<{ Bindings: Bindings; Variables: Variables }>;
 
 function assertProjectUploadWritable(c: AppContext): void {
   if (c.get("projectLifecycleState") === "deleting") {
-    throw new TusError(
+    throw new UploadError(
       "INVALID_REQUEST",
       409,
       "Project is currently being deleted and cannot accept upload writes.",
@@ -36,21 +36,18 @@ function assertProjectUploadWritable(c: AppContext): void {
   }
 }
 
-function getResumableUploadStub(
-  uploadId: string,
-  env: Bindings,
-): DurableObjectStub {
-  const id = env.TUS_STATE_DO.idFromName(uploadId);
-  return env.TUS_STATE_DO.get(id);
+function getUploadStub(uploadId: string, env: Bindings): DurableObjectStub {
+  const id = env.UPLOAD_STATE_DO.idFromName(uploadId);
+  return env.UPLOAD_STATE_DO.get(id);
 }
 
 async function initializeUploadInDo(
   uploadId: string,
-  metadata: TusUploadMetadata,
+  metadata: UploadStateMetadata,
   env: Bindings,
 ): Promise<void> {
-  const response = await getResumableUploadStub(uploadId, env).fetch(
-    "https://resumable-state.internal/internal/init",
+  const response = await getUploadStub(uploadId, env).fetch(
+    "https://upload-state.internal/internal/init",
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -97,7 +94,7 @@ function buildSignaturePayload(c: AppContext) {
   };
 }
 
-export async function handleResumableCreate(c: AppContext): Promise<Response> {
+export async function handleUploadCreate(c: AppContext): Promise<Response> {
   assertProjectUploadWritable(c);
 
   const projectId: string = c.get("projectId");
@@ -150,7 +147,7 @@ export async function handleResumableCreate(c: AppContext): Promise<Response> {
   if (size === undefined) {
     throw Errors.invalidRequest("Signed upload URL is missing a file size");
   }
-  const maxSize = Number.parseInt(c.env.TUS_MAX_SIZE, 10);
+  const maxSize = Number.parseInt(c.env.UPLOAD_MAX_SIZE, 10);
   if (size > maxSize) {
     throw Errors.uploadTooLarge(size, maxSize);
   }
@@ -158,7 +155,7 @@ export async function handleResumableCreate(c: AppContext): Promise<Response> {
   const uploadId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
   const storageKey = `${projectId}/${payload.environmentId}/${crypto.randomUUID()}`;
   const clientIp = getClientIpFromHeaders(c.req.raw.headers);
-  const metadata: TusUploadMetadata = {
+  const metadata: UploadStateMetadata = {
     uploadId,
     projectId,
     environmentId: payload.environmentId,
@@ -197,12 +194,12 @@ export async function handleResumableCreate(c: AppContext): Promise<Response> {
     );
   } catch (error) {
     const headers = new Headers();
-    headers.set("Tus-Resumable", TUS_VERSION);
-    await getResumableUploadStub(uploadId, c.env)
-      .fetch("https://resumable-state.internal/internal/delete", {
+    headers.set("X-Silo-Upload-Version", UPLOAD_PROTOCOL_VERSION);
+    await getUploadStub(uploadId, c.env)
+      .fetch("https://upload-state.internal/internal/delete", {
         method: "DELETE",
         headers: {
-          "Tus-Resumable": TUS_VERSION,
+          "X-Silo-Upload-Version": UPLOAD_PROTOCOL_VERSION,
           "X-Project-Id": projectId,
           "X-Upload-Id": uploadId,
         },
@@ -234,15 +231,15 @@ export async function handleResumableCreate(c: AppContext): Promise<Response> {
   );
 }
 
-export async function handleResumableStatus(c: AppContext): Promise<Response> {
+export async function handleUploadStatus(c: AppContext): Promise<Response> {
   const uploadId = c.req.param("uploadId");
   const projectId: string = c.get("projectId");
-  const response = await getResumableUploadStub(uploadId, c.env).fetch(
-    "https://resumable-state.internal/internal/head",
+  const response = await getUploadStub(uploadId, c.env).fetch(
+    "https://upload-state.internal/internal/head",
     {
       method: "GET",
       headers: {
-        "Tus-Resumable": TUS_VERSION,
+        "X-Silo-Upload-Version": UPLOAD_PROTOCOL_VERSION,
         "X-Project-Id": projectId,
         "X-Upload-Id": uploadId,
       },
@@ -260,7 +257,7 @@ export async function handleResumableStatus(c: AppContext): Promise<Response> {
   });
 }
 
-export async function handleResumablePut(c: AppContext): Promise<Response> {
+export async function handleUploadPut(c: AppContext): Promise<Response> {
   assertProjectUploadWritable(c);
 
   const uploadId = c.req.param("uploadId");
@@ -279,13 +276,13 @@ export async function handleResumablePut(c: AppContext): Promise<Response> {
   const body = c.req.raw.body as ReadableStream<Uint8Array> | null;
   if (!body) throw Errors.invalidRequest("Request body is required");
 
-  return await getResumableUploadStub(uploadId, c.env).fetch(
-    "https://resumable-state.internal/internal/patch",
+  return await getUploadStub(uploadId, c.env).fetch(
+    "https://upload-state.internal/internal/patch",
     {
       method: "PATCH",
       headers: {
-        "Tus-Resumable": TUS_VERSION,
-        "X-Silo-Resumable": "1",
+        "X-Silo-Upload-Version": UPLOAD_PROTOCOL_VERSION,
+        "X-Silo-Upload-Request": "1",
         "X-Project-Id": projectId,
         "X-Upload-Id": uploadId,
         "Content-Type": CONTENT_TYPE_OCTET_STREAM,
@@ -299,15 +296,15 @@ export async function handleResumablePut(c: AppContext): Promise<Response> {
   );
 }
 
-export async function handleResumableDelete(c: AppContext): Promise<Response> {
+export async function handleUploadDelete(c: AppContext): Promise<Response> {
   const uploadId = c.req.param("uploadId");
   const projectId: string = c.get("projectId");
-  const response = await getResumableUploadStub(uploadId, c.env).fetch(
-    "https://resumable-state.internal/internal/delete",
+  const response = await getUploadStub(uploadId, c.env).fetch(
+    "https://upload-state.internal/internal/delete",
     {
       method: "DELETE",
       headers: {
-        "Tus-Resumable": TUS_VERSION,
+        "X-Silo-Upload-Version": UPLOAD_PROTOCOL_VERSION,
         "X-Project-Id": projectId,
         "X-Upload-Id": uploadId,
       },

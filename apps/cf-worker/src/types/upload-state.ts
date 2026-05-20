@@ -1,4 +1,4 @@
-export interface TusUploadMetadata {
+export interface UploadStateMetadata {
   uploadId: string;
   projectId: string;
   environmentId: string;
@@ -9,7 +9,7 @@ export interface TusUploadMetadata {
   offset: number;
   storageKey: string;
   multipartUploadId: string | null;
-  parts: TusUploadPart[];
+  parts: UploadStatePart[];
   isPublic: boolean;
   claimedHash?: string;
   claimedMimeType?: string;
@@ -23,12 +23,12 @@ export interface TusUploadMetadata {
   callbackDeliveredAt?: string | null;
 }
 
-export interface TusUploadPart {
+export interface UploadStatePart {
   partNumber: number;
   etag: string;
 }
 
-export interface TusCreationParams {
+export interface UploadCreationParams {
   projectId: string;
   environmentId: string;
   fileKeyId: string;
@@ -41,9 +41,9 @@ export interface TusCreationParams {
   metadata?: Record<string, string>;
 }
 
-export type TusVersion = "1.0.0";
+export type UploadProtocolVersion = "1.0.0";
 
-export const TUS_EXTENSIONS = [
+export const UPLOAD_PROTOCOL_EXTENSIONS = [
   "creation",
   "creation-with-upload",
   "creation-defer-length",
@@ -51,4 +51,5 @@ export const TUS_EXTENSIONS = [
   "termination",
 ] as const;
 
-export type TusExtension = (typeof TUS_EXTENSIONS)[number];
+export type UploadProtocolExtension =
+  (typeof UPLOAD_PROTOCOL_EXTENSIONS)[number];

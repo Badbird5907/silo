@@ -1,19 +1,19 @@
 import type { Context } from "hono";
 
 import type { Bindings, Variables } from "../../types/bindings";
-import { TUS_VERSION } from "../../utils/constants";
+import { UPLOAD_PROTOCOL_VERSION } from "../../utils/constants";
 
-interface TusDeleteRequestBody {
+interface UploadDeleteRequestBody {
   projectId?: string;
 }
 
-export async function handleInternalTusDelete(
+export async function handleInternalUploadDelete(
   c: Context<{ Bindings: Bindings; Variables: Variables }>,
 ): Promise<Response> {
   const uploadId = c.req.param("uploadId");
   const body = await c.req
-    .json<TusDeleteRequestBody>()
-    .catch((): TusDeleteRequestBody => ({}));
+    .json<UploadDeleteRequestBody>()
+    .catch((): UploadDeleteRequestBody => ({}));
 
   if (!uploadId) {
     return c.json({ error: "uploadId is required" }, 400);
@@ -23,16 +23,16 @@ export async function handleInternalTusDelete(
     return c.json({ error: "projectId is required" }, 400);
   }
 
-  const id = c.env.TUS_STATE_DO.idFromName(uploadId);
-  const stub = c.env.TUS_STATE_DO.get(id);
+  const id = c.env.UPLOAD_STATE_DO.idFromName(uploadId);
+  const stub = c.env.UPLOAD_STATE_DO.get(id);
 
   const headers = new Headers();
-  headers.set("Tus-Resumable", TUS_VERSION);
+  headers.set("X-Silo-Upload-Version", UPLOAD_PROTOCOL_VERSION);
   headers.set("X-Project-Id", body.projectId);
   headers.set("X-Upload-Id", uploadId);
 
   const response = await stub.fetch(
-    new Request("https://tus-state.internal/internal/delete", {
+    new Request("https://upload-state.internal/internal/delete", {
       method: "DELETE",
       headers,
     }),

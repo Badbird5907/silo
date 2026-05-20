@@ -9,7 +9,7 @@ export const CORS_ALLOW_HEADERS = [
   "Upload-Length",
   "Upload-Defer-Length",
   "Upload-Metadata",
-  "Tus-Resumable",
+  "X-Silo-Upload-Version",
   "X-HTTP-Method-Override",
   "X-Requested-With",
 ];
@@ -21,10 +21,10 @@ export const CORS_EXPOSE_HEADERS = [
   "Upload-Defer-Length",
   "Upload-Metadata",
   "Upload-Expires",
-  "Tus-Resumable",
-  "Tus-Version",
-  "Tus-Extension",
-  "Tus-Max-Size",
+  "X-Silo-Upload-Version",
+  "X-Silo-Upload-Versions",
+  "X-Silo-Upload-Extension",
+  "X-Silo-Upload-Max-Size",
   "Location",
 ];
 

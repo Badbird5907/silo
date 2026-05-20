@@ -14,14 +14,14 @@ import {
   sendUploadCallback,
   verifyUploadSignature,
 } from "../services/callback";
-import { retry } from "../services/tus/retry";
-import { Errors, TusError } from "../utils/errors";
+import { retry } from "../services/upload-state/retry";
+import { Errors, UploadError } from "../utils/errors";
 
 type AppContext = Context<{ Bindings: Bindings; Variables: Variables }>;
 
 function assertProjectUploadWritable(c: AppContext): void {
   if (c.get("projectLifecycleState") === "deleting") {
-    throw new TusError(
+    throw new UploadError(
       "INVALID_REQUEST",
       409,
       "Project is currently being deleted and cannot accept upload writes.",
@@ -140,7 +140,7 @@ export async function handleDirectUpload(c: AppContext): Promise<Response> {
     throw Errors.invalidRequest("Signed upload URL is missing a file size");
   }
 
-  const maxSize = Number.parseInt(c.env.TUS_MAX_SIZE, 10);
+  const maxSize = Number.parseInt(c.env.UPLOAD_MAX_SIZE, 10);
   if (expectedSize > maxSize) {
     throw Errors.uploadTooLarge(expectedSize, maxSize);
   }

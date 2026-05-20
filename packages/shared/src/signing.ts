@@ -344,7 +344,7 @@ export async function hashString(str: string): Promise<string> {
  * @param apiKey - The full API key (will be used to derive signing secret)
  * @param masterSigningSecret - The SIGNING_SECRET from environment
  *
- * URL format: POST https://{projectSlug}.{workerDomain}/ingest/tus?fileName=...&size=...&sig=...
+ * URL format: POST https://{projectSlug}.{workerDomain}/ingest/resumable?fileName=...&size=...&sig=...
  */
 export async function generateSignedUploadUrl(
   workerDomain: string,

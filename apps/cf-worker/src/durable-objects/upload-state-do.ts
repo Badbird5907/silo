@@ -1,6 +1,6 @@
 import type { Bindings } from "../types/bindings";
 import type { UploadCallbackResponse } from "../types/project";
-import type { TusUploadMetadata } from "../types/tus";
+import type { UploadStateMetadata } from "../types/upload-state";
 import {
   areMimeTypesEquivalent,
   detectMimeType,
@@ -18,19 +18,19 @@ import {
   shouldUseSinglePut,
   uploadChunkToR2,
 } from "../services/r2/upload";
-import { isUploadExpired } from "../services/tus/metadata";
-import { isRetryableError, retry } from "../services/tus/retry";
+import { isUploadExpired } from "../services/upload-state/metadata";
+import { isRetryableError, retry } from "../services/upload-state/retry";
 import {
   CONTENT_TYPE_OCTET_STREAM,
   HTTP_STATUS,
-  TUS_VERSION,
   UPLOAD_DEFER_LENGTH_HEADER,
   UPLOAD_EXPIRES_HEADER,
   UPLOAD_LENGTH_HEADER,
   UPLOAD_METADATA_HEADER,
   UPLOAD_OFFSET_HEADER,
+  UPLOAD_PROTOCOL_VERSION,
 } from "../utils/constants";
-import { createErrorResponse, Errors, TusError } from "../utils/errors";
+import { createErrorResponse, Errors, UploadError } from "../utils/errors";
 import { parseNonNegativeInt, sanitizeHeaderValue } from "../utils/validation";
 
 const METADATA_KEY = "upload:metadata";
@@ -48,14 +48,14 @@ interface MultipartRecoveryState {
 }
 
 function getMaxPatchSizeBytes(env: Bindings): number {
-  const raw = env.TUS_MAX_PATCH_SIZE.trim();
+  const raw = env.UPLOAD_MAX_PART_SIZE.trim();
   if (!raw) {
     return DEFAULT_MAX_PATCH_SIZE;
   }
 
   const parsed = Number.parseInt(raw, 10);
   if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new Error(`Invalid TUS_MAX_PATCH_SIZE value: ${raw}`);
+    throw new Error(`Invalid UPLOAD_MAX_PART_SIZE value: ${raw}`);
   }
 
   return parsed;
@@ -82,7 +82,7 @@ function isNoSuchUploadError(error: unknown): boolean {
   );
 }
 
-export class TusStateDO {
+export class UploadStateDO {
   private queue: Promise<void> = Promise.resolve();
 
   constructor(
@@ -118,7 +118,7 @@ export class TusStateDO {
 
       return new Response("Not found", { status: HTTP_STATUS.NOT_FOUND });
     } catch (error) {
-      const response = createErrorResponse(error as TusError | Error);
+      const response = createErrorResponse(error as UploadError | Error);
       const headers = new Headers(response.headers);
       if (url.pathname === "/internal/head") {
         headers.set("Cache-Control", "no-store");
@@ -127,10 +127,13 @@ export class TusStateDO {
     }
   }
 
-  private assertTusVersion(request: Request): void {
-    const tusResumable = request.headers.get("Tus-Resumable");
-    if (tusResumable !== TUS_VERSION) {
-      throw Errors.invalidTusVersion(TUS_VERSION, tusResumable ?? undefined);
+  private assertUploadProtocolVersion(request: Request): void {
+    const uploadVersion = request.headers.get("X-Silo-Upload-Version");
+    if (uploadVersion !== UPLOAD_PROTOCOL_VERSION) {
+      throw Errors.invalidUploadProtocolVersion(
+        UPLOAD_PROTOCOL_VERSION,
+        uploadVersion ?? undefined,
+      );
     }
   }
 
@@ -150,7 +153,7 @@ export class TusStateDO {
   }
 
   private async handleInit(request: Request): Promise<Response> {
-    const body: { metadata?: TusUploadMetadata } = await request.json();
+    const body: { metadata?: UploadStateMetadata } = await request.json();
     if (!body.metadata) {
       throw Errors.invalidRequest("Missing metadata payload");
     }
@@ -164,7 +167,7 @@ export class TusStateDO {
   }
 
   private async handleHead(request: Request): Promise<Response> {
-    this.assertTusVersion(request);
+    this.assertUploadProtocolVersion(request);
 
     const metadata = await this.requireUpload(
       request.headers.get("X-Project-Id"),
@@ -176,7 +179,7 @@ export class TusStateDO {
     }
 
     const headers: Record<string, string> = {
-      "Tus-Resumable": TUS_VERSION,
+      "X-Silo-Upload-Version": UPLOAD_PROTOCOL_VERSION,
       [UPLOAD_OFFSET_HEADER]: metadata.offset.toString(),
       [UPLOAD_EXPIRES_HEADER]: metadata.expiresAt,
       "Cache-Control": "no-store",
@@ -203,7 +206,7 @@ export class TusStateDO {
   }
 
   private async handlePatch(request: Request): Promise<Response> {
-    this.assertTusVersion(request);
+    this.assertUploadProtocolVersion(request);
 
     const contentType = request.headers.get("Content-Type");
     if (contentType !== CONTENT_TYPE_OCTET_STREAM) {
@@ -252,7 +255,7 @@ export class TusStateDO {
           `Upload-Length ${uploadLength} is less than current offset ${metadata.offset}`,
         );
       }
-      const maxSize = parseInt(this.env.TUS_MAX_SIZE, 10);
+      const maxSize = parseInt(this.env.UPLOAD_MAX_SIZE, 10);
       if (uploadLength > maxSize) {
         console.error("Upload too large", { uploadLength, maxSize });
         throw Errors.uploadTooLarge(uploadLength, maxSize);
@@ -294,7 +297,7 @@ export class TusStateDO {
       return new Response(null, {
         status: HTTP_STATUS.NO_CONTENT,
         headers: {
-          "Tus-Resumable": TUS_VERSION,
+          "X-Silo-Upload-Version": UPLOAD_PROTOCOL_VERSION,
           [UPLOAD_OFFSET_HEADER]: metadata.offset.toString(),
           [UPLOAD_EXPIRES_HEADER]: metadata.expiresAt,
         },
@@ -362,7 +365,7 @@ export class TusStateDO {
           );
         });
 
-        throw new TusError(
+        throw new UploadError(
           "INVALID_REQUEST",
           503,
           "Upload setup temporarily unavailable. Retry shortly.",
@@ -454,7 +457,7 @@ export class TusStateDO {
         }
 
         if (abortFailed) {
-          throw new TusError(
+          throw new UploadError(
             "INVALID_REQUEST",
             503,
             "Upload cleanup temporarily unavailable. Retry shortly.",
@@ -479,7 +482,7 @@ export class TusStateDO {
         });
 
         if (isTerminalSessionRegistrationError(persistError)) {
-          throw new TusError(
+          throw new UploadError(
             "INVALID_REQUEST",
             409,
             "Upload session is no longer pending",
@@ -532,14 +535,14 @@ export class TusStateDO {
         return new Response(
           JSON.stringify({
             error:
-              "Temporary upload failure. Retry PATCH with same Upload-Offset.",
+              "Temporary upload failure. Retry with the same Upload-Offset.",
             code: "temporary_unavailable",
           }),
           {
             status: 503,
             headers: {
               "Content-Type": "application/json",
-              "Tus-Resumable": TUS_VERSION,
+              "X-Silo-Upload-Version": UPLOAD_PROTOCOL_VERSION,
               "Retry-After": "1",
               [UPLOAD_OFFSET_HEADER]: metadata.offset.toString(),
               [UPLOAD_EXPIRES_HEADER]: metadata.expiresAt,
@@ -572,7 +575,7 @@ export class TusStateDO {
       await this.persistMetadata(metadata);
     }
 
-    if (request.headers.get("X-Silo-Resumable") === "1") {
+    if (request.headers.get("X-Silo-Upload-Request") === "1") {
       return new Response(
         JSON.stringify({
           ok: true,
@@ -597,7 +600,7 @@ export class TusStateDO {
     return new Response(null, {
       status: HTTP_STATUS.NO_CONTENT,
       headers: {
-        "Tus-Resumable": TUS_VERSION,
+        "X-Silo-Upload-Version": UPLOAD_PROTOCOL_VERSION,
         [UPLOAD_OFFSET_HEADER]: metadata.offset.toString(),
         [UPLOAD_EXPIRES_HEADER]: metadata.expiresAt,
       },
@@ -605,7 +608,7 @@ export class TusStateDO {
   }
 
   private async handleDelete(request: Request): Promise<Response> {
-    this.assertTusVersion(request);
+    this.assertUploadProtocolVersion(request);
 
     const projectId = request.headers.get("X-Project-Id");
     const uploadIdHeader = request.headers.get("X-Upload-Id");
@@ -683,7 +686,7 @@ export class TusStateDO {
     }
 
     if (cleanupFailed) {
-      throw new TusError(
+      throw new UploadError(
         "INVALID_REQUEST",
         503,
         "Upload cleanup temporarily unavailable. Retry deletion shortly.",
@@ -701,7 +704,7 @@ export class TusStateDO {
           environmentId: effectiveEnvironmentId ?? "unknown",
           fileKeyId: effectiveFileKeyId ?? "unknown",
           projectId: effectiveProjectId,
-          error: "Upload aborted via TUS termination",
+          error: "Upload aborted",
         },
       },
       this.env,
@@ -723,7 +726,7 @@ export class TusStateDO {
 
     return new Response(null, {
       status: HTTP_STATUS.NO_CONTENT,
-      headers: { "Tus-Resumable": TUS_VERSION },
+      headers: { "X-Silo-Upload-Version": UPLOAD_PROTOCOL_VERSION },
     });
   }
 
@@ -731,7 +734,7 @@ export class TusStateDO {
     projectId: string | null,
     uploadIdHeader: string | null,
     treatMissingAsTemporary = false,
-  ): Promise<TusUploadMetadata> {
+  ): Promise<UploadStateMetadata> {
     const metadata = await this.getMetadata();
     if (!metadata) {
       if (treatMissingAsTemporary) {
@@ -740,7 +743,7 @@ export class TusStateDO {
           uploadIdHeader,
           projectIdHeader: projectId,
         });
-        throw new TusError(
+        throw new UploadError(
           "INVALID_REQUEST",
           503,
           "Upload state temporarily unavailable. Retry shortly.",
@@ -759,7 +762,7 @@ export class TusStateDO {
   }
 
   private async cleanupExpiredUpload(
-    metadata: TusUploadMetadata,
+    metadata: UploadStateMetadata,
   ): Promise<void> {
     const multipartUploadId = metadata.multipartUploadId;
     let cleanupFailed = false;
@@ -795,7 +798,7 @@ export class TusStateDO {
     }
 
     if (cleanupFailed) {
-      throw new TusError(
+      throw new UploadError(
         "INVALID_REQUEST",
         503,
         "Expired upload cleanup temporarily unavailable. Retry shortly.",
@@ -811,14 +814,14 @@ export class TusStateDO {
   }
 
   private logMissingState(extra: Record<string, unknown> = {}): void {
-    console.info("[tus-do]", {
+    console.info("[upload-state-do]", {
       event: "upload_state_missing",
       ...extra,
     });
   }
 
   private async finalizeUpload(
-    metadata: TusUploadMetadata,
+    metadata: UploadStateMetadata,
   ): Promise<UploadCallbackResponse | null> {
     const multipartUploadId = metadata.multipartUploadId;
     if (multipartUploadId && metadata.parts.length > 0) {
@@ -993,7 +996,7 @@ export class TusStateDO {
   }
 
   private async tryDeliverCompletionCallback(
-    metadata: TusUploadMetadata,
+    metadata: UploadStateMetadata,
     actual?: {
       actualSize: number;
       actualMimeType: string;
@@ -1070,9 +1073,9 @@ export class TusStateDO {
     return callbackResult;
   }
 
-  private async getMetadata(): Promise<TusUploadMetadata | null> {
+  private async getMetadata(): Promise<UploadStateMetadata | null> {
     const metadata =
-      await this.state.storage.get<TusUploadMetadata>(METADATA_KEY);
+      await this.state.storage.get<UploadStateMetadata>(METADATA_KEY);
     return metadata ?? null;
   }
 
@@ -1083,7 +1086,7 @@ export class TusStateDO {
     return state ?? null;
   }
 
-  private async persistMetadata(metadata: TusUploadMetadata): Promise<void> {
+  private async persistMetadata(metadata: UploadStateMetadata): Promise<void> {
     await this.state.storage.put(METADATA_KEY, metadata);
   }
 
@@ -1106,10 +1109,10 @@ export class TusStateDO {
 
   private logEvent(
     event: string,
-    metadata: Pick<TusUploadMetadata, "uploadId" | "projectId">,
+    metadata: Pick<UploadStateMetadata, "uploadId" | "projectId">,
     extra: Record<string, unknown> = {},
   ): void {
-    console.info("[tus-do]", {
+    console.info("[upload-state-do]", {
       event,
       uploadId: metadata.uploadId,
       projectId: metadata.projectId,
