@@ -584,7 +584,7 @@ export class UploadStateDO {
           size: metadata.size,
           complete: isComplete,
           completion,
-          completionDelivered: completion?.onUploadCompleteResult !== undefined,
+          completionDelivered: completion !== null,
           onUploadCompleteResult: completion?.onUploadCompleteResult,
         }),
         {
