@@ -185,7 +185,7 @@ export async function uploadFileWithProgress(
   file: File,
   onProgress: (loaded: number, total: number) => void,
   signal: AbortSignal,
-): Promise<unknown> {
+): Promise<UploadProgressResult> {
   if (uploadMethod === "put") {
     await new Promise<void>((resolve, reject) => {
       let settled = false;
@@ -271,7 +271,7 @@ export async function uploadFileWithProgress(
       signal.addEventListener("abort", abortListener, { once: true });
       xhr.send(file);
     });
-    return undefined;
+    return { delivered: false };
   }
 
   return await uploadResumableFileWithProgress(
@@ -290,11 +290,17 @@ interface ResumableStatusResponse {
   completion?: {
     onUploadCompleteResult?: unknown;
   };
+  completionDelivered?: boolean;
   error?: string;
 }
 
 interface ResumableUploadResponse extends ResumableStatusResponse {
   complete?: boolean;
+  onUploadCompleteResult?: unknown;
+}
+
+export interface UploadProgressResult {
+  delivered: boolean;
   onUploadCompleteResult?: unknown;
 }
 
@@ -313,7 +319,7 @@ async function uploadResumableFileWithProgress(
   file: File,
   onProgress: (loaded: number, total: number) => void,
   signal: AbortSignal,
-): Promise<unknown> {
+): Promise<UploadProgressResult> {
   const createResponse = await fetch(uploadUrl, {
     method: "POST",
     signal,
@@ -366,9 +372,11 @@ async function uploadResumableFileWithProgress(
     onProgress(offset, file.size);
 
     if (data.complete) {
-      return (
-        data.onUploadCompleteResult ?? data.completion?.onUploadCompleteResult
-      );
+      return {
+        delivered: data.completionDelivered === true,
+        onUploadCompleteResult:
+          data.onUploadCompleteResult ?? data.completion?.onUploadCompleteResult,
+      };
     }
   }
 
@@ -381,8 +389,11 @@ async function uploadResumableFileWithProgress(
     .json()
     .catch(() => null)) as ResumableStatusResponse | null;
   if (statusResponse.ok && statusData?.completion) {
-    return statusData.completion.onUploadCompleteResult;
+    return {
+      delivered: statusData.completionDelivered === true,
+      onUploadCompleteResult: statusData.completion.onUploadCompleteResult,
+    };
   }
 
-  return undefined;
+  return { delivered: false };
 }

@@ -308,19 +308,18 @@ export function useUploadInternal<
                 abortController.signal,
               );
 
-              const completion =
-                uploadMethod === "resumable" && uploadResult !== undefined
-                  ? {
-                      fileKeyId: registration.fileKeyId,
-                      routeSlug: options.endpoint,
-                      onUploadCompleteResult: uploadResult,
-                    }
-                  : await awaitCompletion(
-                      factoryContext.endpointUrl,
-                      factoryContext.fetchImpl,
-                      registration.fileKeyId,
-                      uploadOptions?.awaitTimeoutMs,
-                    );
+              const completion = uploadResult.delivered
+                ? {
+                    fileKeyId: registration.fileKeyId,
+                    routeSlug: options.endpoint,
+                    onUploadCompleteResult: uploadResult.onUploadCompleteResult,
+                  }
+                : await awaitCompletion(
+                    factoryContext.endpointUrl,
+                    factoryContext.fetchImpl,
+                    registration.fileKeyId,
+                    uploadOptions?.awaitTimeoutMs,
+                  );
 
               completionsByIndex[index] = {
                 fileKeyId: completion.fileKeyId,
