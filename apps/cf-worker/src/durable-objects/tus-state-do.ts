@@ -1,4 +1,5 @@
 import type { Bindings } from "../types/bindings";
+import type { UploadCallbackResponse } from "../types/project";
 import type { TusUploadMetadata } from "../types/tus";
 import {
   areMimeTypesEquivalent,
@@ -564,10 +565,33 @@ export class TusStateDO {
       partNumber: uploadResult.part?.partNumber ?? null,
     });
 
+    let completion: UploadCallbackResponse | null = null;
     if (isComplete) {
-      await this.finalizeUpload(metadata);
+      completion = await this.finalizeUpload(metadata);
     } else {
       await this.persistMetadata(metadata);
+    }
+
+    if (request.headers.get("X-Silo-Resumable") === "1") {
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          uploadId: metadata.uploadId,
+          offset: metadata.offset,
+          size: metadata.size,
+          complete: isComplete,
+          completion,
+          onUploadCompleteResult: completion?.onUploadCompleteResult,
+        }),
+        {
+          status: HTTP_STATUS.OK,
+          headers: {
+            "Content-Type": "application/json",
+            [UPLOAD_OFFSET_HEADER]: metadata.offset.toString(),
+            [UPLOAD_EXPIRES_HEADER]: metadata.expiresAt,
+          },
+        },
+      );
     }
 
     return new Response(null, {
@@ -793,7 +817,9 @@ export class TusStateDO {
     });
   }
 
-  private async finalizeUpload(metadata: TusUploadMetadata): Promise<void> {
+  private async finalizeUpload(
+    metadata: TusUploadMetadata,
+  ): Promise<UploadCallbackResponse | null> {
     const multipartUploadId = metadata.multipartUploadId;
     if (multipartUploadId && metadata.parts.length > 0) {
       await retry((attempt) => {
@@ -959,7 +985,7 @@ export class TusStateDO {
       offsetAfter: metadata.offset,
       multipartUploadId: metadata.multipartUploadId,
     });
-    await this.tryDeliverCompletionCallback(metadata, {
+    return await this.tryDeliverCompletionCallback(metadata, {
       actualSize,
       actualMimeType,
       actualHash,
@@ -973,10 +999,10 @@ export class TusStateDO {
       actualMimeType: string;
       actualHash: string | null;
     },
-  ): Promise<void> {
+  ): Promise<UploadCallbackResponse | null> {
     if (metadata.callbackDeliveredAt) {
       await this.deleteMetadata();
-      return;
+      return null;
     }
 
     let actualSize = actual?.actualSize;
@@ -985,7 +1011,7 @@ export class TusStateDO {
 
     if (actualSize === undefined || actualMimeType === undefined) {
       const object = await this.env.R2_BUCKET.get(metadata.storageKey);
-      if (!object) return;
+      if (!object) return null;
       actualSize = object.size;
       const headerBytes = await readHeaderBytes(
         object.body as ReadableStream<Uint8Array>,
@@ -994,7 +1020,7 @@ export class TusStateDO {
       actualMimeType = await detectMimeType(headerBytes, metadata.fileName);
       actualHash = metadata.claimedHash ?? null;
     }
-    await retry(
+    const callbackResult = await retry(
       (attempt) => {
         if (attempt > 1) {
           this.logEvent("callback_retry", metadata, {
@@ -1041,6 +1067,7 @@ export class TusStateDO {
       offsetAfter: metadata.offset,
     });
     await this.deleteMetadata();
+    return callbackResult;
   }
 
   private async getMetadata(): Promise<TusUploadMetadata | null> {

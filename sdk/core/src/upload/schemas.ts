@@ -19,7 +19,7 @@ const uploadResponseBodySchema = z.object({
   fileKeyId: z.string().min(1),
   accessKey: z.string().min(1),
   expiresAt: z.string().datetime(),
-  uploadMethod: z.enum(["tus", "put"]).optional().default("tus"),
+  uploadMethod: z.enum(["resumable", "put"]).optional().default("resumable"),
 });
 
 export const listFilesResultSchema = z.object({
@@ -109,11 +109,13 @@ export function parseUploadResponseBody(value: unknown): {
   fileKeyId: string;
   accessKey: string;
   expiresAt: string;
-  uploadMethod: "tus" | "put";
+  uploadMethod: "resumable" | "put";
 } {
   const parsed = uploadResponseBodySchema.safeParse(value);
   if (!parsed.success) {
-    throw new Error(`Unexpected upload response shape: ${parsed.error.message}`);
+    throw new Error(
+      `Unexpected upload response shape: ${parsed.error.message}`,
+    );
   }
   return parsed.data;
 }

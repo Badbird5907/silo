@@ -57,7 +57,7 @@ await upload.uploadFiles(files, {
 });
 ```
 
-If you want a single signed upload request instead of the default resumable TUS flow, pass `uploadMethod: "put"`:
+If you want a single signed upload request instead of the default resumable flow, pass `uploadMethod: "put"`:
 
 ```ts
 await upload.uploadFile(file, {
@@ -89,6 +89,7 @@ await upload.beginUpload({
 If your server route uses a function-based `.expects(...)` resolver, the client cannot infer a stable picker filter from router config alone.
 
 In that case, pass `accept` to `useUpload(...)`, `useStagedUpload(...)`, `UploadButton`, or `UploadDropzone` if you want to control the file picker's accepted types.
+
 </Callout>
 
 ## `useStagedUpload`
@@ -96,8 +97,8 @@ In that case, pass `accept` to `useUpload(...)`, `useStagedUpload(...)`, `Upload
 `useStagedUpload` is better for chat-style or draft-style interfaces where file selection and upload happen in separate steps.
 
 <Callout type="info">
-You should use this when you want the user to select files first,
-but upload them later. (e.g in a chat or messaging interface)
+  You should use this when you want the user to select files first, but upload
+  them later. (e.g in a chat or messaging interface)
 </Callout>
 
 ```ts

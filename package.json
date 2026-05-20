@@ -31,6 +31,7 @@
     "sdk:publish:dry-run": "pnpm -r --filter @silo-storage/shared --filter @silo-storage/mime-types --filter @silo-storage/sdk-core --filter @silo-storage/sdk-server --filter @silo-storage/sdk-react --filter @silo-storage/sdk-next --filter @silo-storage/sdk-tanstack-start publish --dry-run --access public --no-git-checks",
     "sdk:set-version": "tsx tooling/github/set-sdk-version.ts",
     "sdk:typecheck": "pnpm --filter @silo-storage/shared --filter @silo-storage/mime-types --filter @silo-storage/sdk-core --filter @silo-storage/sdk-server --filter @silo-storage/sdk-next --filter @silo-storage/sdk-tanstack-start --filter @silo-storage/sdk-react typecheck",
+    "test": "turbo run test",
     "typecheck": "turbo run typecheck",
     "ui-add": "pnpm -F @silo-storage/ui ui-add"
   },
@@ -42,7 +43,8 @@
     "sherif": "1.11.1",
     "tsx": "catalog:",
     "turbo": "^2.5.8",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "^4.0.13"
   },
   "prettier": "@silo-storage/prettier-config"
 }

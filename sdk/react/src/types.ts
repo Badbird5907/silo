@@ -27,7 +27,11 @@ export interface SiloProgressEvent {
   aggregatePercent: number;
 }
 
-export type UploadAccept = string | (() => Promise<string> | string) | string[] | (() => Promise<string[]> | string[]);
+export type UploadAccept =
+  | string
+  | (() => Promise<string> | string)
+  | string[]
+  | (() => Promise<string[]> | string[]);
 
 export type AnyFileRouterLike = Record<
   string,
@@ -68,7 +72,7 @@ export interface UploadCompletion<
   routeSlug: TEndpoint;
   accessKey?: string;
   uploadUrl?: string;
-  uploadMethod?: "tus" | "put";
+  uploadMethod?: "resumable" | "put";
   result: RouteOutputBySlug<TRouter, TEndpoint>;
 }
 
@@ -130,7 +134,7 @@ export interface UploadRequestOptions<
   input?: RouteInputBySlug<TRouter, TEndpoint>;
   expiresIn?: number;
   protocol?: "http" | "https";
-  uploadMethod?: "tus" | "put";
+  uploadMethod?: "resumable" | "put";
   awaitTimeoutMs?: number;
   concurrency?: number;
 }

@@ -99,7 +99,7 @@ export type ParsedSignedUrl =
   | ParsedSignedImageUrl;
 
 export type ProjectRouteMode = "subdomain" | "path";
-export type UploadMethod = "tus" | "put";
+export type UploadMethod = "resumable" | "put";
 
 export interface SignedUrlRoutingOptions {
   routeMode?: ProjectRouteMode;
@@ -166,9 +166,7 @@ function buildProjectScopedUrl(
     );
   }
 
-  return new URL(
-    `${protocol}://${projectSlug}.${host}${normalizedPath}`,
-  );
+  return new URL(`${protocol}://${projectSlug}.${host}${normalizedPath}`);
 }
 
 function inferUploadMethodFromPath(pathname: string): UploadMethod {
@@ -179,7 +177,7 @@ function inferUploadMethodFromPath(pathname: string): UploadMethod {
   ) {
     return "put";
   }
-  return "tus";
+  return "resumable";
 }
 
 export function normalizeAcceptedMimeTypePattern(pattern: string): string {
@@ -189,9 +187,12 @@ export function normalizeAcceptedMimeTypePattern(pattern: string): string {
 export function normalizeUploadMethod(
   value: string | undefined | null,
 ): UploadMethod {
-  const normalized = value?.trim().toLowerCase() ?? "tus";
-  if (normalized === "tus" || normalized === "put") {
+  const normalized = value?.trim().toLowerCase() ?? "resumable";
+  if (normalized === "resumable" || normalized === "put") {
     return normalized;
+  }
+  if (normalized === "tus") {
+    return "resumable";
   }
   throw new Error(`Invalid upload method "${value}"`);
 }
@@ -379,6 +380,9 @@ export async function generateSignedUploadUrl(
   if (params.isPublic !== undefined) {
     payload.isPublic = params.isPublic.toString();
   }
+  if (uploadMethod !== "resumable") {
+    payload.uploadMethod = uploadMethod;
+  }
   const acceptedMimeTypes = serializeAcceptedMimeTypePatterns(
     params.acceptedMimeTypes,
   );
@@ -391,7 +395,7 @@ export async function generateSignedUploadUrl(
   const url = buildProjectScopedUrl(
     workerDomain,
     projectSlug,
-    uploadMethod === "put" ? "/ingest/put" : "/ingest/tus",
+    uploadMethod === "put" ? "/ingest/put" : "/ingest/resumable",
     routing,
     params.protocol,
   );
@@ -442,6 +446,9 @@ export async function generateSignedUploadUrlWithSecret(
   if (params.isPublic !== undefined) {
     payload.isPublic = params.isPublic.toString();
   }
+  if (uploadMethod !== "resumable") {
+    payload.uploadMethod = uploadMethod;
+  }
   const acceptedMimeTypes = serializeAcceptedMimeTypePatterns(
     params.acceptedMimeTypes,
   );
@@ -454,7 +461,7 @@ export async function generateSignedUploadUrlWithSecret(
   const url = buildProjectScopedUrl(
     workerDomain,
     projectSlug,
-    uploadMethod === "put" ? "/ingest/put" : "/ingest/tus",
+    uploadMethod === "put" ? "/ingest/put" : "/ingest/resumable",
     routing,
     params.protocol,
   );
@@ -749,6 +756,9 @@ export async function verifySignedUploadUrl(
   if (expiresAtStr) payload.expiresAt = expiresAtStr;
   if (acceptedMimeTypes) {
     payload.acceptedMimeTypes = acceptedMimeTypes.join(",");
+  }
+  if (uploadMethod !== "resumable") {
+    payload.uploadMethod = uploadMethod;
   }
 
   const expectedSignature = await createSignature(payload, apiKeySecret);

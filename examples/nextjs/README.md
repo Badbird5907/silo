@@ -39,7 +39,6 @@ pnpm --filter nextjs dev
 ```
 
 Open [http://localhost:5714](http://localhost:5714), sign in with Clerk, then upload an image from the home page.
-You can also open [http://localhost:5714/tus](http://localhost:5714/tus) for a manual tus upload demo with pause/resume/cancel controls.
 
 ## What Was Added
 

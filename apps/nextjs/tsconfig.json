@@ -2,13 +2,14 @@
   "extends": "@silo-storage/tsconfig/base.json",
   "compilerOptions": {
     "lib": ["ES2022", "dom", "dom.iterable"],
+    "allowJs": false,
+    "checkJs": false,
     "jsx": "preserve",
     "paths": {
-      "@/*": ["./src/*"],
+      "@/*": ["./src/*"]
     },
     "plugins": [{ "name": "next" }]
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["node_modules", ".next"]
 }
-

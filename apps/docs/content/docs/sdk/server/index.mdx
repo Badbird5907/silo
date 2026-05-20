@@ -32,8 +32,9 @@ Start by creating a typed route builder with the request and context types you w
 
 ```ts title="src/upload.ts"
 import type { FileRouter } from "@silo-storage/sdk-server";
-import { createSiloUpload } from "@silo-storage/sdk-server";
 import { z } from "zod";
+
+import { createSiloUpload } from "@silo-storage/sdk-server";
 
 export interface UploadContext {
   userId: string;
@@ -85,9 +86,7 @@ export const fileRouter = {
     )
     .public(({ input }) => input.public ?? false)
     .serveImage(({ input }) => input.folder === "avatars")
-    .expires(({ input }) =>
-      input.folder === "avatars" ? "30 days" : "7 days",
-    )
+    .expires(({ input }) => (input.folder === "avatars" ? "30 days" : "7 days"))
     .onUploadComplete(async ({ metadata, file, core }) => {
       return {
         uploadedBy: metadata.userId,
@@ -116,6 +115,7 @@ Each call to `f(...)` starts a route definition:
 `onUploadComplete(...)` is a per-file callback.
 
 If a route allows multiple files and the client uploads `4` files, Silo dispatches `4` completion callbacks and your route's `onUploadComplete(...)` handler runs `4` separate times, once for each file.
+
 </Callout>
 
 The builder is fully typed. The `context` type comes from `createSiloUpload<Request, UploadContext>()`, and the route `input` type comes from the schema you pass to `f(schema)`.
@@ -124,10 +124,12 @@ The builder is fully typed. The `context` type comes from `createSiloUpload<Requ
 `f(schema)` is optional.
 
 Routes that do not need app-defined input can call `f()` directly.
+
 </Callout>
 
 <Callout type="idea">
-You can pass both static values and async resolvers to `.expects(...)`, `.public(...)`, `.serveImage(...)`, and `.expires(...)`.
+  You can pass both static values and async resolvers to `.expects(...)`,
+  `.public(...)`, `.serveImage(...)`, and `.expires(...)`.
 </Callout>
 
 ## What middleware does
@@ -149,7 +151,7 @@ When a route defines `f(schema)`, middleware, expects resolvers, and route optio
 ## File expectations
 
 <Callout type="info">
-File expectations are enforced on the upload endpoint.
+  File expectations are enforced on the upload endpoint.
 </Callout>
 
 Use `.expects(...)` to define the files a route can accept.
@@ -175,7 +177,7 @@ f(
       maxFileCount: input.kind === "pdf" ? 4 : 1,
       maxFileSize: "16MB",
     },
-  }))
+  }));
 ```
 
 This form is concise when the route maps naturally to broad file groups like `image` or to exact keyed MIME types like `application/pdf`.
@@ -193,7 +195,7 @@ f()
       maxFileCount: 4,
       maxFileSize: "16MB",
     },
-  ])
+  ]);
 ```
 
 That is the form to use when one shared `maxFileCount` applies to a custom MIME list.
@@ -210,7 +212,7 @@ f()
       maxFileCount: 4,
       maxFileSize: "8MB",
     },
-  ])
+  ]);
 ```
 
 ### Defaults
@@ -233,7 +235,10 @@ const core = createSiloCoreFromToken({
   cdnHost: process.env.SILO_CDN_HOST!,
 });
 
-export async function registerUpload(request: Request, context: { userId: string; plan: "free" | "pro" }) {
+export async function registerUpload(
+  request: Request,
+  context: { userId: string; plan: "free" | "pro" },
+) {
   const result = await registerRouteUpload({
     core,
     router: fileRouter,
@@ -264,7 +269,7 @@ export async function registerUpload(request: Request, context: { userId: string
 
 By default registration uses the core `uploadStrategy: "server"` flow. Pass `uploadStrategy: "self"` only when you explicitly want local signing behavior for that call.
 
-You can also pass `uploadMethod: "put"` when the client should receive a direct signed `PUT` URL instead of the default resumable TUS URL.
+You can also pass `uploadMethod: "put"` when the client should receive a direct signed `PUT` URL instead of the default resumable upload URL.
 
 ## Prepare a single upload
 
@@ -282,7 +287,10 @@ const core = createSiloCoreFromToken({
   cdnHost: process.env.SILO_CDN_HOST!,
 });
 
-export async function prepareUpload(request: Request, context: { userId: string; plan: "free" | "pro" }) {
+export async function prepareUpload(
+  request: Request,
+  context: { userId: string; plan: "free" | "pro" },
+) {
   const result = await prepareRouteUpload({
     core,
     router: fileRouter,
@@ -307,18 +315,21 @@ Reach for `registerRouteUpload(...)` when you are handling a batch of files. Rea
 ## Handle upload callbacks
 
 <Callout type="info">
-Your framework adapter should handle this for you. You should only need to call this if you are
-handling the callback yourself.
+  Your framework adapter should handle this for you. You should only need to
+  call this if you are handling the callback yourself.
 </Callout>
 
 When Silo sends a signed callback, use `handleUploadCallback(...)` to verify it and dispatch the matching route's `onUploadComplete(...)`.
 
 ```ts title="src/http/upload-callback.ts"
-import { createSiloCoreFromToken, parseSiloToken } from "@silo-storage/sdk-core";
+import {
+  createSiloCoreFromToken,
+  parseSiloToken,
+} from "@silo-storage/sdk-core";
 import { handleUploadCallback } from "@silo-storage/sdk-server";
 
-import { fileRouter } from "../upload";
 import type { UploadContext } from "../upload";
+import { fileRouter } from "../upload";
 
 const core = createSiloCoreFromToken({
   url: process.env.SILO_URL!,

@@ -13,8 +13,8 @@ import {
   requireProject,
 } from "./middleware/project";
 import { handleDevR2ListAll } from "./routes/dev/r2-list-all";
-import { handleDownload } from "./routes/download";
 import { handleDirectUpload } from "./routes/direct-upload";
+import { handleDownload } from "./routes/download";
 import { handleImage, handleInternalImageSource } from "./routes/image";
 import { handleInternalDelete } from "./routes/internal/delete";
 import { handleInternalDeletePrefix } from "./routes/internal/delete-prefix";
@@ -23,12 +23,11 @@ import { handleInternalMetadata } from "./routes/internal/metadata";
 import { handleInternalMultipartAbort } from "./routes/internal/multipart-abort";
 import { handleInternalTusDelete } from "./routes/internal/tus-delete";
 import {
-  handleTusCreate,
-  handleTusDelete,
-  handleTusHead,
-  handleTusOptions,
-  handleTusPatch,
-} from "./routes/tus-handlers";
+  handleResumableCreate,
+  handleResumableDelete,
+  handleResumablePut,
+  handleResumableStatus,
+} from "./routes/resumable-upload";
 import { runExpiryCleanup } from "./services/expiry-cleanup";
 import { runLifecycleJobs } from "./services/lifecycle-job-runner";
 import { runPendingUploadCleanup } from "./services/pending-upload-cleanup";
@@ -43,63 +42,58 @@ app.use("*", extractProject);
 
 app.get("/health", (c) => c.json({ status: "ok", version: "1.0.0" }));
 app.get("/dev/r2/list-all", requireDevelopment, handleDevR2ListAll);
-app.options("/ingest/tus", requireProject, handleTusOptions);
-app.options("/ingest/tus/:uploadId", requireProject, handleTusOptions);
-app.post("/ingest/tus", requireProject, handleTusCreate);
+app.options("/ingest/resumable", requireProject, (c) => c.body(null, 204));
+app.options("/ingest/resumable/:uploadId", requireProject, (c) =>
+  c.body(null, 204),
+);
+app.post("/ingest/resumable", requireProject, handleResumableCreate);
+app.get("/ingest/resumable/:uploadId", requireProject, handleResumableStatus);
+app.put("/ingest/resumable/:uploadId", requireProject, handleResumablePut);
+app.delete(
+  "/ingest/resumable/:uploadId",
+  requireProject,
+  handleResumableDelete,
+);
 app.put("/ingest/put", requireProject, handleDirectUpload);
-// Some runtimes/proxies can normalize HEAD to GET before Hono routing.
-// Mirror HEAD handling on GET so resumable uploads do not restart on 404.
-app.get("/ingest/tus/:uploadId", requireProject, handleTusHead);
-app.on("HEAD", "/ingest/tus/:uploadId", requireProject, handleTusHead);
-app.patch("/ingest/tus/:uploadId", requireProject, handleTusPatch);
-app.delete("/ingest/tus/:uploadId", requireProject, handleTusDelete);
-
 app.get("/f/:accessKey", requireProject, handleDownload);
 app.get("/i/:accessKey", requireProject, handleImage);
 
 // Path-mode project routes (e.g. /p/:projectSlug/...)
 app.options(
-  "/:projectRoutePrefix/:projectSlug/ingest/tus",
+  "/:projectRoutePrefix/:projectSlug/ingest/resumable",
   requireProject,
-  handleTusOptions,
+  (c) => c.body(null, 204),
 );
 app.options(
-  "/:projectRoutePrefix/:projectSlug/ingest/tus/:uploadId",
+  "/:projectRoutePrefix/:projectSlug/ingest/resumable/:uploadId",
   requireProject,
-  handleTusOptions,
+  (c) => c.body(null, 204),
 );
 app.post(
-  "/:projectRoutePrefix/:projectSlug/ingest/tus",
+  "/:projectRoutePrefix/:projectSlug/ingest/resumable",
   requireProject,
-  handleTusCreate,
+  handleResumableCreate,
+);
+app.get(
+  "/:projectRoutePrefix/:projectSlug/ingest/resumable/:uploadId",
+  requireProject,
+  handleResumableStatus,
+);
+app.put(
+  "/:projectRoutePrefix/:projectSlug/ingest/resumable/:uploadId",
+  requireProject,
+  handleResumablePut,
+);
+app.delete(
+  "/:projectRoutePrefix/:projectSlug/ingest/resumable/:uploadId",
+  requireProject,
+  handleResumableDelete,
 );
 app.put(
   "/:projectRoutePrefix/:projectSlug/ingest/put",
   requireProject,
   handleDirectUpload,
 );
-app.get(
-  "/:projectRoutePrefix/:projectSlug/ingest/tus/:uploadId",
-  requireProject,
-  handleTusHead,
-);
-app.on(
-  "HEAD",
-  "/:projectRoutePrefix/:projectSlug/ingest/tus/:uploadId",
-  requireProject,
-  handleTusHead,
-);
-app.patch(
-  "/:projectRoutePrefix/:projectSlug/ingest/tus/:uploadId",
-  requireProject,
-  handleTusPatch,
-);
-app.delete(
-  "/:projectRoutePrefix/:projectSlug/ingest/tus/:uploadId",
-  requireProject,
-  handleTusDelete,
-);
-
 app.get(
   "/:projectRoutePrefix/:projectSlug/f/:accessKey",
   requireProject,
@@ -157,8 +151,10 @@ app.get(
 
 app.onError((err, c) => {
   console.error("Unhandled error:", err);
-  const isTusRequest = c.req.path.includes("/ingest/tus");
-  const response = createErrorResponse(err, isTusRequest);
+  const isProtocolRequest =
+    c.req.path.includes("/ingest/tus") ||
+    c.req.path.includes("/ingest/resumable");
+  const response = createErrorResponse(err, isProtocolRequest);
 
   // TUS spec requires Cache-Control: no-store on all HEAD responses
   if (c.req.method === "HEAD") {

@@ -24,8 +24,8 @@ By default, router registration uses core `uploadStrategy: "server"` (combined
 `/api/v1/upload` registration + URL signing). You can opt into
 `uploadStrategy: "self"` per call when you need local signing behavior.
 
-Registration also supports `uploadMethod: "tus" | "put"`. Leave it as the
-default `tus` for resumable uploads, or pass `put` when the client should
+Registration also supports `uploadMethod: "resumable" | "put"`. Leave it as the
+default `resumable` for resumable uploads, or pass `put` when the client should
 receive a direct signed `PUT` URL instead.
 
 ## Example
@@ -76,9 +76,7 @@ export const fileRouter = {
     )
     .public(({ input }) => input.public ?? false)
     .serveImage(({ input }) => input.folder === "avatars")
-    .expires(({ input }) =>
-      input.folder === "avatars" ? "30 days" : "7 days",
-    )
+    .expires(({ input }) => (input.folder === "avatars" ? "30 days" : "7 days"))
     .onUploadComplete(async ({ metadata, file, core }) => {
       return {
         uploadedBy: metadata.userId,
@@ -117,7 +115,7 @@ f()
       maxFileCount: 2,
       maxFileSize: "16MB",
     },
-  })
+  });
 ```
 
 Array buckets work well when several arbitrary MIME types should share the same
@@ -132,7 +130,7 @@ f()
       maxFileCount: 4,
       maxFileSize: "16MB",
     },
-  ])
+  ]);
 ```
 
 You can also combine a broad `type` with a narrowed MIME list:
@@ -147,5 +145,5 @@ f()
       maxFileCount: 4,
       maxFileSize: "8MB",
     },
-  ])
+  ]);
 ```

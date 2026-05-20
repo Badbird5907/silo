@@ -54,6 +54,7 @@ export const fileRouter = {
         test: "test",
         uploadedBy: metadata.userId,
         folder: metadata.folder,
+        str: "Done uploading"
       };
     })
 } satisfies FileRouter<Request, UploadContext>;

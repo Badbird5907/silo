@@ -1,0 +1,318 @@
+import type { Context } from "hono";
+
+import { getClientIpFromHeaders } from "@silo-storage/shared";
+
+import type { Bindings, Variables } from "../types/bindings";
+import type { TusUploadMetadata } from "../types/tus";
+import {
+  detectProjectRouteModeFromPath,
+  toProjectScopedPath,
+} from "../lib/subdomain";
+import {
+  registerUploadSession,
+  verifyUploadSignature,
+} from "../services/callback";
+import { parseContentRangeHeader } from "../services/resumable/range";
+import { generateExpirationDate } from "../services/tus/metadata";
+import {
+  CONTENT_TYPE_OCTET_STREAM,
+  HTTP_STATUS,
+  TUS_VERSION,
+  UPLOAD_LENGTH_HEADER,
+  UPLOAD_OFFSET_HEADER,
+} from "../utils/constants";
+import { Errors, TusError } from "../utils/errors";
+import { parseNonNegativeInt } from "../utils/validation";
+
+type AppContext = Context<{ Bindings: Bindings; Variables: Variables }>;
+
+function assertProjectUploadWritable(c: AppContext): void {
+  if (c.get("projectLifecycleState") === "deleting") {
+    throw new TusError(
+      "INVALID_REQUEST",
+      409,
+      "Project is currently being deleted and cannot accept upload writes.",
+    );
+  }
+}
+
+function getResumableUploadStub(
+  uploadId: string,
+  env: Bindings,
+): DurableObjectStub {
+  const id = env.TUS_STATE_DO.idFromName(uploadId);
+  return env.TUS_STATE_DO.get(id);
+}
+
+async function initializeUploadInDo(
+  uploadId: string,
+  metadata: TusUploadMetadata,
+  env: Bindings,
+): Promise<void> {
+  const response = await getResumableUploadStub(uploadId, env).fetch(
+    "https://resumable-state.internal/internal/init",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ metadata }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to initialize upload in DO: ${response.status}`);
+  }
+}
+
+function buildSignaturePayload(c: AppContext) {
+  const environmentId = c.req.query("environmentId");
+  const fileKeyId = c.req.query("fileKeyId");
+  const accessKey = c.req.query("accessKey");
+  const fileName = c.req.query("fileName");
+  const keyId = c.req.query("keyId");
+  const signature = c.req.query("sig");
+  const sizeParam = c.req.query("size");
+
+  if (
+    !environmentId ||
+    !fileKeyId ||
+    !accessKey ||
+    !fileName ||
+    !keyId ||
+    !signature ||
+    !sizeParam
+  ) {
+    throw Errors.invalidRequest(
+      "Missing required parameters: environmentId, fileKeyId, accessKey, fileName, keyId, size, sig",
+    );
+  }
+
+  return {
+    environmentId,
+    fileKeyId,
+    accessKey,
+    fileName,
+    keyId,
+    signature,
+    sizeParam,
+  };
+}
+
+export async function handleResumableCreate(c: AppContext): Promise<Response> {
+  assertProjectUploadWritable(c);
+
+  const projectId: string = c.get("projectId");
+  const payload = buildSignaturePayload(c);
+
+  const verificationResult = await verifyUploadSignature(
+    {
+      keyId: payload.keyId,
+      signature: payload.signature,
+      payload: {
+        type: "upload",
+        environmentId: payload.environmentId,
+        fileKeyId: payload.fileKeyId,
+        accessKey: payload.accessKey,
+        fileName: payload.fileName,
+        size: payload.sizeParam,
+        keyId: payload.keyId,
+        ...(c.req.query("hash") && { hash: c.req.query("hash") ?? undefined }),
+        ...(c.req.query("mimeType") && {
+          mimeType: c.req.query("mimeType") ?? undefined,
+        }),
+        ...(c.req.query("acceptedMimeTypes") && {
+          acceptedMimeTypes: c.req.query("acceptedMimeTypes") ?? undefined,
+        }),
+        ...(c.req.query("expiresAt") && {
+          expiresAt: c.req.query("expiresAt") ?? undefined,
+        }),
+        ...(c.req.query("isPublic") && {
+          isPublic: c.req.query("isPublic") ?? undefined,
+        }),
+        uploadMethod: "resumable",
+      },
+    },
+    c.env,
+  );
+
+  if (!verificationResult.valid) {
+    throw Errors.signatureInvalid();
+  }
+  if (
+    verificationResult.projectId &&
+    verificationResult.projectId !== projectId
+  ) {
+    throw Errors.unauthorized(
+      "Signed upload URL does not belong to this project",
+    );
+  }
+
+  const size = verificationResult.size;
+  if (size === undefined) {
+    throw Errors.invalidRequest("Signed upload URL is missing a file size");
+  }
+  const maxSize = Number.parseInt(c.env.TUS_MAX_SIZE, 10);
+  if (size > maxSize) {
+    throw Errors.uploadTooLarge(size, maxSize);
+  }
+
+  const uploadId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+  const storageKey = `${projectId}/${payload.environmentId}/${crypto.randomUUID()}`;
+  const clientIp = getClientIpFromHeaders(c.req.raw.headers);
+  const metadata: TusUploadMetadata = {
+    uploadId,
+    projectId,
+    environmentId: payload.environmentId,
+    fileKeyId: payload.fileKeyId,
+    accessKey: payload.accessKey,
+    fileName: payload.fileName,
+    size,
+    offset: 0,
+    storageKey,
+    multipartUploadId: null,
+    parts: [],
+    isPublic: verificationResult.isPublic ?? false,
+    claimedHash: verificationResult.claimedHash ?? undefined,
+    claimedMimeType: verificationResult.claimedMimeType ?? undefined,
+    acceptedMimeTypes: verificationResult.acceptedMimeTypes ?? undefined,
+    claimedSize: size,
+    createdAt: new Date().toISOString(),
+    expiresAt: generateExpirationDate(c.env),
+    clientIp,
+    metadata: {},
+    rawMetadata: "",
+    callbackDeliveredAt: null,
+  };
+
+  await initializeUploadInDo(uploadId, metadata, c.env);
+  try {
+    await registerUploadSession(
+      {
+        projectId,
+        environmentId: payload.environmentId,
+        fileKeyId: payload.fileKeyId,
+        uploadId,
+        storageKey,
+      },
+      c.env,
+    );
+  } catch (error) {
+    const headers = new Headers();
+    headers.set("Tus-Resumable", TUS_VERSION);
+    await getResumableUploadStub(uploadId, c.env)
+      .fetch("https://resumable-state.internal/internal/delete", {
+        method: "DELETE",
+        headers: {
+          "Tus-Resumable": TUS_VERSION,
+          "X-Project-Id": projectId,
+          "X-Upload-Id": uploadId,
+        },
+      })
+      .catch(() => undefined);
+    throw error;
+  }
+
+  const url = new URL(c.req.url);
+  const projectSlug = c.get("projectSlug");
+  if (!projectSlug) throw Errors.projectNotFound("missing-project-scope");
+  const routeMode = detectProjectRouteModeFromPath(url.pathname, projectSlug);
+  const uploadLocationPath = toProjectScopedPath(
+    `/ingest/resumable/${uploadId}`,
+    projectSlug,
+    routeMode,
+  );
+
+  return c.json(
+    {
+      ok: true,
+      uploadId,
+      offset: 0,
+      size,
+      uploadUrl: `${url.protocol}//${url.host}${uploadLocationPath}${url.search}`,
+      expiresAt: metadata.expiresAt,
+    },
+    HTTP_STATUS.CREATED,
+  );
+}
+
+export async function handleResumableStatus(c: AppContext): Promise<Response> {
+  const uploadId = c.req.param("uploadId");
+  const projectId: string = c.get("projectId");
+  const response = await getResumableUploadStub(uploadId, c.env).fetch(
+    "https://resumable-state.internal/internal/head",
+    {
+      method: "GET",
+      headers: {
+        "Tus-Resumable": TUS_VERSION,
+        "X-Project-Id": projectId,
+        "X-Upload-Id": uploadId,
+      },
+    },
+  );
+  if (!response.ok) return response;
+
+  return c.json({
+    ok: true,
+    uploadId,
+    offset: Number(response.headers.get(UPLOAD_OFFSET_HEADER) ?? "0"),
+    size: response.headers.get(UPLOAD_LENGTH_HEADER)
+      ? Number(response.headers.get(UPLOAD_LENGTH_HEADER))
+      : null,
+  });
+}
+
+export async function handleResumablePut(c: AppContext): Promise<Response> {
+  assertProjectUploadWritable(c);
+
+  const uploadId = c.req.param("uploadId");
+  const projectId: string = c.get("projectId");
+  const range = parseContentRangeHeader(c.req.header("Content-Range"));
+  const contentLength = parseNonNegativeInt(c.req.header("Content-Length"));
+  if (contentLength === null) {
+    throw Errors.invalidRequest("Content-Length header is required");
+  }
+  if (contentLength !== range.length) {
+    throw Errors.invalidRequest(
+      `Content-Length ${contentLength} does not match Content-Range length ${range.length}`,
+    );
+  }
+
+  const body = c.req.raw.body as ReadableStream<Uint8Array> | null;
+  if (!body) throw Errors.invalidRequest("Request body is required");
+
+  return await getResumableUploadStub(uploadId, c.env).fetch(
+    "https://resumable-state.internal/internal/patch",
+    {
+      method: "PATCH",
+      headers: {
+        "Tus-Resumable": TUS_VERSION,
+        "X-Silo-Resumable": "1",
+        "X-Project-Id": projectId,
+        "X-Upload-Id": uploadId,
+        "Content-Type": CONTENT_TYPE_OCTET_STREAM,
+        "Content-Length": String(contentLength),
+        "Upload-Offset": String(range.start),
+        "Upload-Length": String(range.total),
+      },
+      body,
+      duplex: "half",
+    } as RequestInit,
+  );
+}
+
+export async function handleResumableDelete(c: AppContext): Promise<Response> {
+  const uploadId = c.req.param("uploadId");
+  const projectId: string = c.get("projectId");
+  const response = await getResumableUploadStub(uploadId, c.env).fetch(
+    "https://resumable-state.internal/internal/delete",
+    {
+      method: "DELETE",
+      headers: {
+        "Tus-Resumable": TUS_VERSION,
+        "X-Project-Id": projectId,
+        "X-Upload-Id": uploadId,
+      },
+    },
+  );
+  if (!response.ok) return response;
+  return c.json({ ok: true });
+}

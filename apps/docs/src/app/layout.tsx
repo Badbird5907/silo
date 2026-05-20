@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Inter, Geist } from "next/font/google";
+import { Toaster } from "@/components/ui/sonner";
 import { RootProvider } from "fumadocs-ui/provider/next";
 
 import "./globals.css";
@@ -30,7 +31,10 @@ export default function RootLayout({
         // required styles
         className="flex flex-col min-h-screen"
       >
-        <RootProvider>{children}</RootProvider>
+        <RootProvider>
+          {children}
+          <Toaster />
+        </RootProvider>
       </body>
     </html>
   );
