@@ -122,7 +122,7 @@ export function CallbackHeadersDialog({
               Callback headers
             </DialogTitle>
             <DialogDescription>
-              HTTP headers included whenb calling back to your application on
+              HTTP headers included when calling back to your application on
               environment
               <strong>{` ${environment?.name}`}</strong>. Silo signing headers
               always take precedence over duplicates.
