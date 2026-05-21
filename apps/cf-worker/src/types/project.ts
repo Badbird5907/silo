@@ -125,6 +125,7 @@ export const uploadCallbackResponseSchema = z.object({
   accessKey: z.string().optional(),
   fileId: z.string().optional(),
   status: z.string().optional(),
+  onUploadCompleteResult: z.unknown().optional(),
 });
 export type UploadCallbackResponse = z.infer<
   typeof uploadCallbackResponseSchema
@@ -167,6 +168,6 @@ export interface SignatureVerificationResponse {
   claimedMimeType?: string | null;
   acceptedMimeTypes?: string[] | null;
   isPublic?: boolean;
-  uploadMethod?: "tus" | "put";
+  uploadMethod?: "resumable" | "put";
   error?: string;
 }

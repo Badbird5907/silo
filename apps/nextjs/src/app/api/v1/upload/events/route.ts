@@ -24,7 +24,11 @@ function toSseFrame(
 
 export async function GET(request: Request) {
   if (!env.DEV_UPLOAD_SSE_ENABLED) {
-    return jsonError("Service Unavailable", "SSE upload events are disabled.", 503);
+    return jsonError(
+      "Service Unavailable",
+      "SSE upload events are disabled.",
+      503,
+    );
   }
 
   const authResult = await authenticateRequest(request);
@@ -126,7 +130,8 @@ export async function GET(request: Request) {
         }
 
         // listen for upload completion/failure
-        while (Date.now() - startedAt < 120000) { // 2 mins
+        while (Date.now() - startedAt < 120000) {
+          // 2 mins
           if (request.signal.aborted) {
             close();
             break;
@@ -146,7 +151,9 @@ export async function GET(request: Request) {
             }
           } catch (error) {
             const err =
-              error instanceof Error ? error.message : "Unknown SSE stream error";
+              error instanceof Error
+                ? error.message
+                : "Unknown SSE stream error";
             if (err.includes("Timeout waiting for message")) {
               controller.enqueue(
                 encoder.encode(toSseFrame("keepalive", { ts: Date.now() })),
@@ -154,7 +161,9 @@ export async function GET(request: Request) {
               continue;
             }
 
-            controller.enqueue(encoder.encode(toSseFrame("error", { message: err })));
+            controller.enqueue(
+              encoder.encode(toSseFrame("error", { message: err })),
+            );
             close();
             return;
           }

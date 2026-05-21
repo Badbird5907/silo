@@ -1,9 +1,5 @@
-
 import { db } from "./src/client";
-import {
-  usageDaily,
-  usageEvents,
-} from "./src/schema";
+import { usageDaily, usageEvents } from "./src/schema";
 
 async function seed() {
   console.log("Fetching projects and environments...");
@@ -78,7 +74,8 @@ async function seed() {
         const bytesUploaded = uploadsCompleted * avgUploadSize;
         const bytesDownloaded = downloads * avgDownloadSize;
         const bytesDeleted = Math.floor(
-          Math.random() * Math.min(storageBytes, bytesUploaded * 0.35 + 50_000_000),
+          Math.random() *
+            Math.min(storageBytes, bytesUploaded * 0.35 + 50_000_000),
         );
         storageBytes = Math.max(0, storageBytes + bytesUploaded - bytesDeleted);
 

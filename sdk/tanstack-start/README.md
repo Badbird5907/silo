@@ -16,6 +16,7 @@ TanStack Start server-route adapter for `@silo-storage/sdk-server`.
 
 ```ts
 import { createFileRoute } from "@tanstack/react-start";
+
 import { createSiloCoreFromToken } from "@silo-storage/sdk-core";
 import { createRouteHandler } from "@silo-storage/sdk-tanstack-start";
 

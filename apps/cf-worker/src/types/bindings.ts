@@ -2,7 +2,7 @@ import type { DeletePrefixQueueMessage } from "../services/r2/delete-prefix";
 
 export interface Bindings {
   R2_BUCKET: R2Bucket;
-  TUS_STATE_DO: DurableObjectNamespace;
+  UPLOAD_STATE_DO: DurableObjectNamespace;
   DELETE_PREFIX_QUEUE: {
     send(message: DeletePrefixQueueMessage): Promise<void>;
   };
@@ -12,9 +12,9 @@ export interface Bindings {
   ENV: string;
   CALLBACK_SECRET: string;
   SIGNING_SECRET: string;
-  TUS_MAX_SIZE: string;
-  TUS_MAX_PATCH_SIZE: string;
-  TUS_EXPIRATION_HOURS: string;
+  UPLOAD_MAX_SIZE: string;
+  UPLOAD_MAX_PART_SIZE: string;
+  UPLOAD_EXPIRATION_HOURS: string;
   EXPIRY_CLEANUP_BATCH_SIZE: string;
   EXPIRY_CLEANUP_MAX_BATCHES: string;
   PENDING_UPLOAD_CLEANUP_BATCH_SIZE: string;

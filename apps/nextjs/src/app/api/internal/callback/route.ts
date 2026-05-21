@@ -15,7 +15,13 @@ import {
   runLifecycleJobBatch,
 } from "@silo-storage/api/service/lifecycleJob";
 import { computeRetentionExpiry } from "@silo-storage/api/service/retention";
-import { enqueueUploadWebhookEvent } from "@silo-storage/api/service/webhook";
+import {
+  deriveSigningSecretFromApiKeyHash,
+  enqueueUploadWebhookEvent,
+  getNextCallbackAttemptNumber,
+  recordCallbackAttempt,
+  signWebhookPayload,
+} from "@silo-storage/api/service/webhook";
 import { eq, sql } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import {
@@ -33,6 +39,7 @@ import {
   normalizeFileKeyMetadata,
 } from "@silo-storage/shared";
 
+import { env } from "@/env";
 import { isCallbackAuthorized } from "@/lib/internal/callback-auth";
 import { setCompletionRecord } from "@/lib/upload/completion";
 import { completeFileKeyFromCallback } from "@/lib/upload/register";
@@ -100,6 +107,124 @@ function getCallbackApiKeyId(callbackMetadata: unknown): string | undefined {
 
   const value = (callbackMetadata as Record<string, unknown>).apiKeyId;
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function getCallbackUrl(callbackMetadata: unknown): string | undefined {
+  if (
+    !callbackMetadata ||
+    typeof callbackMetadata !== "object" ||
+    Array.isArray(callbackMetadata)
+  ) {
+    return undefined;
+  }
+
+  const value = (callbackMetadata as Record<string, unknown>).callbackUrl;
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+async function deliverSdkCallbackNow(input: {
+  eventId: string;
+  idempotencyKey: string;
+  environmentId: string;
+  projectId: string;
+  callbackMetadata: unknown;
+  event: unknown;
+}): Promise<unknown> {
+  const callbackUrl = getCallbackUrl(input.callbackMetadata);
+  const callbackApiKeyId = getCallbackApiKeyId(input.callbackMetadata);
+  if (!callbackUrl || !callbackApiKeyId) return undefined;
+
+  const apiKey = await db.query.apiKeys.findFirst({
+    where: eq(apiKeys.id, callbackApiKeyId),
+    columns: { keyHash: true },
+  });
+  if (!apiKey?.keyHash) return undefined;
+
+  const payload = JSON.stringify({
+    metadata: input.callbackMetadata,
+    data: input.event,
+  });
+  const secret = await deriveSigningSecretFromApiKeyHash(
+    env.SIGNING_SECRET,
+    apiKey.keyHash,
+  );
+  const signed = await signWebhookPayload(payload, secret);
+  const startedAt = Date.now();
+  const attemptNumber = await getNextCallbackAttemptNumber(db, input.eventId);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+  try {
+    const response = await fetch(callbackUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "silo-webhooks/1.0",
+        "X-Silo-Webhook-Id": input.idempotencyKey,
+        "X-Silo-Event-Type": "upload.completed",
+        "X-Silo-Event-Version": "1",
+        "X-Silo-Signature": signed.signature,
+        "X-Silo-Timestamp": String(signed.timestamp),
+      },
+      body: payload,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    const text = await response.text().catch(() => "");
+    await recordCallbackAttempt(db, {
+      eventId: input.eventId,
+      idempotencyKey: input.idempotencyKey,
+      environmentId: input.environmentId,
+      projectId: input.projectId,
+      callbackUrl,
+      attemptNumber,
+      status: response.ok ? "success" : "retry",
+      responseStatus: response.status,
+      responseBody: text.slice(0, 2000),
+      error: response.ok ? undefined : `HTTP ${response.status}`,
+      latencyMs: Date.now() - startedAt,
+    });
+    if (!response.ok) return undefined;
+
+    try {
+      const parsed = text ? (JSON.parse(text) as unknown) : null;
+      if (
+        parsed &&
+        typeof parsed === "object" &&
+        "callback" in parsed &&
+        parsed.callback &&
+        typeof parsed.callback === "object" &&
+        "onUploadCompleteResult" in parsed.callback
+      ) {
+        return (parsed.callback as { onUploadCompleteResult?: unknown })
+          .onUploadCompleteResult;
+      }
+    } catch (parseError) {
+      console.error("Failed to parse callback response JSON:", parseError);
+      return undefined;
+    }
+  } catch (error) {
+    clearTimeout(timeoutId);
+    const isTimeout = error instanceof Error && error.name === "AbortError";
+    await recordCallbackAttempt(db, {
+      eventId: input.eventId,
+      idempotencyKey: input.idempotencyKey,
+      environmentId: input.environmentId,
+      projectId: input.projectId,
+      callbackUrl,
+      attemptNumber,
+      status: "retry",
+      error: isTimeout
+        ? "Request timeout (5s)"
+        : error instanceof Error
+          ? error.message
+          : String(error),
+      latencyMs: Date.now() - startedAt,
+    });
+  }
+
+  return undefined;
 }
 
 async function trackUsageEvent(
@@ -587,6 +712,17 @@ export async function POST(request: Request) {
         console.error("Failed to publish upload completion message:", pubError);
       }
 
+      const onUploadCompleteResult = !completion.alreadyCompleted
+        ? await deliverSdkCallbackNow({
+            eventId: uploadCompletedEvent.id,
+            idempotencyKey: uploadCompletedEvent.id,
+            environmentId: data.environmentId,
+            projectId: data.projectId,
+            callbackMetadata: fileKey.callbackMetadata,
+            event: uploadCompletedEvent,
+          })
+        : undefined;
+
       try {
         await setCompletionRecord({
           fileKeyId: data.fileKeyId,
@@ -596,12 +732,15 @@ export async function POST(request: Request) {
             source: "nextjs.internal.callback",
             routeSlug: "upload.completed",
             completedAt: Date.now(),
-            onUploadCompleteResult: {
-              event: uploadCompletedEvent,
-              fileKeyId: fileKey.id,
-              fileId: file.id,
-              accessKey: fileKey.accessKey,
-            },
+            onUploadCompleteResult:
+              onUploadCompleteResult === undefined
+                ? {
+                    event: uploadCompletedEvent,
+                    fileKeyId: fileKey.id,
+                    fileId: file.id,
+                    accessKey: fileKey.accessKey,
+                  }
+                : onUploadCompleteResult,
           },
         });
       } catch (completionStoreError) {
@@ -648,6 +787,7 @@ export async function POST(request: Request) {
           fileKeyId: fileKey.id,
           accessKey: fileKey.accessKey,
           fileId: file.id,
+          onUploadCompleteResult,
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       );

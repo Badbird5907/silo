@@ -1,6 +1,7 @@
 import type { z } from "zod";
 import { nanoid } from "nanoid";
 
+import type { UploadMethod } from "../signing";
 import type { UpdateFileAccessInput, UpdateFileAccessResult } from "./access";
 import type { DeleteFileInput, DeleteFileResult } from "./delete";
 import type { UpdateFileExpiryInput, UpdateFileExpiryResult } from "./expiry";
@@ -23,21 +24,17 @@ import type {
   UploadStrategy,
 } from "./types";
 import {
-  generatePublicImageUrl,
   generatePublicDownloadUrl,
-  generateSignedImageUrl,
+  generatePublicImageUrl,
   generateSignedDownloadUrl,
+  generateSignedImageUrl,
   generateSignedUploadUrlWithSecret,
 } from "../signing";
-import type { UploadMethod } from "../signing";
 import {
   createUpdateFileAccessRequestBody,
   updateFileAccessResultSchema,
 } from "./access";
-import {
-  createDeleteFileRequestBody,
-  deleteFileResultSchema,
-} from "./delete";
+import { createDeleteFileRequestBody, deleteFileResultSchema } from "./delete";
 import {
   applyFileExpiryToRegisterBody,
   createUpdateFileExpiryRequestBody,
@@ -109,9 +106,16 @@ interface NormalizedGenerateImageUrlInput {
 }
 
 function resolveGenerateUrlFileKeyId(
-  source: GenerateDownloadUrlInput | GenerateImageUrlInput | GenerateUrlFileLike,
+  source:
+    | GenerateDownloadUrlInput
+    | GenerateImageUrlInput
+    | GenerateUrlFileLike,
 ): string {
-  return source.fileKeyId ?? ("id" in source ? source.id : undefined) ?? source.accessKey;
+  return (
+    source.fileKeyId ??
+    ("id" in source ? source.id : undefined) ??
+    source.accessKey
+  );
 }
 
 function normalizeGenerateDownloadUrlInput(
@@ -127,7 +131,7 @@ function normalizeGenerateDownloadUrlInput(
       accessKey: sourceInput.accessKey,
       isPublic:
         overrides?.sign === undefined
-          ? sourceInput.isPublic ?? false
+          ? (sourceInput.isPublic ?? false)
           : !overrides.sign,
       fileKeyId:
         overrides?.fileKeyId ?? resolveGenerateUrlFileKeyId(sourceInput),
@@ -151,7 +155,7 @@ function normalizeGenerateImageUrlInput(
       accessKey: sourceInput.accessKey,
       isPublic:
         overrides?.sign === undefined
-          ? sourceInput.isPublic ?? false
+          ? (sourceInput.isPublic ?? false)
           : !overrides.sign,
       serveImage: sourceInput.serveImage ?? null,
       fileKeyId:
@@ -284,7 +288,8 @@ export function createSiloCore(config: UploadCoreConfig) {
     const expiresIn = input.expiresIn ?? 3600;
     const resolvedUploadStrategy: UploadStrategy =
       input.uploadStrategy ?? config.uploadStrategy ?? "server";
-    const resolvedUploadMethod: UploadMethod = input.uploadMethod ?? "tus";
+    const resolvedUploadMethod: UploadMethod =
+      input.uploadMethod ?? "resumable";
     const effectiveUploadStrategy: UploadStrategy =
       resolvedUploadStrategy === "server" && input.dev === true
         ? "self"
@@ -767,8 +772,7 @@ export function createSiloCore(config: UploadCoreConfig) {
 
     if (
       sign === false ||
-      (sign === undefined &&
-        (input.isPublic || input.serveImage === true))
+      (sign === undefined && (input.isPublic || input.serveImage === true))
     ) {
       return generatePublicImageUrl(
         config.ingestServer,

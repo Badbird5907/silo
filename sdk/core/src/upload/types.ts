@@ -1,5 +1,5 @@
-import type { FileExpiryInput } from "./expiry";
 import type { UploadMethod } from "../signing";
+import type { FileExpiryInput } from "./expiry";
 
 export type UploadStrategy = "server" | "self";
 

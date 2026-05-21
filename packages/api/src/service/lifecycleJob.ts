@@ -284,9 +284,7 @@ async function claimLifecycleJobs(db: Db, options: ClaimOptions) {
   const claimedById = new Map(claimed.map((job) => [job.id, job]));
   return ids
     .map((id) => claimedById.get(id))
-    .filter(
-      (job): job is NonNullable<typeof job> => job !== undefined,
-    );
+    .filter((job): job is NonNullable<typeof job> => job !== undefined);
 }
 
 export async function requeueDeadLifecycleJobs(
@@ -456,7 +454,7 @@ async function performAbortMultipart(
   let doStatus = 0;
   if (hasDoPath) {
     const response = await fetch(
-      `${env.WORKER_URL}/internal/tus/${adapterData.uploadSessionId}/delete`,
+      `${env.WORKER_URL}/internal/uploads/${adapterData.uploadSessionId}/delete`,
       {
         method: "POST",
         headers: {

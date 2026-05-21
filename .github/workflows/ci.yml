@@ -31,6 +31,9 @@ jobs:
         shell: bash
         run: cp .env.example .env
 
+      - name: Generate docs sources
+        run: pnpm --filter @silo-storage/docs generate
+
       - name: Lint
         run: pnpm lint && pnpm lint:ws
 
@@ -52,6 +55,9 @@ jobs:
 
       - name: Setup
         uses: ./tooling/github/setup
+
+      - name: Generate docs sources
+        run: pnpm --filter @silo-storage/docs generate
 
       - name: Typecheck
         run: pnpm typecheck

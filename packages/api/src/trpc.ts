@@ -7,8 +7,8 @@
  * The pieces you will need to use are documented accordingly near the end
  */
 import type { Auth, PermissionCheck, Session } from "@silo-storage/auth";
-import type { Redis } from "@upstash/redis";
 import type { TRPCProcedureBuilder, TRPCUnsetMarker } from "@trpc/server";
+import type { Redis } from "@upstash/redis";
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { z, ZodError } from "zod/v4";
@@ -21,13 +21,13 @@ import { redis } from "@silo-storage/redis";
 import { getClientIpFromHeaders } from "@silo-storage/shared";
 
 type AuthApi = Auth["api"];
-export type TRPCContext = {
+export interface TRPCContext {
   authApi: AuthApi;
   session: Session | null;
   db: typeof db;
   redis: Redis;
   clientIp: string | null;
-};
+}
 
 /**
  * 1. CONTEXT
@@ -63,12 +63,12 @@ type AuthenticatedSession = Session & {
   user: NonNullable<Session["user"]>;
 };
 
-type OrganizationProcedureContext = {
+interface OrganizationProcedureContext {
   session: AuthenticatedSession;
   organizationId: string;
   organization: typeof organizations.$inferSelect;
   membership: typeof members.$inferSelect;
-};
+}
 
 type OrganizationProcedure = TRPCProcedureBuilder<
   TRPCContext,

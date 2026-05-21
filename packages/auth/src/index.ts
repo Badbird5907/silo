@@ -7,6 +7,7 @@ import { db } from "@silo-storage/db/client";
 
 import { authEnv } from "../env";
 import { organizationAccessControl, organizationRoles } from "./permissions";
+
 export * from "./permissions";
 
 type SocialProviderConfig = Record<string, unknown> & {
@@ -15,7 +16,6 @@ type SocialProviderConfig = Record<string, unknown> & {
   redirectURI?: string;
   disableImplicitSignUp?: boolean;
 };
-
 
 export function initAuth<
   TExtraPlugins extends BetterAuthPlugin[] = [],

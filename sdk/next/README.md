@@ -15,8 +15,11 @@ Next.js App Router adapter for `@silo-storage/sdk-server`.
 ## Example
 
 ```ts
+import {
+  createSiloCoreFromToken,
+  parseSiloToken,
+} from "@silo-storage/sdk-core";
 import { createRouteHandler } from "@silo-storage/sdk-next";
-import { createSiloCoreFromToken, parseSiloToken } from "@silo-storage/sdk-core";
 
 import { fileRouter } from "./core";
 
@@ -33,6 +36,8 @@ export const { GET, POST } = createRouteHandler({
   router: fileRouter,
   core,
   signingSecret: parsed.signingSecret,
-  resolveContext: async (req) => ({ userId: req.headers.get("x-user-id") ?? "" }),
+  resolveContext: async (req) => ({
+    userId: req.headers.get("x-user-id") ?? "",
+  }),
 });
 ```

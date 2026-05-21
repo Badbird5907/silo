@@ -30,7 +30,9 @@ async function resolveHeaders(
   return headers;
 }
 
-function parseCompletion(payload: CompletionApiResponse): CompletionEntry | null {
+function parseCompletion(
+  payload: CompletionApiResponse,
+): CompletionEntry | null {
   if (!payload.ok || !payload.completion) return null;
   return payload.completion;
 }
@@ -44,19 +46,22 @@ export function createHttpCompletionStore(
 
   return {
     async set(fileKeyId, value, ttlMs) {
-      const response = await fetchImpl(toUrl(options.baseUrl, `${pathPrefix}/set`), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(await resolveHeaders(options.headers)),
+      const response = await fetchImpl(
+        toUrl(options.baseUrl, `${pathPrefix}/set`),
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(await resolveHeaders(options.headers)),
+          },
+          body: JSON.stringify({
+            fileKeyId,
+            namespace,
+            completion: value,
+            ttlSeconds: Math.max(1, Math.ceil(ttlMs / 1000)),
+          }),
         },
-        body: JSON.stringify({
-          fileKeyId,
-          namespace,
-          completion: value,
-          ttlSeconds: Math.max(1, Math.ceil(ttlMs / 1000)),
-        }),
-      });
+      );
 
       if (!response.ok) {
         const message = await response.text().catch(() => "");

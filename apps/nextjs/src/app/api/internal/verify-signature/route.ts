@@ -13,8 +13,8 @@ import {
   serializeAcceptedMimeTypePatterns,
 } from "@silo-storage/shared/signing";
 
-import { checkCallbackAuthorization } from "@/lib/internal/callback-auth";
 import { env } from "@/env";
+import { checkCallbackAuthorization } from "@/lib/internal/callback-auth";
 
 /**
  * Internal endpoint for Cloudflare Worker to verify upload URL signatures.
@@ -154,7 +154,7 @@ export async function POST(request: Request) {
     const parsed = schema.safeParse(body);
 
     if (!parsed.success) {
-      console.log("[verify-signature] Invalid request")
+      console.log("[verify-signature] Invalid request");
       return new Response(
         JSON.stringify({
           error: "Invalid request",
@@ -273,6 +273,9 @@ export async function POST(request: Request) {
     }
     if (payload.expiresAt) payloadForSigning.expiresAt = payload.expiresAt;
     if (payload.isPublic) payloadForSigning.isPublic = payload.isPublic;
+    if (payload.uploadMethod && payload.uploadMethod !== "resumable") {
+      payloadForSigning.uploadMethod = payload.uploadMethod;
+    }
 
     const signingSecretData = await crypto.subtle.importKey(
       "raw",
@@ -335,11 +338,14 @@ export async function POST(request: Request) {
     }
 
     if (environment.projectId !== apiKey.projectId) {
-      console.log("[verify-signature] Environment does not belong to the API key's project", {
-        environmentId: payload.environmentId,
-        projectId: apiKey.projectId,
-        environmentProjectId: environment.projectId,
-      });
+      console.log(
+        "[verify-signature] Environment does not belong to the API key's project",
+        {
+          environmentId: payload.environmentId,
+          projectId: apiKey.projectId,
+          environmentProjectId: environment.projectId,
+        },
+      );
       return new Response(
         JSON.stringify({
           error: "Environment does not belong to the API key's project",
@@ -353,9 +359,12 @@ export async function POST(request: Request) {
     }
 
     if (!apiKey.environmentId) {
-      console.log("[verify-signature] API key must be scoped to an environment", {
-        apiKeyId: apiKey.id,
-      });
+      console.log(
+        "[verify-signature] API key must be scoped to an environment",
+        {
+          apiKeyId: apiKey.id,
+        },
+      );
       return new Response(
         JSON.stringify({
           error: "API key must be scoped to an environment",
@@ -369,11 +378,14 @@ export async function POST(request: Request) {
     }
 
     if (apiKey.environmentId !== payload.environmentId) {
-      console.log("[verify-signature] API key is not authorized for this environment", {
-        apiKeyId: apiKey.id,
-        environmentId: payload.environmentId,
-        apiKeyEnvironmentId: apiKey.environmentId,
-      });
+      console.log(
+        "[verify-signature] API key is not authorized for this environment",
+        {
+          apiKeyId: apiKey.id,
+          environmentId: payload.environmentId,
+          apiKeyEnvironmentId: apiKey.environmentId,
+        },
+      );
       return new Response(
         JSON.stringify({
           error: "API key is not authorized for this environment",
@@ -560,6 +572,7 @@ export async function POST(request: Request) {
         claimedMimeType: payload.mimeType ?? null,
         acceptedMimeTypes: acceptedMimeTypes ?? null,
         isPublic: payload.isPublic === "true",
+        uploadMethod: payload.uploadMethod === "put" ? "put" : "resumable",
       }),
       {
         status: 200,

@@ -14,9 +14,7 @@ export default async function LoginPage() {
     <main className="container flex min-h-screen items-center justify-center py-16">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <h1 className="text-4xl font-extrabold tracking-tight">
-            Log in
-          </h1>
+          <h1 className="text-4xl font-extrabold tracking-tight">Log in</h1>
           <p className="text-muted-foreground mt-2">
             Sign in to your account to continue
           </p>
@@ -26,5 +24,3 @@ export default async function LoginPage() {
     </main>
   );
 }
-
-

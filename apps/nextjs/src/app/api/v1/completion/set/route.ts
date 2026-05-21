@@ -1,9 +1,6 @@
 import { z } from "zod";
 
-import {
-  authenticateRequest,
-  jsonError,
-} from "@/lib/api-key-middleware";
+import { authenticateRequest, jsonError } from "@/lib/api-key-middleware";
 import { setCompletionRecord } from "@/lib/upload/completion";
 
 const requestSchema = z.object({
@@ -18,7 +15,12 @@ const requestSchema = z.object({
       onUploadCompleteResult: z.unknown(),
     })
     .catchall(z.unknown()),
-  ttlSeconds: z.number().int().positive().max(7 * 24 * 60 * 60).optional(),
+  ttlSeconds: z
+    .number()
+    .int()
+    .positive()
+    .max(7 * 24 * 60 * 60)
+    .optional(),
 });
 
 export async function POST(request: Request) {

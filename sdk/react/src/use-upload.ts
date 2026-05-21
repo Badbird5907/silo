@@ -11,9 +11,7 @@ import type {
   UseUploadOptions,
   UseUploadResult,
 } from "./types";
-import {
-  resolveAcceptValue,
-} from "./accepts";
+import { resolveAcceptValue } from "./accepts";
 import {
   buildAcceptAttribute,
   getRouteFileTypeKeys,
@@ -48,13 +46,11 @@ function resolveUploadConcurrency(
   return Math.min(fileCount, normalized);
 }
 
-function openFilePickerDialog(
-  options: {
-    multiple?: boolean;
-    accept?: string;
-    onCancel?: () => void;
-  },
-): Promise<File[]> {
+function openFilePickerDialog(options: {
+  multiple?: boolean;
+  accept?: string;
+  onCancel?: () => void;
+}): Promise<File[]> {
   if (typeof document === "undefined" || typeof window === "undefined") {
     throw new SiloUploadError({
       code: "FILE_PICKER_UNAVAILABLE",
@@ -276,9 +272,10 @@ export function useUploadInternal<
             setCurrentUploadingFile(file);
 
             try {
-              await uploadFileWithProgress(
+              const uploadMethod = registration.uploadMethod ?? "resumable";
+              const uploadResult = await uploadFileWithProgress(
                 registration.uploadUrl,
-                registration.uploadMethod ?? "tus",
+                uploadMethod,
                 file,
                 (loaded, total) => {
                   const previousLoaded = loadedByIndex.get(index) ?? 0;
@@ -311,19 +308,25 @@ export function useUploadInternal<
                 abortController.signal,
               );
 
-              const completion = await awaitCompletion(
-                factoryContext.endpointUrl,
-                factoryContext.fetchImpl,
-                registration.fileKeyId,
-                uploadOptions?.awaitTimeoutMs,
-              );
+              const completion = uploadResult.delivered
+                ? {
+                    fileKeyId: registration.fileKeyId,
+                    routeSlug: options.endpoint,
+                    onUploadCompleteResult: uploadResult.onUploadCompleteResult,
+                  }
+                : await awaitCompletion(
+                    factoryContext.endpointUrl,
+                    factoryContext.fetchImpl,
+                    registration.fileKeyId,
+                    uploadOptions?.awaitTimeoutMs,
+                  );
 
               completionsByIndex[index] = {
                 fileKeyId: completion.fileKeyId,
                 routeSlug: completion.routeSlug as TEndpoint,
                 accessKey: String(registration.accessKey),
                 uploadUrl: String(registration.uploadUrl),
-                uploadMethod: registration.uploadMethod ?? "tus",
+                uploadMethod,
                 result: completion.onUploadCompleteResult as UploadCompletion<
                   TRouter,
                   TEndpoint
@@ -461,12 +464,7 @@ export function useUploadInternal<
         throw normalized;
       }
     },
-    [
-      maxFileCountByRoute,
-      options,
-      supportsMultipleByRoute,
-      uploadFiles,
-    ],
+    [maxFileCountByRoute, options, supportsMultipleByRoute, uploadFiles],
   );
 
   const aggregateLoaded = Object.values(progressByFile).reduce(
@@ -590,12 +588,7 @@ export function useStagedUploadInternal<
         throw normalized;
       }
     },
-    [
-      maxFileCountByRoute,
-      options,
-      supportsMultipleByRoute,
-      upload.accept,
-    ],
+    [maxFileCountByRoute, options, supportsMultipleByRoute, upload.accept],
   );
 
   const removeFile = React.useCallback<

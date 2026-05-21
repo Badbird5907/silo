@@ -7,7 +7,6 @@ import { toast } from "sonner";
 
 import { Button } from "@silo-storage/ui/components/button";
 import { Checkbox } from "@silo-storage/ui/components/checkbox";
-import { Switch } from "@silo-storage/ui/components/switch";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +17,7 @@ import {
 } from "@silo-storage/ui/components/dialog";
 import { Input } from "@silo-storage/ui/components/input";
 import { Label } from "@silo-storage/ui/components/label";
+import { Switch } from "@silo-storage/ui/components/switch";
 
 import { useTRPC } from "@/trpc/react";
 
@@ -166,7 +166,8 @@ export function ManageEnvironmentWebhookDialog({
               Manage Webhook
             </DialogTitle>
             <DialogDescription>
-              Configure webhook delivery for <strong>{environment?.name}</strong>.
+              Configure webhook delivery for{" "}
+              <strong>{environment?.name}</strong>.
             </DialogDescription>
           </DialogHeader>
 
@@ -203,13 +204,16 @@ export function ManageEnvironmentWebhookDialog({
               <Label>Events</Label>
               <div className="space-y-2 rounded-md border p-3">
                 {WEBHOOK_EVENT_OPTIONS.map((event) => (
-                  <label key={event} className="flex items-center gap-3 text-sm">
+                  <label
+                    key={event}
+                    className="flex items-center gap-3 text-sm"
+                  >
                     <Checkbox
                       checked={webhookEvents.includes(event)}
                       onCheckedChange={() => toggleEvent(event)}
                       className="h-4 w-4"
                     />
-                    <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                    <code className="bg-muted rounded px-1.5 py-0.5 text-xs">
                       {event}
                     </code>
                   </label>
@@ -222,7 +226,11 @@ export function ManageEnvironmentWebhookDialog({
               <div className="space-y-3 rounded-md border p-3">
                 <div className="text-sm">
                   Status:{" "}
-                  <span className={webhookSecretSet ? "text-green-600" : "text-amber-600"}>
+                  <span
+                    className={
+                      webhookSecretSet ? "text-green-600" : "text-amber-600"
+                    }
+                  >
                     {webhookSecretSet ? "Configured" : "Not configured"}
                   </span>
                 </div>
@@ -238,9 +246,11 @@ export function ManageEnvironmentWebhookDialog({
                   {webhookSecretSet ? "Rotate Secret" : "Generate Secret"}
                 </Button>
                 {generatedSecret && (
-                  <div className="space-y-2 rounded-md border bg-muted/40 p-2">
-                    <p className="text-xs font-medium">New secret (shown once):</p>
-                    <code className="block break-all rounded bg-background px-2 py-1 text-xs">
+                  <div className="bg-muted/40 space-y-2 rounded-md border p-2">
+                    <p className="text-xs font-medium">
+                      New secret (shown once):
+                    </p>
+                    <code className="bg-background block rounded px-2 py-1 text-xs break-all">
                       {generatedSecret}
                     </code>
                     <Button
@@ -274,9 +284,13 @@ export function ManageEnvironmentWebhookDialog({
             </Button>
             <Button
               type="submit"
-              disabled={updateWebhookMutation.isPending || rotateSecretMutation.isPending}
+              disabled={
+                updateWebhookMutation.isPending ||
+                rotateSecretMutation.isPending
+              }
             >
-              {(updateWebhookMutation.isPending || rotateSecretMutation.isPending) && (
+              {(updateWebhookMutation.isPending ||
+                rotateSecretMutation.isPending) && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
               Save Webhook
@@ -287,4 +301,3 @@ export function ManageEnvironmentWebhookDialog({
     </Dialog>
   );
 }
- 

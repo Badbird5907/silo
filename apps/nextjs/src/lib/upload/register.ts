@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { syncEnvironmentStorageSnapshot } from "@silo-storage/api/service/analytics";
 import { and, eq, sql } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import {
@@ -9,7 +10,6 @@ import {
   projects,
 } from "@silo-storage/db/schema";
 import { clearUploadSessionAdapterData } from "@silo-storage/shared";
-import { syncEnvironmentStorageSnapshot } from "@silo-storage/api/service/analytics";
 
 const unknownRecordSchema = z.record(z.string(), z.unknown());
 
@@ -373,14 +373,14 @@ export async function completeFileKeyFromCallback(input: {
           fileName: input.fileName,
           projectId: input.projectId,
           environmentId: input.environmentId,
-        fileId: null,
-        isPublic: input.isPublic ?? false,
-        serveImage: resolveServeImageValue({
-          serveImage: input.serveImage ?? undefined,
-          mimeType: input.actualMimeType,
+          fileId: null,
           isPublic: input.isPublic ?? false,
-          projectDefaultServeImage: project.defaultServeImage,
-        }),
+          serveImage: resolveServeImageValue({
+            serveImage: input.serveImage ?? undefined,
+            mimeType: input.actualMimeType,
+            isPublic: input.isPublic ?? false,
+            projectDefaultServeImage: project.defaultServeImage,
+          }),
           metadata: mergedMetadata,
           claimedSize: input.claimedSize,
           claimedMimeType: input.claimedMimeType ?? null,

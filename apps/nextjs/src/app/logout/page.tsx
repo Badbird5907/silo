@@ -14,9 +14,7 @@ export default async function LogoutPage() {
     <main className="container flex min-h-screen items-center justify-center py-16">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <h1 className="text-4xl font-extrabold tracking-tight">
-            Sign Out
-          </h1>
+          <h1 className="text-4xl font-extrabold tracking-tight">Sign Out</h1>
           <p className="text-muted-foreground mt-2">
             Are you sure you want to sign out?
           </p>
@@ -26,4 +24,3 @@ export default async function LogoutPage() {
     </main>
   );
 }
-

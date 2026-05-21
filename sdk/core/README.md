@@ -9,6 +9,7 @@ It also includes direct file-management helpers for listing, fetching, updating,
 ## Core Upload API
 
 Use `createSiloCoreFromToken` to:
+
 - prepare uploads through one endpoint (`/api/v1/upload`) by default
 - optionally use register + self-sign flow (`/api/v1/upload/register`)
 - enable dev streaming mode (`dev: true`)
@@ -19,10 +20,10 @@ Use `createSiloCoreFromToken` to:
 
 `sdk-core` supports two upload strategies:
 
-| Strategy | Behavior | Recommended |
-| --- | --- | --- |
-| `server` (default) | Calls `/api/v1/upload` to register + return signed upload URL in one request | Yes, default for most users |
-| `self` | Calls `/api/v1/upload/register` then signs URL locally | Advanced/custom signing flows |
+| Strategy           | Behavior                                                                     | Recommended                   |
+| ------------------ | ---------------------------------------------------------------------------- | ----------------------------- |
+| `server` (default) | Calls `/api/v1/upload` to register + return signed upload URL in one request | Yes, default for most users   |
+| `self`             | Calls `/api/v1/upload/register` then signs URL locally                       | Advanced/custom signing flows |
 
 Set strategy in core config or per-call (`prepareUpload` / `registerUploadBatch`):
 
@@ -101,7 +102,6 @@ await fetch(prepared.file.uploadUrl, {
 ```
 
 ## URL Generation
-
 
 ```ts
 const downloadUrl = await uploadCore.generateDownloadUrl({

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+
 import { Button } from "@silo-storage/ui/components/button";
 
 import { authClient } from "@/auth/client";
@@ -42,7 +43,7 @@ export function LogoutForm() {
             {error}
           </div>
         )}
-        
+
         <div className="flex flex-col gap-3">
           <Button
             type="button"
@@ -53,7 +54,7 @@ export function LogoutForm() {
           >
             {isLoading ? "Signing out..." : "Yes, sign me out"}
           </Button>
-          
+
           <Button
             type="button"
             variant="outline"

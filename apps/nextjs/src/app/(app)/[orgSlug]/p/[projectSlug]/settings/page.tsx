@@ -11,13 +11,13 @@ import { useQuery } from "@tanstack/react-query";
 
 import { Skeleton } from "@silo-storage/ui/components/skeleton";
 
-import { DangerZone } from "@/components/project-settings/danger-zone";
 import {
   ApiKeysList,
   CreatePersonalEnvironmentWizard,
   EnvironmentsList,
   ProjectGeneralSettings,
 } from "@/components/project-settings";
+import { DangerZone } from "@/components/project-settings/danger-zone";
 import { useOrganization } from "@/hooks/use-organization";
 import { useTRPC } from "@/trpc/react";
 

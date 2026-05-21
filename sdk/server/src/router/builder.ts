@@ -45,13 +45,7 @@ function createRouteBuilder<
     | SiloRouteExpectResolver<TMiddlewareData, TContext, TInput>
     | undefined,
   hasExpects: THasExpects,
-): SiloRouteBuilder<
-  TRequest,
-  TContext,
-  TMiddlewareData,
-  TInput,
-  THasExpects
-> {
+): SiloRouteBuilder<TRequest, TContext, TMiddlewareData, TInput, THasExpects> {
   const withRouteOptions = (
     nextRouteOptions: SiloRouteOptions<TMiddlewareData, TContext, TInput>,
   ) =>
@@ -109,7 +103,11 @@ function createRouteBuilder<
         resolveStaticRouteConfig(
           nextExpects as
             | SiloRouteConfigInput
-            | SiloRouteExpectResolver<Record<string, unknown>, unknown, unknown>,
+            | SiloRouteExpectResolver<
+                Record<string, unknown>,
+                unknown,
+                unknown
+              >,
         ),
         routeOptions,
         inputSchema,

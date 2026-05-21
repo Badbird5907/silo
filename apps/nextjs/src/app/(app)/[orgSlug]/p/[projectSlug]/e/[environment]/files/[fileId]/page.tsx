@@ -4,6 +4,8 @@ import FileDetailsPage from "@/app/(app)/[orgSlug]/p/[projectSlug]/files/[fileId
 
 type FileDetailsPageProps = Parameters<typeof FileDetailsPage>[0];
 
-export default function EnvironmentFileDetailsPage(props: FileDetailsPageProps) {
+export default function EnvironmentFileDetailsPage(
+  props: FileDetailsPageProps,
+) {
   return <FileDetailsPage {...props} />;
 }

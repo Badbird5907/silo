@@ -27,7 +27,9 @@ function normalizeAcceptPattern(value: string): string | undefined {
   }
 }
 
-function isRouteConfigBucketLike(value: unknown): value is RouteConfigBucketLike {
+function isRouteConfigBucketLike(
+  value: unknown,
+): value is RouteConfigBucketLike {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
@@ -51,9 +53,7 @@ function normalizeRouteConfigBuckets(
     }));
 }
 
-function getRouteAcceptPatterns(
-  routeConfig: unknown,
-): string[] | undefined {
+function getRouteAcceptPatterns(routeConfig: unknown): string[] | undefined {
   const buckets = normalizeRouteConfigBuckets(routeConfig);
   if (!buckets) {
     return undefined;
@@ -93,10 +93,7 @@ function getRouteAcceptPatterns(
   return [...patterns];
 }
 
-function matchesAcceptPattern(
-  mimeType: string,
-  pattern: string,
-): boolean {
+function matchesAcceptPattern(mimeType: string, pattern: string): boolean {
   if (pattern === "blob") {
     return true;
   }

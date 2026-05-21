@@ -42,10 +42,7 @@ export const allowedFileTypes = [
 export type AllowedFileType = (typeof allowedFileTypes)[number];
 export type ExactMimeType = `${string}/${string}`;
 export type FileRouterInputKey = AllowedFileType | ExactMimeType;
-export type WildcardMimeType = `${Exclude<
-  AllowedFileType,
-  "blob" | "pdf"
->}/*`;
+export type WildcardMimeType = `${Exclude<AllowedFileType, "blob" | "pdf">}/*`;
 export type ExpandedMimeTypePattern = ExactMimeType | WildcardMimeType;
 
 export const mimeTypes = mimes as unknown as Record<

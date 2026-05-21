@@ -1,9 +1,6 @@
 import { z } from "zod";
 
-import {
-  authenticateRequest,
-  jsonError,
-} from "@/lib/api-key-middleware";
+import { authenticateRequest, jsonError } from "@/lib/api-key-middleware";
 import { waitForCompletionRecord } from "@/lib/upload/completion";
 
 const querySchema = z.object({

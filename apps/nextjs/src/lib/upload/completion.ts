@@ -1,5 +1,10 @@
-import { asyncWaitForMessage, publishMessage, redis } from "@silo-storage/redis";
 import { z } from "zod";
+
+import {
+  asyncWaitForMessage,
+  publishMessage,
+  redis,
+} from "@silo-storage/redis";
 
 const DEFAULT_COMPLETION_NAMESPACE = "default";
 const DEFAULT_COMPLETION_TTL_SECONDS = 25 * 60;
@@ -63,9 +68,13 @@ export async function setCompletionRecord(input: {
     onUploadCompleteResult: input.completion.onUploadCompleteResult,
   });
 
-  await redis.set(completionKey(input.fileKeyId, namespace), JSON.stringify(record), {
-    ex: ttlSeconds,
-  });
+  await redis.set(
+    completionKey(input.fileKeyId, namespace),
+    JSON.stringify(record),
+    {
+      ex: ttlSeconds,
+    },
+  );
   const persisted = await redis.get<string | null>(
     completionKey(input.fileKeyId, namespace),
   );
@@ -93,7 +102,9 @@ export async function getCompletionRecord(
   namespace?: string,
 ): Promise<CompletionRecord | null> {
   const resolvedNamespace = resolveCompletionNamespace(namespace);
-  const raw = await redis.get<unknown>(completionKey(fileKeyId, resolvedNamespace));
+  const raw = await redis.get<unknown>(
+    completionKey(fileKeyId, resolvedNamespace),
+  );
   if (raw == null) {
     logCompletionDebug("get.miss", { fileKeyId, namespace: resolvedNamespace });
     return null;

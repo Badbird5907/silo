@@ -57,10 +57,10 @@ import {
 import { Skeleton } from "@silo-storage/ui/components/skeleton";
 
 import { getDownloadUrl } from "@/actions/file";
+import { EnvBadge } from "@/components/env-badge";
 import { FileStatusBadge } from "@/components/file-status-badge";
 import { useOrganization } from "@/hooks/use-organization";
 import { useTRPC } from "@/trpc/react";
-import { EnvBadge } from "@/components/env-badge";
 import { MimeTypeText } from "../mime-type-display";
 
 interface FileDetailPageProps {
@@ -530,7 +530,10 @@ export default function FileDetailPage({ params }: FileDetailPageProps) {
                   <Tag className="text-muted-foreground h-4 w-4" />
                   <span className="text-muted-foreground">Environment</span>
                 </div>
-                <EnvBadge name={fileKey.environment.name} type={fileKey.environment.type} />
+                <EnvBadge
+                  name={fileKey.environment.name}
+                  type={fileKey.environment.type}
+                />
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-sm">

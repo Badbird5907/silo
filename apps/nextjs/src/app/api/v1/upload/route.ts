@@ -46,7 +46,7 @@ const schema = z.object({
     ])
     .optional(),
   dev: z.boolean().optional(),
-  uploadMethod: z.enum(["tus", "put"]).optional(),
+  uploadMethod: z.enum(["resumable", "put"]).optional(),
 });
 
 export async function POST(request: Request) {

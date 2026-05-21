@@ -1,4 +1,5 @@
 import Link from "next/link";
+
 import { Button } from "@silo-storage/ui/components/button";
 
 import { getSession } from "@/auth/server";
@@ -15,9 +16,7 @@ export async function AuthMenu() {
           </Button>
         </Link>
         <Link href="/signup">
-          <Button size="sm">
-            Sign Up
-          </Button>
+          <Button size="sm">Sign Up</Button>
         </Link>
       </div>
     );
@@ -36,4 +35,3 @@ export async function AuthMenu() {
     </div>
   );
 }
-

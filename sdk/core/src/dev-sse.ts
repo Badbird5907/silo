@@ -96,9 +96,8 @@ function parseFrame(frame: string): DevSseEvent | null {
       event: "connected",
       data: {
         channel: typeof connected.channel === "string" ? connected.channel : "",
-        fileKeyId: typeof connected.fileKeyId === "string"
-          ? connected.fileKeyId
-          : "",
+        fileKeyId:
+          typeof connected.fileKeyId === "string" ? connected.fileKeyId : "",
         status: typeof connected.status === "string" ? connected.status : "",
       },
     };
@@ -125,9 +124,10 @@ function parseFrame(frame: string): DevSseEvent | null {
     return {
       event: "error",
       data: {
-        message: typeof errorPayload.message === "string"
-          ? errorPayload.message
-          : "Unknown SSE error",
+        message:
+          typeof errorPayload.message === "string"
+            ? errorPayload.message
+            : "Unknown SSE error",
       },
     };
   }

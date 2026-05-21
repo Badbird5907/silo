@@ -89,12 +89,8 @@
           "name": "silo_api_keys_project_id_silo_projects_id_fk",
           "tableFrom": "silo_api_keys",
           "tableTo": "silo_projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -102,12 +98,8 @@
           "name": "silo_api_keys_organization_id_silo_organizations_id_fk",
           "tableFrom": "silo_api_keys",
           "tableTo": "silo_organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -115,12 +107,8 @@
           "name": "silo_api_keys_environment_id_silo_project_environments_id_fk",
           "tableFrom": "silo_api_keys",
           "tableTo": "silo_project_environments",
-          "columnsFrom": [
-            "environment_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["environment_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -128,12 +116,8 @@
           "name": "silo_api_keys_created_by_id_silo_members_id_fk",
           "tableFrom": "silo_api_keys",
           "tableTo": "silo_members",
-          "columnsFrom": [
-            "created_by_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -143,9 +127,7 @@
         "silo_api_keys_key_hash_unique": {
           "name": "silo_api_keys_key_hash_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "key_hash"
-          ]
+          "columns": ["key_hash"]
         }
       },
       "policies": {},
@@ -465,12 +447,8 @@
           "name": "silo_audit_events_organization_id_silo_organizations_id_fk",
           "tableFrom": "silo_audit_events",
           "tableTo": "silo_organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -478,12 +456,8 @@
           "name": "silo_audit_events_project_id_silo_projects_id_fk",
           "tableFrom": "silo_audit_events",
           "tableTo": "silo_projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -491,12 +465,8 @@
           "name": "silo_audit_events_environment_id_silo_project_environments_id_fk",
           "tableFrom": "silo_audit_events",
           "tableTo": "silo_project_environments",
-          "columnsFrom": [
-            "environment_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["environment_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -504,12 +474,8 @@
           "name": "silo_audit_events_actor_user_id_silo_users_id_fk",
           "tableFrom": "silo_audit_events",
           "tableTo": "silo_users",
-          "columnsFrom": [
-            "actor_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["actor_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -517,12 +483,8 @@
           "name": "silo_audit_events_actor_member_id_silo_members_id_fk",
           "tableFrom": "silo_audit_events",
           "tableTo": "silo_members",
-          "columnsFrom": [
-            "actor_member_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["actor_member_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -682,12 +644,8 @@
           "name": "silo_callback_attempts_environment_id_silo_project_environments_id_fk",
           "tableFrom": "silo_callback_attempts",
           "tableTo": "silo_project_environments",
-          "columnsFrom": [
-            "environment_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["environment_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -695,12 +653,8 @@
           "name": "silo_callback_attempts_project_id_silo_projects_id_fk",
           "tableFrom": "silo_callback_attempts",
           "tableTo": "silo_projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -911,12 +865,8 @@
           "name": "silo_file_keys_file_id_silo_files_id_fk",
           "tableFrom": "silo_file_keys",
           "tableTo": "silo_files",
-          "columnsFrom": [
-            "file_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["file_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -924,12 +874,8 @@
           "name": "silo_file_keys_environment_id_silo_project_environments_id_fk",
           "tableFrom": "silo_file_keys",
           "tableTo": "silo_project_environments",
-          "columnsFrom": [
-            "environment_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["environment_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -937,12 +883,8 @@
           "name": "silo_file_keys_project_id_silo_projects_id_fk",
           "tableFrom": "silo_file_keys",
           "tableTo": "silo_projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1178,12 +1120,8 @@
           "name": "silo_file_lifecycle_jobs_project_id_silo_projects_id_fk",
           "tableFrom": "silo_file_lifecycle_jobs",
           "tableTo": "silo_projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -1191,12 +1129,8 @@
           "name": "silo_file_lifecycle_jobs_environment_id_silo_project_environments_id_fk",
           "tableFrom": "silo_file_lifecycle_jobs",
           "tableTo": "silo_project_environments",
-          "columnsFrom": [
-            "environment_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["environment_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -1204,12 +1138,8 @@
           "name": "silo_file_lifecycle_jobs_file_key_id_silo_file_keys_id_fk",
           "tableFrom": "silo_file_lifecycle_jobs",
           "tableTo": "silo_file_keys",
-          "columnsFrom": [
-            "file_key_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["file_key_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -1217,12 +1147,8 @@
           "name": "silo_file_lifecycle_jobs_file_id_silo_files_id_fk",
           "tableFrom": "silo_file_lifecycle_jobs",
           "tableTo": "silo_files",
-          "columnsFrom": [
-            "file_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["file_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1300,12 +1226,8 @@
           "name": "silo_files_environment_id_silo_project_environments_id_fk",
           "tableFrom": "silo_files",
           "tableTo": "silo_project_environments",
-          "columnsFrom": [
-            "environment_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["environment_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1313,12 +1235,8 @@
           "name": "silo_files_project_id_silo_projects_id_fk",
           "tableFrom": "silo_files",
           "tableTo": "silo_projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1433,12 +1351,8 @@
           "name": "silo_project_environments_project_id_silo_projects_id_fk",
           "tableFrom": "silo_project_environments",
           "tableTo": "silo_projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1446,12 +1360,8 @@
           "name": "silo_project_environments_owner_user_id_silo_users_id_fk",
           "tableFrom": "silo_project_environments",
           "tableTo": "silo_users",
-          "columnsFrom": [
-            "owner_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1578,12 +1488,8 @@
           "name": "silo_projects_parent_organization_id_silo_organizations_id_fk",
           "tableFrom": "silo_projects",
           "tableTo": "silo_organizations",
-          "columnsFrom": [
-            "parent_organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["parent_organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1593,9 +1499,7 @@
         "silo_projects_slug_unique": {
           "name": "silo_projects_slug_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "slug"
-          ]
+          "columns": ["slug"]
         }
       },
       "policies": {},
@@ -1739,12 +1643,8 @@
           "name": "silo_usage_daily_organization_id_silo_organizations_id_fk",
           "tableFrom": "silo_usage_daily",
           "tableTo": "silo_organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1752,12 +1652,8 @@
           "name": "silo_usage_daily_project_id_silo_projects_id_fk",
           "tableFrom": "silo_usage_daily",
           "tableTo": "silo_projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1765,12 +1661,8 @@
           "name": "silo_usage_daily_environment_id_silo_project_environments_id_fk",
           "tableFrom": "silo_usage_daily",
           "tableTo": "silo_project_environments",
-          "columnsFrom": [
-            "environment_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["environment_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1860,12 +1752,8 @@
           "name": "silo_usage_events_organization_id_silo_organizations_id_fk",
           "tableFrom": "silo_usage_events",
           "tableTo": "silo_organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1873,12 +1761,8 @@
           "name": "silo_usage_events_project_id_silo_projects_id_fk",
           "tableFrom": "silo_usage_events",
           "tableTo": "silo_projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1886,12 +1770,8 @@
           "name": "silo_usage_events_environment_id_silo_project_environments_id_fk",
           "tableFrom": "silo_usage_events",
           "tableTo": "silo_project_environments",
-          "columnsFrom": [
-            "environment_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["environment_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1899,12 +1779,8 @@
           "name": "silo_usage_events_file_id_silo_files_id_fk",
           "tableFrom": "silo_usage_events",
           "tableTo": "silo_files",
-          "columnsFrom": [
-            "file_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["file_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -1912,12 +1788,8 @@
           "name": "silo_usage_events_api_key_id_silo_api_keys_id_fk",
           "tableFrom": "silo_usage_events",
           "tableTo": "silo_api_keys",
-          "columnsFrom": [
-            "api_key_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["api_key_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -2083,12 +1955,8 @@
           "name": "silo_webhook_attempts_environment_id_silo_project_environments_id_fk",
           "tableFrom": "silo_webhook_attempts",
           "tableTo": "silo_project_environments",
-          "columnsFrom": [
-            "environment_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["environment_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2096,12 +1964,8 @@
           "name": "silo_webhook_attempts_project_id_silo_projects_id_fk",
           "tableFrom": "silo_webhook_attempts",
           "tableTo": "silo_projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2218,12 +2082,8 @@
           "name": "silo_accounts_user_id_silo_users_id_fk",
           "tableFrom": "silo_accounts",
           "tableTo": "silo_users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2295,12 +2155,8 @@
           "name": "silo_invitations_organization_id_silo_organizations_id_fk",
           "tableFrom": "silo_invitations",
           "tableTo": "silo_organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2308,12 +2164,8 @@
           "name": "silo_invitations_inviter_id_silo_users_id_fk",
           "tableFrom": "silo_invitations",
           "tableTo": "silo_users",
-          "columnsFrom": [
-            "inviter_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["inviter_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2366,12 +2218,8 @@
           "name": "silo_members_organization_id_silo_organizations_id_fk",
           "tableFrom": "silo_members",
           "tableTo": "silo_organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2379,12 +2227,8 @@
           "name": "silo_members_user_id_silo_users_id_fk",
           "tableFrom": "silo_members",
           "tableTo": "silo_users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2443,9 +2287,7 @@
         "silo_organizations_slug_unique": {
           "name": "silo_organizations_slug_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "slug"
-          ]
+          "columns": ["slug"]
         }
       },
       "policies": {},
@@ -2534,12 +2376,8 @@
           "name": "silo_sessions_user_id_silo_users_id_fk",
           "tableFrom": "silo_sessions",
           "tableTo": "silo_users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2549,9 +2387,7 @@
         "silo_sessions_token_unique": {
           "name": "silo_sessions_token_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "token"
-          ]
+          "columns": ["token"]
         }
       },
       "policies": {},
@@ -2615,9 +2451,7 @@
         "silo_users_email_unique": {
           "name": "silo_users_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         }
       },
       "policies": {},
@@ -2696,30 +2530,17 @@
     "public.silo_audit_actor_types": {
       "name": "silo_audit_actor_types",
       "schema": "public",
-      "values": [
-        "user",
-        "api_key",
-        "system"
-      ]
+      "values": ["user", "api_key", "system"]
     },
     "public.silo_audit_event_categories": {
       "name": "silo_audit_event_categories",
       "schema": "public",
-      "values": [
-        "operational",
-        "configuration",
-        "security",
-        "lifecycle"
-      ]
+      "values": ["operational", "configuration", "security", "lifecycle"]
     },
     "public.silo_audit_log_download_policy": {
       "name": "silo_audit_log_download_policy",
       "schema": "public",
-      "values": [
-        "disabled",
-        "always",
-        "signed_only"
-      ]
+      "values": ["disabled", "always", "signed_only"]
     },
     "public.silo_audit_resource_types": {
       "name": "silo_audit_resource_types",
@@ -2739,28 +2560,17 @@
     "public.silo_audit_statuses": {
       "name": "silo_audit_statuses",
       "schema": "public",
-      "values": [
-        "success",
-        "failure"
-      ]
+      "values": ["success", "failure"]
     },
     "public.silo_file_access_types": {
       "name": "silo_file_access_types",
       "schema": "public",
-      "values": [
-        "public",
-        "private"
-      ]
+      "values": ["public", "private"]
     },
     "public.silo_file_key_status": {
       "name": "silo_file_key_status",
       "schema": "public",
-      "values": [
-        "pending",
-        "completed",
-        "failed",
-        "deleted"
-      ]
+      "values": ["pending", "completed", "failed", "deleted"]
     },
     "public.silo_file_lifecycle_job_kind": {
       "name": "silo_file_lifecycle_job_kind",
@@ -2775,39 +2585,22 @@
     "public.silo_file_lifecycle_job_state": {
       "name": "silo_file_lifecycle_job_state",
       "schema": "public",
-      "values": [
-        "pending",
-        "leased",
-        "retry",
-        "done",
-        "dead"
-      ]
+      "values": ["pending", "leased", "retry", "done", "dead"]
     },
     "public.silo_image_delivery_policy": {
       "name": "silo_image_delivery_policy",
       "schema": "public",
-      "values": [
-        "disabled",
-        "public_only",
-        "public_and_private_opt_in"
-      ]
+      "values": ["disabled", "public_only", "public_and_private_opt_in"]
     },
     "public.silo_project_environment_types": {
       "name": "silo_project_environment_types",
       "schema": "public",
-      "values": [
-        "development",
-        "staging",
-        "production"
-      ]
+      "values": ["development", "staging", "production"]
     },
     "public.silo_resource_lifecycle_state": {
       "name": "silo_resource_lifecycle_state",
       "schema": "public",
-      "values": [
-        "active",
-        "deleting"
-      ]
+      "values": ["active", "deleting"]
     },
     "public.silo_usage_event_types": {
       "name": "silo_usage_event_types",
@@ -2822,19 +2615,12 @@
     "public.silo_webhook_attempt_status": {
       "name": "silo_webhook_attempt_status",
       "schema": "public",
-      "values": [
-        "success",
-        "retry",
-        "failed"
-      ]
+      "values": ["success", "retry", "failed"]
     },
     "public.silo_webhook_event_types": {
       "name": "silo_webhook_event_types",
       "schema": "public",
-      "values": [
-        "upload.completed",
-        "upload.failed"
-      ]
+      "values": ["upload.completed", "upload.failed"]
     }
   },
   "schemas": {},

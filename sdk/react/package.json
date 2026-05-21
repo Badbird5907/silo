@@ -26,6 +26,7 @@
     "dev": "tsup --watch",
     "format": "prettier --check . --ignore-path ../../.gitignore",
     "lint": "eslint",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "devDependencies": {
@@ -37,14 +38,14 @@
     "prettier": "^3.6.2",
     "react": "19.2.3",
     "tsup": "^8.5.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.13"
   },
   "peerDependencies": {
     "react": ">=18.2.0"
   },
   "prettier": "@silo-storage/prettier-config",
   "dependencies": {
-    "@silo-storage/mime-types": "0.0.0-alpha.0",
-    "tus-js-client": "^4.3.1"
+    "@silo-storage/mime-types": "0.0.0-alpha.0"
   }
 }

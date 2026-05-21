@@ -62,7 +62,9 @@ export async function getCachedProject(
   slug: string,
   env: Bindings,
 ): Promise<ProjectInfo | null> {
-  return await readCachedJson<ProjectInfo>(createProjectCacheRequest(slug, env));
+  return await readCachedJson<ProjectInfo>(
+    createProjectCacheRequest(slug, env),
+  );
 }
 
 export async function cacheProject(

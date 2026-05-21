@@ -6,6 +6,7 @@ import * as React from "react";
 import { Show, SignInButton, SignUpButton, useAuth } from "@clerk/nextjs";
 import { useQuery } from "@tanstack/react-query";
 import { Eye, Loader2, RefreshCcw, UploadIcon } from "lucide-react";
+import { toast } from "sonner";
 
 import type { AppFileRouter } from "@/lib/sdk-demo/file-router";
 import { Button } from "@silo-storage/ui/components/button";
@@ -156,6 +157,9 @@ export function SdkUploadDemo() {
       console.log("onComplete", result);
       setUploadError(null);
       void myFilesQuery.refetch();
+      for (const completion of result) {
+        toast.success(completion.result.str);
+      }
     },
     onError: (error) => {
       setUploadError(error.message);

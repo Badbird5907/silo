@@ -21,9 +21,7 @@ export function extractProjectSlug(
   return subdomain;
 }
 
-export function extractProjectSlugFromPath(
-  pathname: string,
-): string | null {
+export function extractProjectSlugFromPath(pathname: string): string | null {
   const normalizedPath = pathname.startsWith("/") ? pathname : `/${pathname}`;
   const prefixWithSlash = `${PROJECT_ROUTE_PREFIX}/`;
 

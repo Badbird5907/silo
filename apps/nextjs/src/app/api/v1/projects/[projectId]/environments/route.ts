@@ -1,6 +1,9 @@
 import { z } from "zod";
 
-import { createEnvironment, listEnvironments } from "@silo-storage/api/service/environment";
+import {
+  createEnvironment,
+  listEnvironments,
+} from "@silo-storage/api/service/environment";
 import { db } from "@silo-storage/db/client";
 
 import {

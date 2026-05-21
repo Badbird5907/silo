@@ -1,8 +1,8 @@
 import type { Bindings } from "../types/bindings";
 import type { ProjectInfo } from "../types/project";
-import { projectInfoSchema } from "../types/project";
 import { cacheProject, getCachedProject } from "../services/metadata-cache";
-import { Errors, TusError } from "../utils/errors";
+import { projectInfoSchema } from "../types/project";
+import { Errors, UploadError } from "../utils/errors";
 import { buildNextJsInternalHeaders } from "./nextjs-internal";
 
 export async function lookupProject(
@@ -54,7 +54,7 @@ export async function lookupProject(
 
     return project;
   } catch (error) {
-    if (error instanceof TusError) {
+    if (error instanceof UploadError) {
       throw error;
     }
     console.error("Failed to lookup project:", error);

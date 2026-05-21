@@ -13,6 +13,14 @@ import {
   Settings,
 } from "lucide-react";
 
+import { Button } from "@silo-storage/ui/components/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@silo-storage/ui/components/select";
 import {
   Sidebar,
   SidebarContent,
@@ -23,14 +31,6 @@ import {
   SidebarRail,
   useSidebar,
 } from "@silo-storage/ui/components/sidebar";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@silo-storage/ui/components/select";
-import { Button } from "@silo-storage/ui/components/button";
 import { Skeleton } from "@silo-storage/ui/components/skeleton";
 
 import { authClient } from "@/auth/client";
@@ -195,10 +195,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const user = session?.user
     ? {
-      name: session.user.name,
-      email: session.user.email,
-      avatar: session.user.image ?? undefined,
-    }
+        name: session.user.name,
+        email: session.user.email,
+        avatar: session.user.image ?? undefined,
+      }
     : null;
 
   const handleEnvironmentChange = (environmentSlug: string) => {
@@ -207,7 +207,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       environmentSlug === "__none__"
         ? `/${orgSlug}/p/${currentProjectSlug}`
         : `/${orgSlug}/p/${currentProjectSlug}/e/${environmentSlug}`;
-    const nextSuffix = pathname.replace(/^\/[^/]+\/p\/[^/]+(?:\/e\/[^/]+)?/, "");
+    const nextSuffix = pathname.replace(
+      /^\/[^/]+\/p\/[^/]+(?:\/e\/[^/]+)?/,
+      "",
+    );
     router.push(`${nextBase}${nextSuffix}`);
   };
 
@@ -249,7 +252,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <OrganizationSwitcher />
         )}
         {isInProject && !isSidebarCollapsed && (
-          <div className="px-2 pt-2 space-y-2">
+          <div className="space-y-2 px-2 pt-2">
             {showEnvironmentSwitcherSkeleton ? (
               <EnvironmentSwitcherSkeleton />
             ) : (
@@ -290,9 +293,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavMain items={navItems} label={navLabel} />
       </SidebarContent>
       <SidebarFooter>
-        {hasMounted && user && (
-          <NavUser user={user} onLogout={handleLogout} />
-        )}
+        {hasMounted && user && <NavUser user={user} onLogout={handleLogout} />}
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

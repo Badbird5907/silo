@@ -1,3 +1,4 @@
+import type { AuthContext } from "@silo-storage/api/types/auth";
 import { headers } from "next/headers";
 
 import { and, eq } from "@silo-storage/db";
@@ -10,7 +11,6 @@ import {
 } from "@silo-storage/db/schema";
 
 import { auth } from "@/auth/server";
-import type { AuthContext } from "@silo-storage/api/types/auth";
 
 type Project = typeof projects.$inferSelect;
 type ProjectEnvironment = typeof projectEnvironments.$inferSelect;
@@ -55,7 +55,6 @@ export function extractApiKeyFromRequest(request: Request): string | null {
 
   return null;
 }
-
 
 export async function authenticateRequest(
   request: Request,

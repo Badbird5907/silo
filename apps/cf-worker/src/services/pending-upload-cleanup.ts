@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { buildNextJsInternalHeaders } from "../lib/nextjs-internal";
 import type { Bindings } from "../types/bindings";
+import { buildNextJsInternalHeaders } from "../lib/nextjs-internal";
 
 const pendingUploadCleanupResponseSchema = z.object({
   selected: z.number().int().nonnegative(),

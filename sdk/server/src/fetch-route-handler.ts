@@ -1,19 +1,20 @@
+import type {
+  DevSseChunkEvent,
+  UploadCore,
+  UploadFileInput,
+  UploadMethod,
+} from "@silo-storage/sdk-core";
+import { z } from "zod";
+
 import {
   consumeDevRegisterSse,
   verifyCallbackSignature,
 } from "@silo-storage/sdk-core";
-import type {
-  DevSseChunkEvent,
-  UploadCore,
-  UploadMethod,
-  UploadFileInput,
-} from "@silo-storage/sdk-core";
-import { z } from "zod";
 
+import type { FileRouter } from "./router";
 import { handleUploadCallback } from "./callback-handler";
 import { SiloRouteInputValidationError } from "./errors";
 import { createHttpCompletionStore } from "./http-completion-store";
-import type { FileRouter } from "./router";
 import { extractRouterConfig, registerRouteUpload } from "./router";
 
 const registerRequestSchema = z.object({
@@ -22,7 +23,7 @@ const registerRequestSchema = z.object({
   input: z.unknown().optional(),
   expiresIn: z.number().int().positive().optional(),
   protocol: z.enum(["http", "https"]).optional(),
-  uploadMethod: z.enum(["tus", "put"]).optional(),
+  uploadMethod: z.enum(["resumable", "put"]).optional(),
   files: z
     .object({
       fileName: z.string().min(1),
@@ -87,11 +88,7 @@ class MemoryCompletionStore implements CompletionStore {
     CompletionEntry & { expiresAt: number }
   >();
 
-  set(
-    fileKeyId: string,
-    value: CompletionEntry,
-    ttlMs: number,
-  ): Promise<void> {
+  set(fileKeyId: string, value: CompletionEntry, ttlMs: number): Promise<void> {
     this.completionByFileKey.set(fileKeyId, {
       ...value,
       expiresAt: Date.now() + Math.max(1, ttlMs),
@@ -114,7 +111,10 @@ class MemoryCompletionStore implements CompletionStore {
     });
   }
 
-  async wait(fileKeyId: string, timeoutMs: number): Promise<CompletionEntry | null> {
+  async wait(
+    fileKeyId: string,
+    timeoutMs: number,
+  ): Promise<CompletionEntry | null> {
     const startedAt = Date.now();
     while (Date.now() - startedAt <= timeoutMs) {
       const found = await this.get(fileKeyId);
@@ -230,13 +230,15 @@ interface FetchRouteHandlers {
 export function createFetchRouteHandler<
   TContext = undefined,
   TRouter extends FileRouter<Request, TContext> = FileRouter<Request, TContext>,
->(options: CreateFetchRouteHandlerOptions<TContext, TRouter>): FetchRouteHandlers {
+>(
+  options: CreateFetchRouteHandlerOptions<TContext, TRouter>,
+): FetchRouteHandlers {
   const completionDebugEnabled =
     (globalThis as { process?: { env?: Record<string, string | undefined> } })
       .process?.env?.SILO_COMPLETION_DEBUG === "1";
-  const runtimeNodeEnv =
-    (globalThis as { process?: { env?: Record<string, string | undefined> } })
-      .process?.env?.NODE_ENV;
+  const runtimeNodeEnv = (
+    globalThis as { process?: { env?: Record<string, string | undefined> } }
+  ).process?.env?.NODE_ENV;
   const logCompletionDebug = (
     event: string,
     details: Record<string, unknown>,
@@ -255,7 +257,8 @@ export function createFetchRouteHandler<
     options.completionStoreAuthToken ?? options.core.config.apiKey;
   const completionStorePathPrefix =
     options.completionStorePathPrefix ?? "/api/v1/completion";
-  const completionNamespace = options.completionNamespace ?? "sdk-route-handler";
+  const completionNamespace =
+    options.completionNamespace ?? "sdk-route-handler";
   const completionStore =
     options.completionStore ??
     (completionStoreUrl
@@ -305,7 +308,9 @@ export function createFetchRouteHandler<
         }
 
         if (chunkEvent.data.hook === "upload.failed") {
-          devUploadFailedEventDataSchema.safeParse(chunkEvent.data.parsedPayload);
+          devUploadFailedEventDataSchema.safeParse(
+            chunkEvent.data.parsedPayload,
+          );
           return;
         }
 

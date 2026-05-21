@@ -14,14 +14,14 @@ import {
   sendUploadCallback,
   verifyUploadSignature,
 } from "../services/callback";
-import { retry } from "../services/tus/retry";
-import { Errors, TusError } from "../utils/errors";
+import { retry } from "../services/upload-state/retry";
+import { Errors, UploadError } from "../utils/errors";
 
 type AppContext = Context<{ Bindings: Bindings; Variables: Variables }>;
 
 function assertProjectUploadWritable(c: AppContext): void {
   if (c.get("projectLifecycleState") === "deleting") {
-    throw new TusError(
+    throw new UploadError(
       "INVALID_REQUEST",
       409,
       "Project is currently being deleted and cannot accept upload writes.",
@@ -116,6 +116,7 @@ export async function handleDirectUpload(c: AppContext): Promise<Response> {
         ...(acceptedMimeTypes ? { acceptedMimeTypes } : {}),
         ...(expiresAt ? { expiresAt } : {}),
         ...(isPublic ? { isPublic } : {}),
+        uploadMethod: "put",
       },
     },
     c.env,
@@ -129,7 +130,9 @@ export async function handleDirectUpload(c: AppContext): Promise<Response> {
     verificationResult.projectId &&
     verificationResult.projectId !== projectId
   ) {
-    throw Errors.unauthorized("Signed upload URL does not belong to this project");
+    throw Errors.unauthorized(
+      "Signed upload URL does not belong to this project",
+    );
   }
 
   const expectedSize = verificationResult.size;
@@ -137,7 +140,7 @@ export async function handleDirectUpload(c: AppContext): Promise<Response> {
     throw Errors.invalidRequest("Signed upload URL is missing a file size");
   }
 
-  const maxSize = Number.parseInt(c.env.TUS_MAX_SIZE, 10);
+  const maxSize = Number.parseInt(c.env.UPLOAD_MAX_SIZE, 10);
   if (expectedSize > maxSize) {
     throw Errors.uploadTooLarge(expectedSize, maxSize);
   }
@@ -169,9 +172,9 @@ export async function handleDirectUpload(c: AppContext): Promise<Response> {
     expectedSize === 0
       ? new Uint8Array(0)
       : ((c.req.raw.body as ReadableStream<Uint8Array> | null) ??
-          (() => {
-            throw Errors.invalidRequest("Request body is required");
-          })());
+        (() => {
+          throw Errors.invalidRequest("Request body is required");
+        })());
 
   try {
     await c.env.R2_BUCKET.put(storageKey, body);

@@ -1,5 +1,5 @@
 import type { Bindings } from "../../types/bindings";
-import type { TusUploadPart } from "../../types/tus";
+import type { UploadStatePart } from "../../types/upload-state";
 
 export interface UploadChunkParams {
   storageKey: string;
@@ -14,7 +14,7 @@ export interface UploadChunkParams {
 
 export interface UploadChunkResult {
   multipartUploadId: string | null;
-  part: TusUploadPart | null;
+  part: UploadStatePart | null;
 }
 
 const MULTIPART_MIN_PART_SIZE = 5 * 1024 * 1024;
@@ -69,7 +69,7 @@ export async function uploadChunkToR2(
   }
 
   // parts are 1-indexed, calculate sequentially from existing parts count
-  // (not from offset, as TUS allows variable chunk sizes)
+  // (not from offset, because the upload protocol allows variable chunk sizes)
   const partNumber = existingPartsCount + 1;
 
   const multipart = env.R2_BUCKET.resumeMultipartUpload(storageKey, uploadId);
@@ -87,7 +87,7 @@ export async function uploadChunkToR2(
 export async function completeMultipartUpload(params: {
   storageKey: string;
   uploadId: string;
-  parts: TusUploadPart[];
+  parts: UploadStatePart[];
   env: Bindings;
 }): Promise<R2Object> {
   const { storageKey, uploadId, parts, env } = params;

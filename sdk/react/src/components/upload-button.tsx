@@ -8,10 +8,7 @@ import type {
   UseUploadOptions,
   UseUploadResult,
 } from "../types";
-import {
-  resolveAcceptValue,
-  resolveStaticAcceptValue,
-} from "../accepts";
+import { resolveAcceptValue, resolveStaticAcceptValue } from "../accepts";
 
 interface UploadButtonBaseProps<
   TRouter extends AnyFileRouterLike,
@@ -29,7 +26,9 @@ interface UploadButtonBaseProps<
 export interface UploadButtonWithHookProps<
   TRouter extends AnyFileRouterLike,
   TEndpoint extends RouteSlug<TRouter>,
-> extends UploadButtonBaseProps<TRouter, TEndpoint>,
+>
+  extends
+    UploadButtonBaseProps<TRouter, TEndpoint>,
     UseUploadOptions<TRouter, TEndpoint> {
   upload?: never;
   useUpload: (
@@ -85,8 +84,7 @@ function UploadButtonRoot<
   const inputRef = React.useRef<HTMLInputElement>(null);
   const isDisabled = disabled === true || upload.isUploading;
   const pickerAccept = accept ?? upload.accept;
-  const staticAccept =
-    resolveStaticAcceptValue(pickerAccept) ?? "";
+  const staticAccept = resolveStaticAcceptValue(pickerAccept) ?? "";
   const handleClick = React.useCallback(() => {
     const input = inputRef.current;
     if (!input) return;

@@ -1,4 +1,7 @@
-import type { AllowedFileType, FileRouterInputKey } from "@silo-storage/mime-types";
+import type {
+  AllowedFileType,
+  FileRouterInputKey,
+} from "@silo-storage/mime-types";
 import type { StringValue } from "ms";
 import ms from "ms";
 
@@ -118,13 +121,12 @@ function normalizeObjectConstraint(
   };
 }
 
-function normalizeBucketInput(
-  bucket: SiloRouteExpectBucket,
-  index: number,
-) {
+function normalizeBucketInput(bucket: SiloRouteExpectBucket, index: number) {
   const label = `Route config bucket at index ${index}`;
   if (bucket.type === undefined && bucket.mimeTypes === undefined) {
-    throw new Error(`${label} must define at least one of "type" or "mimeTypes".`);
+    throw new Error(
+      `${label} must define at least one of "type" or "mimeTypes".`,
+    );
   }
 
   const normalizedType =
@@ -180,8 +182,7 @@ function isBucketArrayRouteConfigInput(
   routeConfigInput: readonly unknown[],
 ): routeConfigInput is readonly SiloRouteExpectBucket[] {
   return routeConfigInput.every(
-    (value) =>
-      !!value && typeof value === "object" && !Array.isArray(value),
+    (value) => !!value && typeof value === "object" && !Array.isArray(value),
   );
 }
 

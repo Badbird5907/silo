@@ -1,15 +1,18 @@
-import { normalizeFileKeyMetadata } from "@silo-storage/shared";
 import type { UploadEventEnvelope } from "@silo-storage/shared";
 
+import { signWebhookPayload } from "@silo-storage/api/service/webhook";
 import { and, eq } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import { fileKeys } from "@silo-storage/db/schema";
 import { asyncWaitForMessage } from "@silo-storage/redis";
+import { normalizeFileKeyMetadata } from "@silo-storage/shared";
 
 import { env } from "@/env";
-import { signWebhookPayload } from "@silo-storage/api/service/webhook";
 
-function toSseFrame(event: "connected" | "chunk" | "keepalive" | "error", payload: unknown) {
+function toSseFrame(
+  event: "connected" | "chunk" | "keepalive" | "error",
+  payload: unknown,
+) {
   return `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
 }
 
@@ -24,11 +27,14 @@ async function toDevChunk(event: UploadEventEnvelope) {
   };
 }
 
-export async function createDevUploadEventStream(request: Request, input: {
-  projectId: string;
-  environmentId: string;
-  fileKeyId: string;
-}) {
+export async function createDevUploadEventStream(
+  request: Request,
+  input: {
+    projectId: string;
+    environmentId: string;
+    fileKeyId: string;
+  },
+) {
   const fileKey = await db.query.fileKeys.findFirst({
     where: and(
       eq(fileKeys.id, input.fileKeyId),
@@ -69,39 +75,41 @@ export async function createDevUploadEventStream(request: Request, input: {
         }
 
         if (fileKey?.status === "completed" || fileKey?.status === "failed") {
-          const terminalEvent: UploadEventEnvelope = fileKey.status === "completed"
-            ? {
-                id: `upload.completed:${fileKey.id}`,
-                type: "upload.completed",
-                version: 1,
-                occurredAt: new Date().toISOString(),
-                data: {
-                  environmentId: fileKey.environmentId,
-                  projectId: fileKey.projectId,
-                  fileKeyId: fileKey.id,
-                  accessKey: fileKey.accessKey,
-                  fileId: fileKey.file?.id ?? "",
-                  fileName: fileKey.fileName,
-                  hash: fileKey.file?.hash ?? null,
-                  mimeType: fileKey.file?.mimeType ?? "application/octet-stream",
-                  size: fileKey.file?.size ?? 0,
-                  expiresAt: fileKey.expiresAt?.toISOString() ?? null,
-                  metadata: normalizeFileKeyMetadata(fileKey.metadata),
-                },
-              }
-            : {
-                id: `upload.failed:${fileKey.id}`,
-                type: "upload.failed",
-                version: 1,
-                occurredAt: new Date().toISOString(),
-                data: {
-                  environmentId: fileKey.environmentId,
-                  projectId: fileKey.projectId,
-                  fileKeyId: fileKey.id,
-                  metadata: normalizeFileKeyMetadata(fileKey.metadata),
-                  error: "Upload failed",
-                },
-              };
+          const terminalEvent: UploadEventEnvelope =
+            fileKey.status === "completed"
+              ? {
+                  id: `upload.completed:${fileKey.id}`,
+                  type: "upload.completed",
+                  version: 1,
+                  occurredAt: new Date().toISOString(),
+                  data: {
+                    environmentId: fileKey.environmentId,
+                    projectId: fileKey.projectId,
+                    fileKeyId: fileKey.id,
+                    accessKey: fileKey.accessKey,
+                    fileId: fileKey.file?.id ?? "",
+                    fileName: fileKey.fileName,
+                    hash: fileKey.file?.hash ?? null,
+                    mimeType:
+                      fileKey.file?.mimeType ?? "application/octet-stream",
+                    size: fileKey.file?.size ?? 0,
+                    expiresAt: fileKey.expiresAt?.toISOString() ?? null,
+                    metadata: normalizeFileKeyMetadata(fileKey.metadata),
+                  },
+                }
+              : {
+                  id: `upload.failed:${fileKey.id}`,
+                  type: "upload.failed",
+                  version: 1,
+                  occurredAt: new Date().toISOString(),
+                  data: {
+                    environmentId: fileKey.environmentId,
+                    projectId: fileKey.projectId,
+                    fileKeyId: fileKey.id,
+                    metadata: normalizeFileKeyMetadata(fileKey.metadata),
+                    error: "Upload failed",
+                  },
+                };
 
           const chunk = await toDevChunk(terminalEvent);
           controller.enqueue(encoder.encode(toSseFrame("chunk", chunk)));
@@ -121,14 +129,19 @@ export async function createDevUploadEventStream(request: Request, input: {
             const chunk = await toDevChunk(event);
             controller.enqueue(encoder.encode(toSseFrame("chunk", chunk)));
 
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-            if (event.type === "upload.completed" || event.type === "upload.failed") {
+            if (
+              event.type === "upload.completed" ||
+              // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+              event.type === "upload.failed"
+            ) {
               close();
               return;
             }
           } catch (error) {
             const err =
-              error instanceof Error ? error.message : "Unknown SSE stream error";
+              error instanceof Error
+                ? error.message
+                : "Unknown SSE stream error";
 
             if (err.includes("Timeout waiting for message")) {
               controller.enqueue(
@@ -137,7 +150,9 @@ export async function createDevUploadEventStream(request: Request, input: {
               continue;
             }
 
-            controller.enqueue(encoder.encode(toSseFrame("error", { message: err })));
+            controller.enqueue(
+              encoder.encode(toSseFrame("error", { message: err })),
+            );
             close();
             return;
           }

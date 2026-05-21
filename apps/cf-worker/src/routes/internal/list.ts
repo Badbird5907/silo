@@ -37,7 +37,9 @@ export async function handleInternalList(
           httpMetadata: obj.httpMetadata,
         })),
         truncated: result.truncated,
-        ...(result.truncated && { cursor: (result as { cursor?: string }).cursor }),
+        ...(result.truncated && {
+          cursor: (result as { cursor?: string }).cursor,
+        }),
       },
       HTTP_STATUS.OK,
     );

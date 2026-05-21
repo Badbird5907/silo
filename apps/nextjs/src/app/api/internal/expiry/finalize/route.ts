@@ -1,11 +1,11 @@
 import { z } from "zod";
 
+import { syncEnvironmentStorageSnapshots } from "@silo-storage/api/service/analytics";
 import { and, eq, inArray, isNotNull, lte } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import { fileKeys, files } from "@silo-storage/db/schema";
 
 import { isCallbackAuthorized } from "@/lib/internal/callback-auth";
-import { syncEnvironmentStorageSnapshots } from "@silo-storage/api/service/analytics";
 
 const bodySchema = z.object({
   fileIds: z.array(z.string().min(1)).min(1).max(1000),
@@ -62,7 +62,9 @@ export async function POST(request: Request) {
 
       const deletableFileIds = [
         ...new Set(
-          candidates.map((row) => row.fileId).filter((id): id is string => !!id),
+          candidates
+            .map((row) => row.fileId)
+            .filter((id): id is string => !!id),
         ),
       ];
 

@@ -1,5 +1,11 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@silo-storage/ui/components/card";
 import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
+
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@silo-storage/ui/components/card";
 
 export function StatCard({
   title,

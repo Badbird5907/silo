@@ -67,8 +67,7 @@ export function ProfileSettingsCard({
     },
   });
 
-  const hasChanges =
-    name.trim() !== user.name || image.trim() !== user.image;
+  const hasChanges = name.trim() !== user.name || image.trim() !== user.image;
 
   return (
     <Card>
@@ -79,7 +78,9 @@ export function ProfileSettingsCard({
       <CardContent className="space-y-4">
         <div className="flex items-center gap-4">
           <Avatar className="h-12 w-12">
-            <AvatarImage src={image !== "" ? image : user.image ?? undefined} />
+            <AvatarImage
+              src={image !== "" ? image : (user.image ?? undefined)}
+            />
             <AvatarFallback>{getInitials(name || user.name)}</AvatarFallback>
           </Avatar>
           <div className="text-sm">

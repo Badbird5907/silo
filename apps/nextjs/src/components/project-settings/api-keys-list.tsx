@@ -1,11 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Key, MoreHorizontal, Trash2 } from "lucide-react";
-import { useState } from "react";
 import { toast } from "sonner";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@silo-storage/ui/components/avatar";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@silo-storage/ui/components/avatar";
 import { Badge } from "@silo-storage/ui/components/badge";
 import { Button } from "@silo-storage/ui/components/button";
 import {
@@ -43,8 +47,8 @@ import {
 } from "@silo-storage/ui/components/table";
 
 import { useTRPC } from "@/trpc/react";
-import { CreateApiKeyDialog } from "./create-api-key-dialog";
 import { EnvBadge } from "../env-badge";
+import { CreateApiKeyDialog } from "./create-api-key-dialog";
 
 interface ApiKeysListProps {
   projectId: string;
@@ -142,8 +146,8 @@ export function ApiKeysList({ projectId, organizationId }: ApiKeysListProps) {
             {apiKeys.length} {apiKeys.length === 1 ? "key" : "keys"})
           </CardDescription>
           <p className="text-muted-foreground mt-2 text-xs">
-            Deployment setup: create one key per environment and use its `SILO_TOKEN`
-            in that environment only.
+            Deployment setup: create one key per environment and use its
+            `SILO_TOKEN` in that environment only.
           </p>
         </div>
         <CreateApiKeyDialog
@@ -187,7 +191,10 @@ export function ApiKeysList({ projectId, organizationId }: ApiKeysListProps) {
                       </code>
                     </TableCell>
                     <TableCell>
-                      <EnvBadge name={apiKey.environment.name} type={apiKey.environment.type} />
+                      <EnvBadge
+                        name={apiKey.environment.name}
+                        type={apiKey.environment.type}
+                      />
                     </TableCell>
                     <TableCell>
                       {apiKey.createdBy ? (
@@ -281,8 +288,8 @@ export function ApiKeysList({ projectId, organizationId }: ApiKeysListProps) {
               <span className="text-foreground font-medium">
                 {keyPendingDelete?.name}
               </span>
-              . Apps using this key will stop working immediately. This cannot be
-              undone.
+              . Apps using this key will stop working immediately. This cannot
+              be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

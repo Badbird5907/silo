@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { buildNextJsInternalHeaders } from "../lib/nextjs-internal";
 import type { Bindings } from "../types/bindings";
+import { buildNextJsInternalHeaders } from "../lib/nextjs-internal";
 
 const lifecycleJobRunResponseSchema = z.object({
   batches: z.number().int().nonnegative(),

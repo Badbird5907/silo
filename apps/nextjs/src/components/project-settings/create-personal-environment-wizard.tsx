@@ -25,11 +25,8 @@ import {
 } from "@silo-storage/ui/components/select";
 
 import { authClient } from "@/auth/client";
+import { ApiKeySecretsSection } from "@/components/project-settings/api-key-secrets-section";
 import { useTRPC } from "@/trpc/react";
-
-import {
-  ApiKeySecretsSection,
-} from "@/components/project-settings/api-key-secrets-section";
 
 interface CreatePersonalEnvironmentWizardProps {
   projectId: string;
@@ -70,7 +67,8 @@ export function CreatePersonalEnvironmentWizard({
   const queryClient = useQueryClient();
   const { data: session } = authClient.useSession();
   const userName = session?.user.name.trim();
-  const defaultName = userName && userName.length > 0 ? `${userName}'s Dev Env` : "My Dev Env";
+  const defaultName =
+    userName && userName.length > 0 ? `${userName}'s Dev Env` : "My Dev Env";
   const [open, setOpen] = React.useState(false);
   const [step, setStep] = React.useState<1 | 2 | 3>(1);
   const [name, setName] = React.useState(defaultName);
@@ -106,24 +104,31 @@ export function CreatePersonalEnvironmentWizard({
         });
         if (shouldCreateApiKey) {
           if (!environment.id) {
-            toast.error("Environment was created but no environment id was returned");
+            toast.error(
+              "Environment was created but no environment id was returned",
+            );
             return;
           }
           try {
-            const apiKeyResult: unknown = await createApiKeyMutation.mutateAsync({
-              organizationId,
-              projectId,
-              name: apiKeyName.trim() || `${name.trim() || defaultName} API Key`,
-              environmentId: environment.id,
-            });
+            const apiKeyResult: unknown =
+              await createApiKeyMutation.mutateAsync({
+                organizationId,
+                projectId,
+                name:
+                  apiKeyName.trim() || `${name.trim() || defaultName} API Key`,
+                environmentId: environment.id,
+              });
             const record =
               apiKeyResult && typeof apiKeyResult === "object"
                 ? (apiKeyResult as Record<string, unknown>)
                 : null;
             const apiKey = typeof record?.key === "string" ? record.key : null;
-            const siloToken = typeof record?.siloToken === "string" ? record.siloToken : null;
+            const siloToken =
+              typeof record?.siloToken === "string" ? record.siloToken : null;
             const signingSecret =
-              typeof record?.signingSecret === "string" ? record.signingSecret : null;
+              typeof record?.signingSecret === "string"
+                ? record.signingSecret
+                : null;
             setCreatedValues({
               apiKey,
               siloToken,
@@ -141,7 +146,9 @@ export function CreatePersonalEnvironmentWizard({
         handleOpenChange(false);
       },
       onError: (error: { message?: string }) => {
-        toast.error(error.message ?? "Failed to create development environment");
+        toast.error(
+          error.message ?? "Failed to create development environment",
+        );
       },
     }),
   );
@@ -228,7 +235,9 @@ export function CreatePersonalEnvironmentWizard({
               <Label htmlFor="create-api-key">Create an API key now?</Label>
               <Select
                 value={shouldCreateApiKey ? "yes" : "no"}
-                onValueChange={(value) => setShouldCreateApiKey(value === "yes")}
+                onValueChange={(value) =>
+                  setShouldCreateApiKey(value === "yes")
+                }
               >
                 <SelectTrigger id="create-api-key">
                   <SelectValue />
@@ -267,7 +276,8 @@ export function CreatePersonalEnvironmentWizard({
               Name: <strong>{name.trim() || defaultName}</strong>
             </p>
             <p className="text-muted-foreground">
-              Create API key: <strong>{shouldCreateApiKey ? "Yes" : "No"}</strong>
+              Create API key:{" "}
+              <strong>{shouldCreateApiKey ? "Yes" : "No"}</strong>
             </p>
             {shouldCreateApiKey && (
               <p className="text-muted-foreground">
@@ -314,7 +324,9 @@ export function CreatePersonalEnvironmentWizard({
               </Button>
               <Button
                 onClick={handleCreate}
-                disabled={isCreating || (shouldCreateApiKey && !apiKeyName.trim())}
+                disabled={
+                  isCreating || (shouldCreateApiKey && !apiKeyName.trim())
+                }
               >
                 {isCreating && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

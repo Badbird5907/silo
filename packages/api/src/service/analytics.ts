@@ -1,5 +1,4 @@
 import type { Db } from "@silo-storage/db/client";
-
 import { and, eq, sum } from "drizzle-orm";
 
 import { files, projects, usageDaily } from "@silo-storage/db/schema";

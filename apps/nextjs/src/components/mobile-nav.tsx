@@ -3,7 +3,11 @@
 import { LogOut, MenuIcon, Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@silo-storage/ui/components/avatar";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@silo-storage/ui/components/avatar";
 import { Button } from "@silo-storage/ui/components/button";
 import {
   DropdownMenu,

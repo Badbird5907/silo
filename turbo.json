@@ -1,73 +1,76 @@
 {
-    "$schema": "https://turborepo.com/schema.json",
-    "ui": "stream",
-    "tasks": {
-      "topo": {
-        "dependsOn": ["^topo"]
-      },
-      "build": {
-        "dependsOn": ["^build"],
-        "outputs": [".cache/tsbuildinfo.json", "dist/**"]
-      },
-      "dev": {
-        "cache": false,
-        "persistent": true
-      },
-      "format": {
-        "outputs": [".cache/.prettiercache"],
-        "outputLogs": "new-only"
-      },
-      "lint": {
-        "dependsOn": ["^topo", "^build"],
-        "outputs": [".cache/.eslintcache"]
-      },
-      "typecheck": {
-        "dependsOn": ["^topo", "^build"],
-        "outputs": [".cache/tsbuildinfo.json"]
-      },
-      "clean": {
-        "cache": false
-      },
-      "//#clean": {
-        "cache": false
-      },
-      "push": {
-        "cache": false,
-        "interactive": true
-      },
-      "studio": {
-        "cache": false,
-        "persistent": true
-      },
-      "ui-add": {
-        "cache": false,
-        "interactive": true
-      }
+  "$schema": "https://turborepo.com/schema.json",
+  "ui": "stream",
+  "tasks": {
+    "topo": {
+      "dependsOn": ["^topo"]
     },
-    "globalEnv": [
-      "POSTGRES_URL",
-      "POSTGRES_MAX_CONNECTIONS",
-      "AUTH_REDIRECT_PROXY_URL",
-      "AUTH_SECRET",
-      "SILO_URL",
-      "SILO_TOKEN",
-      "CLERK_SECRET_KEY",
-      "PORT",
-      "SIGNING_SECRET",
-      "UPSTASH_REDIS_REST_URL",
-      "UPSTASH_REDIS_REST_TOKEN",
-      "WORKER_URL",
-      "WORKER_CALLBACK_SECRET",
-      "WEBHOOK_DELIVERY_ENABLED",
-      "DEV_UPLOAD_SSE_ENABLED"
-    ],
-    "globalPassThroughEnv": [
-      "NODE_ENV",
-      "CI",
-      "VERCEL",
-      "VERCEL_ENV",
-      "VERCEL_URL",
-      "npm_lifecycle_event"
-    ]
-  }
-  
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".cache/tsbuildinfo.json", "dist/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "format": {
+      "outputs": [".cache/.prettiercache"],
+      "outputLogs": "new-only"
+    },
+    "lint": {
+      "dependsOn": ["^topo", "^build"],
+      "outputs": [".cache/.eslintcache"]
+    },
+    "typecheck": {
+      "dependsOn": ["^topo", "^build"],
+      "outputs": [".cache/tsbuildinfo.json"]
+    },
+    "test": {
+      "dependsOn": ["^topo"],
+      "outputs": []
+    },
+    "clean": {
+      "cache": false
+    },
+    "//#clean": {
+      "cache": false
+    },
+    "push": {
+      "cache": false,
+      "interactive": true
+    },
+    "studio": {
+      "cache": false,
+      "persistent": true
+    },
+    "ui-add": {
+      "cache": false,
+      "interactive": true
+    }
+  },
+  "globalEnv": [
+    "POSTGRES_URL",
+    "POSTGRES_MAX_CONNECTIONS",
+    "AUTH_REDIRECT_PROXY_URL",
+    "AUTH_SECRET",
+    "SILO_URL",
+    "SILO_TOKEN",
+    "CLERK_SECRET_KEY",
+    "PORT",
+    "SIGNING_SECRET",
+    "UPSTASH_REDIS_REST_URL",
+    "UPSTASH_REDIS_REST_TOKEN",
+    "WORKER_URL",
+    "WORKER_CALLBACK_SECRET",
+    "WEBHOOK_DELIVERY_ENABLED",
+    "DEV_UPLOAD_SSE_ENABLED"
+  ],
+  "globalPassThroughEnv": [
+    "NODE_ENV",
+    "CI",
+    "VERCEL",
+    "VERCEL_ENV",
+    "VERCEL_URL",
+    "npm_lifecycle_event"
+  ]
+}

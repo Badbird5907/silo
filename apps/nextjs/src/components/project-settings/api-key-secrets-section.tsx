@@ -3,14 +3,15 @@
 import { ChevronDown } from "lucide-react";
 
 import {
-  EnvironmentVariableRow,
-  SiloEnvSnippetSection,
-} from "@/components/project-settings/env-vars";
-import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@silo-storage/ui/components/collapsible";
+
+import {
+  EnvironmentVariableRow,
+  SiloEnvSnippetSection,
+} from "@/components/project-settings/env-vars";
 
 interface ApiKeySecretsSectionProps {
   siloToken: string | null;
@@ -36,7 +37,7 @@ export function ApiKeySecretsSection({
       {siloToken ? (
         <SiloEnvSnippetSection siloToken={siloToken} />
       ) : (
-        <div className="border-amber-500/25 bg-amber-500/5 space-y-2 rounded-lg border p-4">
+        <div className="space-y-2 rounded-lg border border-amber-500/25 bg-amber-500/5 p-4">
           <p className="text-sm font-medium">No SDK token</p>
           <p className="text-muted-foreground text-xs leading-relaxed">
             SILO_TOKEN could not be generated. Delete this key and create a new
@@ -49,7 +50,7 @@ export function ApiKeySecretsSection({
         <CollapsibleTrigger asChild>
           <button
             type="button"
-            className="group flex w-full items-center justify-between gap-2 rounded-md border bg-muted/30 px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted/50"
+            className="group bg-muted/30 hover:bg-muted/50 flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2.5 text-left text-sm transition-colors"
           >
             <span className="min-w-0">
               <span className="font-medium">HTTP API</span>
@@ -58,7 +59,7 @@ export function ApiKeySecretsSection({
               </span>
             </span>
             <ChevronDown
-              className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180"
+              className="text-muted-foreground h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]:rotate-180"
               aria-hidden
             />
           </button>

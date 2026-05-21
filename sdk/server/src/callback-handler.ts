@@ -1,7 +1,7 @@
+import type { UploadCore } from "@silo-storage/sdk-core";
 import { z } from "zod";
 
 import { verifyAndParseUploadCallback } from "@silo-storage/sdk-core";
-import type { UploadCore } from "@silo-storage/sdk-core";
 
 import type { FileRouter } from "./router";
 import {

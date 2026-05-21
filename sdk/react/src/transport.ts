@@ -1,6 +1,9 @@
-import { Upload } from "tus-js-client";
-
-import type { AnyFileRouterLike, RouteInputBySlug, RouteSlug, RouterConfigLike } from "./types";
+import type {
+  AnyFileRouterLike,
+  RouteInputBySlug,
+  RouterConfigLike,
+  RouteSlug,
+} from "./types";
 import { SiloUploadError } from "./types";
 
 interface RegisterResponse {
@@ -10,7 +13,7 @@ interface RegisterResponse {
     fileKeyId: string;
     accessKey: string;
     uploadUrl: string;
-    uploadMethod?: "tus" | "put";
+    uploadMethod?: "resumable" | "put";
     fileName: string;
     size: number;
     mimeType?: string;
@@ -35,7 +38,10 @@ interface AwaitCompletionResponse {
   };
 }
 
-function asError(cause: unknown, fallbackCode = "UNKNOWN_ERROR"): SiloUploadError {
+function asError(
+  cause: unknown,
+  fallbackCode = "UNKNOWN_ERROR",
+): SiloUploadError {
   if (cause instanceof SiloUploadError) return cause;
   if (cause instanceof Error) {
     return new SiloUploadError({
@@ -81,7 +87,7 @@ export async function registerUpload<
     input?: RouteInputBySlug<TRouter, TEndpoint>;
     expiresIn?: number;
     protocol?: "http" | "https";
-    uploadMethod?: "tus" | "put";
+    uploadMethod?: "resumable" | "put";
     files: {
       fileName: string;
       size: number;
@@ -175,11 +181,11 @@ export async function awaitCompletion(
 
 export async function uploadFileWithProgress(
   uploadUrl: string,
-  uploadMethod: "tus" | "put",
+  uploadMethod: "resumable" | "put",
   file: File,
   onProgress: (loaded: number, total: number) => void,
   signal: AbortSignal,
-): Promise<void> {
+): Promise<UploadProgressResult> {
   if (uploadMethod === "put") {
     await new Promise<void>((resolve, reject) => {
       let settled = false;
@@ -265,64 +271,130 @@ export async function uploadFileWithProgress(
       signal.addEventListener("abort", abortListener, { once: true });
       xhr.send(file);
     });
-    return;
+    return { delivered: false };
   }
 
-  await new Promise<void>((resolve, reject) => {
-    let settled = false;
-    const finishResolve = () => {
-      if (settled) return;
-      settled = true;
-      signal.removeEventListener("abort", abortListener);
-      resolve();
-    };
-    const finishReject = (error: SiloUploadError) => {
-      if (settled) return;
-      settled = true;
-      signal.removeEventListener("abort", abortListener);
-      reject(error);
-    };
+  return await uploadResumableFileWithProgress(
+    uploadUrl,
+    file,
+    onProgress,
+    signal,
+  );
+}
 
-    const upload = new Upload(file, {
-      endpoint: uploadUrl,
-      uploadSize: file.size,
-      storeFingerprintForResuming: false,
-      removeFingerprintOnSuccess: true,
-      retryDelays: [0, 1000, 3000],
-      onError: (error) => {
-        finishReject(
-          new SiloUploadError({
-            code: "UPLOAD_FAILED",
-            message: `File upload failed for "${file.name}"`,
-            cause: error,
-          }),
-        );
+interface ResumableStatusResponse {
+  ok?: boolean;
+  uploadId?: string;
+  offset?: number;
+  size?: number | null;
+  completion?: {
+    onUploadCompleteResult?: unknown;
+  };
+  completionDelivered?: boolean;
+  error?: string;
+}
+
+interface ResumableUploadResponse extends ResumableStatusResponse {
+  complete?: boolean;
+  onUploadCompleteResult?: unknown;
+}
+
+export interface UploadProgressResult {
+  delivered: boolean;
+  onUploadCompleteResult?: unknown;
+}
+
+export function resolveResumableUploadUrl(
+  baseUploadUrl: string,
+  uploadId: string,
+): string {
+  const url = new URL(baseUploadUrl);
+  const basePath = url.pathname.replace(/\/+$/, "");
+  url.pathname = `${basePath}/${encodeURIComponent(uploadId)}`;
+  return url.toString();
+}
+
+async function uploadResumableFileWithProgress(
+  uploadUrl: string,
+  file: File,
+  onProgress: (loaded: number, total: number) => void,
+  signal: AbortSignal,
+): Promise<UploadProgressResult> {
+  const createResponse = await fetch(uploadUrl, {
+    method: "POST",
+    signal,
+  });
+  const createData = (await createResponse
+    .json()
+    .catch(() => null)) as ResumableStatusResponse | null;
+  if (!createResponse.ok || !createData?.uploadId) {
+    throw new SiloUploadError({
+      code: "UPLOAD_CREATE_FAILED",
+      message:
+        createData?.error ??
+        `Failed to create resumable upload (${createResponse.status})`,
+      cause: createData,
+    });
+  }
+
+  const partUrl = resolveResumableUploadUrl(uploadUrl, createData.uploadId);
+  let offset = createData.offset ?? 0;
+  onProgress(offset, file.size);
+
+  while (offset < file.size) {
+    const chunk = file.slice(offset);
+    const end = file.size - 1;
+    const response = await fetch(partUrl, {
+      method: "PUT",
+      headers: {
+        "Content-Type": file.type || "application/octet-stream",
+        "Content-Range": `bytes ${offset}-${end}/${file.size}`,
       },
-      onProgress: (bytesUploaded, bytesTotal) => {
-        onProgress(bytesUploaded, bytesTotal);
-      },
-      onSuccess: () => {
-        finishResolve();
-      },
+      body: chunk,
+      signal,
     });
 
-    const abortListener = () => {
-      void upload.abort().finally(() => {
-        finishReject(
-          new SiloUploadError({
-            code: "UPLOAD_ABORTED",
-            message: "Upload aborted",
-          }),
-        );
+    const data = (await response
+      .json()
+      .catch(() => null)) as ResumableUploadResponse | null;
+    if (!response.ok || !data?.ok) {
+      throw new SiloUploadError({
+        code:
+          response.status === 409 ? "UPLOAD_OFFSET_MISMATCH" : "UPLOAD_FAILED",
+        message:
+          data?.error ??
+          `File upload failed for "${file.name}" (${response.status})`,
+        cause: data,
       });
-    };
-
-    if (signal.aborted) {
-      abortListener();
-      return;
     }
 
-    signal.addEventListener("abort", abortListener, { once: true });
-    upload.start();
+    offset = data.offset ?? file.size;
+    onProgress(offset, file.size);
+
+    if (data.complete) {
+      return {
+        delivered: data.completionDelivered === true,
+        onUploadCompleteResult:
+          data.onUploadCompleteResult ??
+          data.completion?.onUploadCompleteResult,
+      };
+    }
+  }
+
+  const statusResponse = await fetch(partUrl, {
+    method: "GET",
+    cache: "no-store",
+    signal,
   });
+  const statusData = (await statusResponse
+    .json()
+    .catch(() => null)) as ResumableStatusResponse | null;
+  if (statusResponse.ok && statusData?.completion) {
+    return {
+      delivered: statusData.completionDelivered === true,
+      onUploadCompleteResult: statusData.completion.onUploadCompleteResult,
+    };
+  }
+
+  return { delivered: false };
 }

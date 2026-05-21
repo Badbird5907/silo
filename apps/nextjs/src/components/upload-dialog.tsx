@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { AlertCircle, CheckCircle2, FileUp, Upload, X } from "lucide-react";
-import * as tus from "tus-js-client";
+import { nanoid } from "nanoid";
 
 import { Button } from "@silo-storage/ui/components/button";
 import {
@@ -24,7 +24,6 @@ import {
   SelectValue,
 } from "@silo-storage/ui/components/select";
 import { cn } from "@silo-storage/ui/lib/utils";
-import { nanoid } from "nanoid";
 
 interface Environment {
   id: string;
@@ -64,7 +63,7 @@ export function UploadDialog({
     progress: 0,
   });
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const uploadRef = React.useRef<tus.Upload | null>(null);
+  const abortControllerRef = React.useRef<AbortController | null>(null);
 
   React.useEffect(() => {
     if (!open) {
@@ -124,36 +123,69 @@ export function UploadDialog({
 
       setUploadState({ status: "uploading", progress: 0 });
 
-      const upload = new tus.Upload(selectedFile, {
-        endpoint: uploadUrl,
-        retryDelays: [0, 1000, 3000, 5000],
-        onError: (error: { message?: string }) => {
-          console.error("Upload failed:", error);
-          setUploadState({
-            status: "error",
-            progress: 0,
-            error: error.message ?? "Upload failed",
-          });
-        },
-        onProgress: (bytesUploaded: number, bytesTotal: number) => {
-          const percentage = Math.round((bytesUploaded / bytesTotal) * 100);
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
+      const createResponse = await fetch(uploadUrl, {
+        method: "POST",
+        signal: abortController.signal,
+      });
+      const createData = (await createResponse.json().catch(() => null)) as {
+        uploadId?: string;
+        error?: string;
+      } | null;
+      if (!createResponse.ok || !createData?.uploadId) {
+        throw new Error(createData?.error ?? "Failed to create upload session");
+      }
+
+      const partUrl = new URL(uploadUrl);
+      partUrl.pathname = `${partUrl.pathname.replace(/\/+$/, "")}/${encodeURIComponent(createData.uploadId)}`;
+
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        const abort = () => {
+          xhr.abort();
+          reject(new Error("Upload aborted"));
+        };
+
+        abortController.signal.addEventListener("abort", abort, { once: true });
+        xhr.open("PUT", partUrl.toString());
+        xhr.setRequestHeader(
+          "Content-Range",
+          `bytes 0-${selectedFile.size - 1}/${selectedFile.size}`,
+        );
+        if (selectedFile.type) {
+          xhr.setRequestHeader("Content-Type", selectedFile.type);
+        }
+        xhr.upload.onprogress = (event) => {
+          if (!event.lengthComputable) return;
+          const percentage = Math.round((event.loaded / event.total) * 100);
           setUploadState((prev) => ({
             ...prev,
             progress: percentage,
           }));
-        },
-        onSuccess: () => {
-          setUploadState({
-            status: "success",
-            progress: 100,
-            accessKey,
-          });
-          onUploadComplete?.();
-        },
+        };
+        xhr.onload = () => {
+          abortController.signal.removeEventListener("abort", abort);
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve();
+            return;
+          }
+          reject(new Error(xhr.responseText || "Upload failed"));
+        };
+        xhr.onerror = () => {
+          abortController.signal.removeEventListener("abort", abort);
+          reject(new Error("Upload failed"));
+        };
+        xhr.send(selectedFile);
       });
 
-      uploadRef.current = upload;
-      upload.start();
+      abortControllerRef.current = null;
+      setUploadState({
+        status: "success",
+        progress: 100,
+        accessKey,
+      });
+      onUploadComplete?.();
     } catch (error) {
       console.error("Upload error:", error);
       setUploadState({
@@ -165,14 +197,13 @@ export function UploadDialog({
   };
 
   const handleCancel = () => {
-    if (uploadRef.current) {
-      void uploadRef.current.abort();
-      uploadRef.current = null;
-    }
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
     setUploadState({ status: "idle", progress: 0 });
   };
 
-  const canUpload = selectedEnvId && selectedFile && uploadState.status === "idle";
+  const canUpload =
+    selectedEnvId && selectedFile && uploadState.status === "idle";
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -190,7 +221,7 @@ export function UploadDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4 max-w-[400px]">
+        <div className="max-w-[400px] space-y-4 py-4">
           <div className="space-y-2">
             <Label htmlFor="environment">Environment</Label>
             <Select

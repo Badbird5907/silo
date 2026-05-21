@@ -147,14 +147,18 @@ export function UploadOutcomeRateChart({
           content={
             <ChartTooltipContent
               labelFormatter={(_value, payload) => {
-                const data = payload[0]?.payload as UploadOutcomeRateDatum | undefined;
+                const data = payload[0]?.payload as
+                  | UploadOutcomeRateDatum
+                  | undefined;
                 if (data?.date) {
                   return formatChartDate(data.date);
                 }
                 return "";
               }}
               formatter={(value, name, _item, _index, payload) => {
-                const data = payload as unknown as UploadOutcomeRateDatum | undefined;
+                const data = payload as unknown as
+                  | UploadOutcomeRateDatum
+                  | undefined;
                 const count =
                   name === "Success rate"
                     ? data?.uploadsCompleted

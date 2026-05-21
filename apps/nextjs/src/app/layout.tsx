@@ -17,12 +17,10 @@ export const metadata: Metadata = {
       : "http://localhost:3000",
   ),
   title: "Silo",
-  description:
-    "S3 for the modern web.",
+  description: "S3 for the modern web.",
   openGraph: {
     title: "Silo",
-    description:
-      "S3 for the modern web.",
+    description: "S3 for the modern web.",
     url: "https://silo.evanyu.dev",
     siteName: "Silo",
   },

@@ -1,5 +1,5 @@
-import { listObjects } from "./upload";
 import type { Bindings } from "../../types/bindings";
+import { listObjects } from "./upload";
 
 export interface DeletePrefixQueueMessage {
   prefix: string;
@@ -22,7 +22,10 @@ export async function deletePrefixChunk(params: {
   let deleted = 0;
 
   while (processed < MAX_OBJECTS_PER_INVOCATION) {
-    const pageLimit = Math.min(LIST_LIMIT, MAX_OBJECTS_PER_INVOCATION - processed);
+    const pageLimit = Math.min(
+      LIST_LIMIT,
+      MAX_OBJECTS_PER_INVOCATION - processed,
+    );
     const page = await listObjects({
       prefix: params.prefix,
       cursor,

@@ -52,22 +52,25 @@ const callbackEnvelopeSchema = z.object({
   data: z.unknown(),
 });
 
-function parseSignatureHeader(value: string): { timestamp?: number; v1?: string } {
+function parseSignatureHeader(value: string): {
+  timestamp?: number;
+  v1?: string;
+} {
   const entriesResult = signatureHeaderPieceSchema.safeParse(
     value
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .map((part) => {
-      const separator = part.indexOf("=");
-      if (separator === -1) {
-        return { key: part, value: "" };
-      }
-      return {
-        key: part.slice(0, separator),
-        value: part.slice(separator + 1),
-      };
-    }),
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => {
+        const separator = part.indexOf("=");
+        if (separator === -1) {
+          return { key: part, value: "" };
+        }
+        return {
+          key: part.slice(0, separator),
+          value: part.slice(separator + 1),
+        };
+      }),
   );
   if (!entriesResult.success) {
     return {};
@@ -76,7 +79,9 @@ function parseSignatureHeader(value: string): { timestamp?: number; v1?: string 
   const entries = entriesResult.data;
   const timestampRaw = entries.find((entry) => entry.key === "t")?.value;
   const v1 = entries.find((entry) => entry.key === "v1")?.value;
-  const timestamp = timestampRaw ? Number.parseInt(timestampRaw, 10) : undefined;
+  const timestamp = timestampRaw
+    ? Number.parseInt(timestampRaw, 10)
+    : undefined;
   return {
     timestamp: Number.isFinite(timestamp) ? timestamp : undefined,
     v1,
@@ -165,7 +170,9 @@ export async function verifyCallbackSignature(
   const nowMs = input.nowMs ?? Date.now();
   const nowSeconds = Math.floor(nowMs / 1000);
   if (Math.abs(nowSeconds - headerTimestamp) > maxAgeSeconds) {
-    throw new Error("Callback signature timestamp is outside allowed tolerance");
+    throw new Error(
+      "Callback signature timestamp is outside allowed tolerance",
+    );
   }
 }
 
@@ -210,4 +217,3 @@ export async function verifyAndParseUploadCallback(
 
   return parseEnvelope(body);
 }
-

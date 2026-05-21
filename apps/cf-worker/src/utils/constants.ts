@@ -1,11 +1,12 @@
-export const TUS_VERSION = "1.0.0";
-export const TUS_SUPPORTED_VERSIONS = ["1.0.0"] as const;
-export const TUS_SUPPORTED_VERSIONS_STRING = TUS_SUPPORTED_VERSIONS.join(",");
+export const UPLOAD_PROTOCOL_VERSION = "1.0.0";
+export const UPLOAD_SUPPORTED_PROTOCOL_VERSIONS = ["1.0.0"] as const;
+export const UPLOAD_SUPPORTED_PROTOCOL_VERSIONS_STRING =
+  UPLOAD_SUPPORTED_PROTOCOL_VERSIONS.join(",");
 
-export const TUS_RESUMABLE_HEADER = "Tus-Resumable";
-export const TUS_VERSION_HEADER = "Tus-Version";
-export const TUS_EXTENSION_HEADER = "Tus-Extension";
-export const TUS_MAX_SIZE_HEADER = "Tus-Max-Size";
+export const UPLOAD_PROTOCOL_HEADER = "X-Silo-Upload-Version";
+export const UPLOAD_PROTOCOL_VERSION_HEADER = "X-Silo-Upload-Versions";
+export const UPLOAD_EXTENSION_HEADER = "X-Silo-Upload-Extension";
+export const UPLOAD_MAX_SIZE_HEADER = "X-Silo-Upload-Max-Size";
 
 export const UPLOAD_OFFSET_HEADER = "Upload-Offset";
 export const UPLOAD_LENGTH_HEADER = "Upload-Length";
@@ -46,7 +47,7 @@ export const RESERVED_SLUGS = [
 ] as const;
 
 export const ERROR_CODES = {
-  INVALID_TUS_VERSION: "invalid_tus_version",
+  INVALID_UPLOAD_PROTOCOL_VERSION: "invalid_upload_version",
   INVALID_CONTENT_TYPE: "invalid_content_type",
   INVALID_REQUEST: "invalid_request",
   OFFSET_MISMATCH: "offset_mismatch",
