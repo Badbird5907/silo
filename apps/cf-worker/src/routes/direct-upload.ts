@@ -7,6 +7,7 @@ import {
   areMimeTypesEquivalent,
   detectMimeType,
   isAllowedMimeType,
+  shouldValidateClaimedMimeType,
 } from "../lib/file-types";
 import { readHeaderBytes } from "../lib/hash";
 import {
@@ -197,8 +198,10 @@ export async function handleDirectUpload(c: AppContext): Promise<Response> {
     const actualHash = verificationResult.claimedHash ?? null;
 
     if (
-      verificationResult.claimedMimeType &&
-      actualMimeType !== "application/octet-stream" &&
+      shouldValidateClaimedMimeType(
+        verificationResult.claimedMimeType,
+        actualMimeType,
+      ) &&
       !areMimeTypesEquivalent(
         verificationResult.claimedMimeType,
         actualMimeType,

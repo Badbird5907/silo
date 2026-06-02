@@ -5,6 +5,7 @@ import {
   areMimeTypesEquivalent,
   detectMimeType,
   isAllowedMimeType,
+  shouldValidateClaimedMimeType,
 } from "../lib/file-types";
 import { readHeaderBytes } from "../lib/hash";
 import {
@@ -914,8 +915,7 @@ export class UploadStateDO {
     const actualHash = metadata.claimedHash ?? null;
 
     if (
-      metadata.claimedMimeType &&
-      actualMimeType !== "application/octet-stream" &&
+      shouldValidateClaimedMimeType(metadata.claimedMimeType, actualMimeType) &&
       !areMimeTypesEquivalent(
         metadata.claimedMimeType,
         actualMimeType,

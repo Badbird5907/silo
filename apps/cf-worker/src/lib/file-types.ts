@@ -8,6 +8,9 @@ import {
 } from "@silo-storage/mime-types";
 
 const GENERIC_XML_MIME_TYPES = new Set(["application/xml", "text/xml"]);
+const NON_AUTHORITATIVE_CLAIMED_MIME_TYPES = new Set([
+  "application/octet-stream",
+]);
 
 function normalizeMimeType(mimeType: string, fileName?: string): string {
   const normalizedFileName = fileName?.trim();
@@ -40,6 +43,18 @@ export function areMimeTypesEquivalent(
   }
 
   return false;
+}
+
+export function shouldValidateClaimedMimeType(
+  claimedMimeType: string | null | undefined,
+  actualMimeType: string,
+): claimedMimeType is string {
+  if (!claimedMimeType || actualMimeType === "application/octet-stream") {
+    return false;
+  }
+
+  const normalizedClaimedMimeType = stripMimeParameters(claimedMimeType);
+  return !NON_AUTHORITATIVE_CLAIMED_MIME_TYPES.has(normalizedClaimedMimeType);
 }
 
 export async function detectMimeType(
