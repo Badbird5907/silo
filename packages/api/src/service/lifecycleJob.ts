@@ -12,12 +12,16 @@ import {
   sql,
 } from "@silo-storage/db";
 import { fileKeys, fileLifecycleJobs, files } from "@silo-storage/db/schema";
-import { clearUploadSessionAdapterData } from "@silo-storage/shared";
+import {
+  clearUploadSessionAdapterData,
+  mapWithConcurrency,
+} from "@silo-storage/shared";
 
 import { env } from "../env";
 import { syncEnvironmentStorageSnapshot } from "./analytics";
 
 const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
+const LIFECYCLE_JOB_EXECUTION_CONCURRENCY = 10;
 const ALWAYS_RETRY_CLEANUP_KINDS = new Set<LifecycleJobKind>([
   "delete_object",
   "abort_multipart",
@@ -233,7 +237,12 @@ async function claimLifecycleJobs(db: Db, options: ClaimOptions) {
     options.leaseOwner ??
     `runner:${process.pid}:${Math.random().toString(36).slice(2, 10)}`;
 
-  const candidates = await db
+  // Claim in a single statement: the inner SELECT ... FOR UPDATE SKIP LOCKED
+  // atomically picks runnable jobs while skipping rows another runner already
+  // holds, and the surrounding UPDATE leases them. This avoids the extra
+  // round-trip (and the lost-update race) of selecting candidate ids first and
+  // re-filtering them in a second UPDATE.
+  const candidateIds = db
     .select({ id: fileLifecycleJobs.id })
     .from(fileLifecycleJobs)
     .where(
@@ -253,10 +262,8 @@ async function claimLifecycleJobs(db: Db, options: ClaimOptions) {
       desc(fileLifecycleJobs.priority),
       asc(fileLifecycleJobs.nextAttemptAt),
     )
-    .limit(limit);
-
-  const ids = candidates.map((candidate) => candidate.id);
-  if (ids.length === 0) return [];
+    .limit(limit)
+    .for("update", { skipLocked: true });
 
   const claimed = await db
     .update(fileLifecycleJobs)
@@ -265,26 +272,15 @@ async function claimLifecycleJobs(db: Db, options: ClaimOptions) {
       leaseOwner,
       leaseExpiresAt: sql`now() + (${leaseSeconds} * interval '1 second')`,
     })
-    .where(
-      and(
-        inArray(fileLifecycleJobs.id, ids),
-        or(
-          eq(fileLifecycleJobs.state, "pending"),
-          eq(fileLifecycleJobs.state, "retry"),
-        ),
-        lte(fileLifecycleJobs.nextAttemptAt, now),
-        or(
-          isNull(fileLifecycleJobs.leaseExpiresAt),
-          lte(fileLifecycleJobs.leaseExpiresAt, now),
-        ),
-      ),
-    )
+    .where(inArray(fileLifecycleJobs.id, candidateIds))
     .returning();
 
-  const claimedById = new Map(claimed.map((job) => [job.id, job]));
-  return ids
-    .map((id) => claimedById.get(id))
-    .filter((job): job is NonNullable<typeof job> => job !== undefined);
+  // Preserve priority ordering for processing (UPDATE ... RETURNING does not
+  // guarantee row order).
+  return claimed.sort((a, b) => {
+    if (a.priority !== b.priority) return b.priority - a.priority;
+    return a.nextAttemptAt.getTime() - b.nextAttemptAt.getTime();
+  });
 }
 
 export async function requeueDeadLifecycleJobs(
@@ -342,7 +338,9 @@ export async function requeueDeadLifecycleJobs(
   };
 }
 
-async function markJobDone(db: Db, jobId: string): Promise<void> {
+async function markJobsDone(db: Db, jobIds: string[]): Promise<void> {
+  if (jobIds.length === 0) return;
+
   await db
     .update(fileLifecycleJobs)
     .set({
@@ -354,7 +352,7 @@ async function markJobDone(db: Db, jobId: string): Promise<void> {
       lastHttpStatus: null,
       lastErrorCode: null,
     })
-    .where(eq(fileLifecycleJobs.id, jobId));
+    .where(inArray(fileLifecycleJobs.id, jobIds));
 }
 
 async function markJobFailed(
@@ -665,38 +663,65 @@ export async function runLifecycleJobBatch(
   dead: number;
 }> {
   const claimedJobs = await claimLifecycleJobs(db, options);
+  if (claimedJobs.length === 0) {
+    return { claimed: 0, completed: 0, retried: 0, dead: 0 };
+  }
 
-  let completed = 0;
-  let retried = 0;
-  let dead = 0;
+  // Jobs in a batch are independent, and the bulk of their work is network I/O
+  // (delete/abort calls to the worker). Execute them concurrently instead of
+  // one-at-a-time so the batch latency is bounded by the slowest job rather
+  // than the sum of all jobs.
+  const results = await mapWithConcurrency(
+    claimedJobs,
+    LIFECYCLE_JOB_EXECUTION_CONCURRENCY,
+    async (job) => ({ job, outcome: await executeLifecycleJob(db, job) }),
+  );
 
-  for (const job of claimedJobs) {
-    const outcome = await executeLifecycleJob(db, job);
+  const completedJobIds: string[] = [];
+  const failedJobs: {
+    job: typeof fileLifecycleJobs.$inferSelect;
+    failure: {
+      message: string;
+      httpStatus?: number;
+      errorCode: string;
+      retryable: boolean;
+    };
+  }[] = [];
 
+  for (const { job, outcome } of results) {
     if (outcome.ok) {
-      await markJobDone(db, job.id);
-      completed += 1;
-      continue;
-    }
-
-    await markJobFailed(db, job, {
-      message: outcome.message,
-      httpStatus: outcome.httpStatus,
-      errorCode: outcome.errorCode,
-      retryable: outcome.retryable,
-    });
-
-    if (outcome.retryable) {
-      retried += 1;
+      completedJobIds.push(job.id);
     } else {
-      dead += 1;
+      failedJobs.push({
+        job,
+        failure: {
+          message: outcome.message,
+          httpStatus: outcome.httpStatus,
+          errorCode: outcome.errorCode,
+          retryable: outcome.retryable,
+        },
+      });
     }
   }
 
+  // Completed jobs share an identical terminal update, so collapse them into a
+  // single statement instead of one UPDATE per job.
+  await markJobsDone(db, completedJobIds);
+
+  // Failed jobs each compute their own backoff/attempt state, so update them
+  // individually but still concurrently.
+  await mapWithConcurrency(
+    failedJobs,
+    LIFECYCLE_JOB_EXECUTION_CONCURRENCY,
+    ({ job, failure }) => markJobFailed(db, job, failure),
+  );
+
+  const retried = failedJobs.filter(({ failure }) => failure.retryable).length;
+
   return {
     claimed: claimedJobs.length,
-    completed,
+    completed: completedJobIds.length,
     retried,
-    dead,
+    dead: failedJobs.length - retried,
   };
 }

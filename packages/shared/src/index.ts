@@ -3,3 +3,4 @@ export * from "./events";
 export * from "./adapterData";
 export * from "./audit";
 export * from "./network";
+export * from "./concurrency";

@@ -8,12 +8,18 @@ import { runLifecycleJobBatch } from "@silo-storage/api/service/lifecycleJob";
 import { and, asc, eq, sql } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import { fileKeys, projects } from "@silo-storage/db/schema";
+import { mapWithConcurrency } from "@silo-storage/shared";
 
 import { isCallbackAuthorized } from "@/lib/internal/callback-auth";
 
 const bodySchema = z.object({
   limit: z.number().int().positive().max(500).default(100).optional(),
 });
+
+// Each stale upload is failed independently (transaction + redis + webhook +
+// usage tracking). Process them concurrently so the route latency scales with
+// the slowest upload rather than the sum of all of them.
+const MARK_STALE_CONCURRENCY = 8;
 
 export async function POST(request: Request) {
   if (!isCallbackAuthorized(request)) {
@@ -65,36 +71,46 @@ export async function POST(request: Request) {
     let skipped = 0;
     let errors = 0;
 
-    for (const upload of stalePendingUploads) {
-      try {
-        await markUploadAsFailed(db, {
-          projectId: upload.projectId,
-          environmentId: upload.environmentId,
-          fileKeyId: upload.fileKeyId,
-          error: "Automatically marked as failed after pending upload timeout",
-        });
+    const outcomes = await mapWithConcurrency(
+      stalePendingUploads,
+      MARK_STALE_CONCURRENCY,
+      async (upload) => {
+        try {
+          await markUploadAsFailed(db, {
+            projectId: upload.projectId,
+            environmentId: upload.environmentId,
+            fileKeyId: upload.fileKeyId,
+            error:
+              "Automatically marked as failed after pending upload timeout",
+          });
 
-        markedFailed += 1;
-      } catch (error) {
-        if (error instanceof UploadFailureError) {
-          if (
-            error.code === "ALREADY_COMPLETED" ||
-            error.code === "ALREADY_FAILED" ||
-            error.code === "NOT_FOUND"
-          ) {
-            skipped += 1;
-            continue;
+          return "marked" as const;
+        } catch (error) {
+          if (error instanceof UploadFailureError) {
+            if (
+              error.code === "ALREADY_COMPLETED" ||
+              error.code === "ALREADY_FAILED" ||
+              error.code === "NOT_FOUND"
+            ) {
+              return "skipped" as const;
+            }
           }
-        }
 
-        errors += 1;
-        console.error("Failed to auto-mark stale pending upload", {
-          fileKeyId: upload.fileKeyId,
-          projectId: upload.projectId,
-          environmentId: upload.environmentId,
-          error,
-        });
-      }
+          console.error("Failed to auto-mark stale pending upload", {
+            fileKeyId: upload.fileKeyId,
+            projectId: upload.projectId,
+            environmentId: upload.environmentId,
+            error,
+          });
+          return "error" as const;
+        }
+      },
+    );
+
+    for (const outcome of outcomes) {
+      if (outcome === "marked") markedFailed += 1;
+      else if (outcome === "skipped") skipped += 1;
+      else errors += 1;
     }
 
     const drainResult = await runLifecycleJobBatch(db, {

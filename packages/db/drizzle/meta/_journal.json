@@ -78,6 +78,13 @@
       "when": 1776754365153,
       "tag": "0010_glossy_franklin_richards",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1782274220767,
+      "tag": "0011_amused_boomerang",
+      "breakpoints": true
     }
   ]
 }
