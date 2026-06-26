@@ -1,0 +1,2 @@
+CREATE INDEX "file_keys_status_created_at_idx" ON "silo_file_keys" USING btree ("status","created_at");--> statement-breakpoint
+CREATE INDEX "file_lifecycle_jobs_state_dead_at_idx" ON "silo_file_lifecycle_jobs" USING btree ("state","dead_at");

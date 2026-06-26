@@ -219,6 +219,9 @@ export const fileKeys = pgTable(
       table.accessKey,
     ),
     index("file_keys_status_expires_at_idx").on(table.status, table.expiresAt),
+    // Supports the stale pending-upload sweep, which scans
+    // status = 'pending' ordered by created_at.
+    index("file_keys_status_created_at_idx").on(table.status, table.createdAt),
     index("file_keys_metadata_gin_idx").using("gin", table.metadata),
   ],
 );
@@ -282,6 +285,12 @@ export const fileLifecycleJobs = pgTable(
     index("file_lifecycle_jobs_file_key_kind_idx").on(
       table.fileKeyId,
       table.kind,
+    ),
+    // Supports the dead-job requeue sweep, which scans state = 'dead'
+    // ordered by dead_at.
+    index("file_lifecycle_jobs_state_dead_at_idx").on(
+      table.state,
+      table.deadAt,
     ),
   ],
 );
