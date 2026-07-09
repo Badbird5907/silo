@@ -25,7 +25,7 @@
     "dev": "tsup --watch",
     "format": "prettier --check . --ignore-path ../../.gitignore",
     "lint": "eslint",
-    "test": "tsx --test test/**/*.test.ts",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
@@ -42,8 +42,8 @@
     "eslint": "^9.38.0",
     "prettier": "^3.6.2",
     "tsup": "^8.5.1",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.13"
   },
   "prettier": "@silo-storage/prettier-config"
 }
