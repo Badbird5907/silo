@@ -20,12 +20,12 @@
     "studio": "pnpm with-env drizzle-kit studio",
     "backfill:audit-events": "pnpm with-env tsx backfill-audit-events.ts",
     "backfill:storage-snapshots": "pnpm with-env tsx backfill-storage-snapshots.ts",
+    "audit:cloudflare-cutover": "pnpm with-env tsx audit-cloudflare-cutover.ts",
     "seed:analytics": "pnpm with-env tsx seed-analytics.ts",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false",
     "with-env": "dotenv -e ../../.env.local --"
   },
   "dependencies": {
-    "@vercel/postgres": "^0.10.0",
     "drizzle-orm": "^0.44.7",
     "drizzle-zod": "^0.8.3",
     "nanoid": "^5.1.6",

@@ -11,8 +11,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
-# You can leverage Vercel Remote Caching with Turbo to speed up your builds
-# @link https://turborepo.com/docs/core-concepts/remote-caching#remote-caching-on-vercel-builds
 env:
   FORCE_COLOR: 3
   TURBO_TEAM: ${{ vars.TURBO_TEAM }}
@@ -61,3 +59,6 @@ jobs:
 
       - name: Typecheck
         run: pnpm typecheck
+
+      - name: Typecheck Alchemy infrastructure
+        run: pnpm exec tsc --noEmit --module Preserve --moduleResolution Bundler --target ES2022 --skipLibCheck alchemy.run.ts

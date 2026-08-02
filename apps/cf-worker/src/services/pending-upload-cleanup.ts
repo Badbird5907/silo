@@ -22,7 +22,7 @@ function resolvePositiveInt(
 
 async function processStalePendingBatch(env: Bindings, limit: number) {
   const response = await fetch(
-    `${env.NEXTJS_CALLBACK_URL}/api/internal/pending-uploads/mark-stale-failed`,
+    `${env.CONTROL_PLANE_URL}/api/internal/pending-uploads/mark-stale-failed`,
     {
       method: "POST",
       headers: buildNextJsInternalHeaders(env, {

@@ -1,14 +1,9 @@
-import type { DeletePrefixQueueMessage } from "../services/r2/delete-prefix";
-
 export interface Bindings {
   R2_BUCKET: R2Bucket;
   UPLOAD_STATE_DO: DurableObjectNamespace;
-  DELETE_PREFIX_QUEUE: {
-    send(message: DeletePrefixQueueMessage): Promise<void>;
-  };
 
   WORKER_DOMAIN: string;
-  NEXTJS_CALLBACK_URL: string;
+  CONTROL_PLANE_URL: string;
   ENV: string;
   CALLBACK_SECRET: string;
   SIGNING_SECRET: string;
@@ -22,8 +17,6 @@ export interface Bindings {
   LIFECYCLE_JOB_BATCH_SIZE: string;
   LIFECYCLE_JOB_MAX_BATCHES: string;
   LIFECYCLE_JOB_LEASE_SECONDS: string;
-
-  VERCEL_AUTOMATION_BYPASS_SECRET?: string;
 }
 
 export interface Variables {

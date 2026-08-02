@@ -15,6 +15,14 @@ import {
 } from "@/lib/upload/register";
 
 export async function POST(request: Request) {
+  if (!env.UPLOADS_ENABLED) {
+    return jsonError(
+      "Service Unavailable",
+      "Uploads are temporarily paused for maintenance.",
+      503,
+    );
+  }
+
   const authResult = await authenticateRequest(request);
   if (authResult instanceof Response) return authResult;
   if (authResult.type !== "apiKey" || !authResult.apiKey.rawKey) {

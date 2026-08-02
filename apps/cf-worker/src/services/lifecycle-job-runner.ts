@@ -27,7 +27,7 @@ async function runLifecycleBatch(
   input: { limit: number; maxBatches: number; leaseSeconds: number },
 ) {
   const response = await fetch(
-    `${env.NEXTJS_CALLBACK_URL}/api/internal/lifecycle-jobs/run`,
+    `${env.CONTROL_PLANE_URL}/api/internal/lifecycle-jobs/run`,
     {
       method: "POST",
       headers: buildNextJsInternalHeaders(env, {

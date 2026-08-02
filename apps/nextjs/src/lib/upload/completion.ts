@@ -1,16 +1,13 @@
 import { z } from "zod";
 
 import {
-  asyncWaitForMessage,
-  publishMessage,
-  redis,
-} from "@silo-storage/redis";
+  getStateValue,
+  setStateValue,
+  waitForStateValue,
+} from "@/cloudflare/state";
 
 const DEFAULT_COMPLETION_NAMESPACE = "default";
 const DEFAULT_COMPLETION_TTL_SECONDS = 25 * 60;
-const COMPLETION_DEBUG_ENABLED =
-  (globalThis as { process?: { env?: Record<string, string | undefined> } })
-    .process?.env?.SILO_COMPLETION_DEBUG === "1";
 
 const completionRecordSchema = z
   .object({
@@ -25,40 +22,16 @@ const completionRecordSchema = z
 
 export type CompletionRecord = z.infer<typeof completionRecordSchema>;
 
-function resolveCompletionNamespace(namespace?: string): string {
-  return namespace ?? DEFAULT_COMPLETION_NAMESPACE;
-}
-
 function completionKey(fileKeyId: string, namespace?: string): string {
-  return `completion:${resolveCompletionNamespace(namespace)}:fileKey:${fileKeyId}`;
-}
-
-function completionChannel(fileKeyId: string, namespace?: string): string {
-  return `completion:${resolveCompletionNamespace(namespace)}:fileKey:${fileKeyId}`;
-}
-
-function logCompletionDebug(event: string, details: Record<string, unknown>) {
-  if (!COMPLETION_DEBUG_ENABLED) return;
-  console.info("[silo-completion-store]", {
-    event,
-    ...details,
-  });
+  return `completion:${namespace ?? DEFAULT_COMPLETION_NAMESPACE}:fileKey:${fileKeyId}`;
 }
 
 export async function setCompletionRecord(input: {
   fileKeyId: string;
-  completion: Partial<CompletionRecord> & {
-    onUploadCompleteResult: unknown;
-  };
+  completion: Partial<CompletionRecord> & { onUploadCompleteResult: unknown };
   ttlSeconds?: number;
   namespace?: string;
 }): Promise<CompletionRecord> {
-  const ttlSeconds = Math.max(
-    1,
-    Math.floor(input.ttlSeconds ?? DEFAULT_COMPLETION_TTL_SECONDS),
-  );
-  const namespace = resolveCompletionNamespace(input.namespace);
-
   const record = completionRecordSchema.parse({
     contractVersion: input.completion.contractVersion ?? 1,
     source: input.completion.source,
@@ -67,33 +40,11 @@ export async function setCompletionRecord(input: {
     completedAt: input.completion.completedAt ?? Date.now(),
     onUploadCompleteResult: input.completion.onUploadCompleteResult,
   });
-
-  await redis.set(
-    completionKey(input.fileKeyId, namespace),
-    JSON.stringify(record),
-    {
-      ex: ttlSeconds,
-    },
+  await setStateValue(
+    completionKey(input.fileKeyId, input.namespace),
+    record,
+    input.ttlSeconds ?? DEFAULT_COMPLETION_TTL_SECONDS,
   );
-  const persisted = await redis.get<string | null>(
-    completionKey(input.fileKeyId, namespace),
-  );
-  logCompletionDebug("set.persisted", {
-    fileKeyId: input.fileKeyId,
-    namespace,
-    ttlSeconds,
-    persisted: Boolean(persisted),
-  });
-  await publishMessage(completionChannel(input.fileKeyId, namespace), {
-    type: "completion.ready",
-    fileKeyId: input.fileKeyId,
-    completedAt: record.completedAt,
-  });
-  logCompletionDebug("set.published", {
-    fileKeyId: input.fileKeyId,
-    namespace,
-  });
-
   return record;
 }
 
@@ -101,48 +52,11 @@ export async function getCompletionRecord(
   fileKeyId: string,
   namespace?: string,
 ): Promise<CompletionRecord | null> {
-  const resolvedNamespace = resolveCompletionNamespace(namespace);
-  const raw = await redis.get<unknown>(
-    completionKey(fileKeyId, resolvedNamespace),
+  const value = await getStateValue<unknown>(
+    completionKey(fileKeyId, namespace),
   );
-  if (raw == null) {
-    logCompletionDebug("get.miss", { fileKeyId, namespace: resolvedNamespace });
-    return null;
-  }
-
-  if (typeof raw !== "string") {
-    try {
-      const parsed = completionRecordSchema.parse(raw);
-      logCompletionDebug("get.hit", {
-        fileKeyId,
-        namespace: resolvedNamespace,
-        completedAt: parsed.completedAt,
-      });
-      return parsed;
-    } catch {
-      logCompletionDebug("get.parse_error", {
-        fileKeyId,
-        namespace: resolvedNamespace,
-      });
-      return null;
-    }
-  }
-
-  try {
-    const parsed = completionRecordSchema.parse(JSON.parse(raw));
-    logCompletionDebug("get.hit", {
-      fileKeyId,
-      namespace: resolvedNamespace,
-      completedAt: parsed.completedAt,
-    });
-    return parsed;
-  } catch {
-    logCompletionDebug("get.parse_error", {
-      fileKeyId,
-      namespace: resolvedNamespace,
-    });
-    return null;
-  }
+  const parsed = completionRecordSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
 }
 
 export async function waitForCompletionRecord(
@@ -150,55 +64,15 @@ export async function waitForCompletionRecord(
   timeoutMs: number,
   namespace?: string,
 ): Promise<CompletionRecord | null> {
-  const startedAt = Date.now();
-  const resolvedNamespace = resolveCompletionNamespace(namespace);
-  logCompletionDebug("wait.start", {
-    fileKeyId,
-    namespace: resolvedNamespace,
-    timeoutMs,
-  });
-  const first = await getCompletionRecord(fileKeyId, resolvedNamespace);
-  if (first) {
-    logCompletionDebug("wait.fast_hit", {
-      fileKeyId,
-      namespace: resolvedNamespace,
-      elapsedMs: Date.now() - startedAt,
-    });
-    return first;
+  const key = completionKey(fileKeyId, namespace);
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const value = await waitForStateValue<unknown>(
+      key,
+      Math.min(25_000, deadline - Date.now()),
+    );
+    const parsed = completionRecordSchema.safeParse(value);
+    if (parsed.success) return parsed.data;
   }
-
-  while (Date.now() - startedAt <= timeoutMs) {
-    const remainingMs = timeoutMs - (Date.now() - startedAt);
-    if (remainingMs <= 0) break;
-
-    try {
-      await asyncWaitForMessage(
-        completionChannel(fileKeyId, resolvedNamespace),
-        Math.min(25_000, remainingMs),
-      );
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unknown wait error";
-      if (!message.includes("Timeout waiting for message")) {
-        throw error;
-      }
-    }
-
-    const current = await getCompletionRecord(fileKeyId, resolvedNamespace);
-    if (current) {
-      logCompletionDebug("wait.hit_after_subscribe", {
-        fileKeyId,
-        namespace: resolvedNamespace,
-        elapsedMs: Date.now() - startedAt,
-      });
-      return current;
-    }
-  }
-
-  logCompletionDebug("wait.timeout", {
-    fileKeyId,
-    namespace: resolvedNamespace,
-    elapsedMs: Date.now() - startedAt,
-  });
   return null;
 }

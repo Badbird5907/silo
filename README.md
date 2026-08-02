@@ -7,7 +7,7 @@ Instead of the usual "presigned URL, then hope the client tells your app it fini
 
 [Read the Docs!](https://silo.evanyu.dev/docs)
 
-## Why Silo 
+## Why Silo
 
 - Resumable uploads via [TUS](https://tus.io/)
 - Server-verified completion callbacks
@@ -18,6 +18,7 @@ Instead of the usual "presigned URL, then hope the client tells your app it fini
 - Support for image transformations and delivery
 
 ## Easy to use SDK
+
 ```ts
 const f = createSiloUpload<Request, UploadContext>();
 
@@ -52,9 +53,9 @@ export const fileRouter = {
 
 This repository is a pnpm/turborepo monorepo containing the full Silo stack:
 
-- `apps/cf-worker`: the Cloudflare Worker that handles uploads and storage operations
-- `apps/nextjs`: the web app frontend (on Vercel)
-- `apps/docs`: the documentation site
+- `apps/cf-worker`: the Cloudflare upload/download Worker backed by R2
+- `apps/nextjs`: the OpenNext control-plane Worker on Cloudflare
+- `apps/docs`: the OpenNext documentation Worker on Cloudflare
 - `sdk/*`: SDK packages for core, server, React, Next.js, and TanStack Start integrations
 - `packages/*`: shared workspace packages used across the apps and SDKs
 
@@ -87,10 +88,11 @@ Common commands:
 
 ```bash
 pnpm dev
-pnpm dev:next
-pnpm dev:worker --local
-pnpm --filter @silo-storage/docs dev
+pnpm infra:plan -- --stage staging
+pnpm infra:deploy -- --stage staging
 ```
+
+Infrastructure details live in [`docs/architecture/cloudflare.md`](docs/architecture/cloudflare.md). Production migration and rollback instructions are in [`docs/migrations/vercel-to-cloudflare.md`](docs/migrations/vercel-to-cloudflare.md).
 
 ## Documentation
 

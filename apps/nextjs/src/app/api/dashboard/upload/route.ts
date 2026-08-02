@@ -28,6 +28,16 @@ const schema = z.object({
 });
 
 export async function POST(request: Request) {
+  if (!env.UPLOADS_ENABLED) {
+    return new Response(
+      JSON.stringify({
+        error: "Service Unavailable",
+        message: "Uploads are temporarily paused for maintenance.",
+      }),
+      { status: 503, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) {
     return new Response(

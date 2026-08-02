@@ -1,13 +1,6 @@
 import type { Bindings } from "../../types/bindings";
 import { listObjects } from "./upload";
 
-export interface DeletePrefixQueueMessage {
-  prefix: string;
-  cursor?: string;
-  requestId: string;
-  startedAt: string;
-}
-
 const LIST_LIMIT = 1000;
 const MAX_OBJECTS_PER_INVOCATION = 5000;
 

@@ -1,5 +1,5 @@
-import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { clerkMiddleware } from "@clerk/nextjs/server";
 import { isMarkdownPreferred, rewritePath } from "fumadocs-core/negotiation";
 
 const llmRewriter = rewritePath("/docs{/*path}", "/llms.mdx/docs{/*path}");

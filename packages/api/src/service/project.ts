@@ -281,7 +281,6 @@ export async function scheduleProjectObjectDeletion(projectId: string) {
       body: JSON.stringify({
         prefix,
         cursor,
-        blocking: true,
       }),
     });
 

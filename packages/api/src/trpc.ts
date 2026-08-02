@@ -8,7 +8,6 @@
  */
 import type { Auth, PermissionCheck, Session } from "@silo-storage/auth";
 import type { TRPCProcedureBuilder, TRPCUnsetMarker } from "@trpc/server";
-import type { Redis } from "@upstash/redis";
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { z, ZodError } from "zod/v4";
@@ -17,7 +16,6 @@ import { roleHasPermissions } from "@silo-storage/auth";
 import { and, eq } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import { members, organizations } from "@silo-storage/db/schema";
-import { redis } from "@silo-storage/redis";
 import { getClientIpFromHeaders } from "@silo-storage/shared";
 
 type AuthApi = Auth["api"];
@@ -25,7 +23,6 @@ export interface TRPCContext {
   authApi: AuthApi;
   session: Session | null;
   db: typeof db;
-  redis: Redis;
   clientIp: string | null;
 }
 
@@ -54,7 +51,6 @@ export async function createTRPCContext(opts: {
     authApi,
     session,
     db,
-    redis,
     clientIp: getClientIpFromHeaders(opts.headers),
   };
 }
