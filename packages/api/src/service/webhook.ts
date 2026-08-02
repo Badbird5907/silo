@@ -1,6 +1,5 @@
 import type { Db } from "@silo-storage/db/client";
 import type { UploadEventEnvelope } from "@silo-storage/shared";
-import { send } from "@vercel/queue";
 import { z } from "zod";
 
 import { and, eq } from "@silo-storage/db";
@@ -11,7 +10,8 @@ import {
   webhookAttempts,
 } from "@silo-storage/db/schema";
 
-const WEBHOOK_TOPIC = "upload-webhooks";
+import { sendWebhookMessage } from "../runtime";
+
 const DEFAULT_MAX_ATTEMPTS = 8;
 
 interface WebhookEnvironmentConfig {
@@ -212,7 +212,7 @@ export async function enqueueUploadWebhookEvent(
 
   console.log("enqueueing webhook event", input);
 
-  await send(WEBHOOK_TOPIC, {
+  const enqueued = await sendWebhookMessage({
     idempotencyKey: input.idempotencyKey ?? input.event.id,
     environmentId: input.environmentId,
     projectId: input.projectId,
@@ -220,7 +220,9 @@ export async function enqueueUploadWebhookEvent(
     event: input.event,
   } satisfies z.infer<typeof queuedWebhookMessageSchema>);
 
-  return { enqueued: true as const };
+  return enqueued
+    ? { enqueued: true as const }
+    : { enqueued: false as const, reason: "local_noop" as const };
 }
 
 export async function getWebhookTargetForEvent(

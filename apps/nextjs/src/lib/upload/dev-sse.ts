@@ -4,9 +4,9 @@ import { signWebhookPayload } from "@silo-storage/api/service/webhook";
 import { and, eq } from "@silo-storage/db";
 import { db } from "@silo-storage/db/client";
 import { fileKeys } from "@silo-storage/db/schema";
-import { asyncWaitForMessage } from "@silo-storage/redis";
 import { normalizeFileKeyMetadata } from "@silo-storage/shared";
 
+import { waitForUploadState } from "@/cloudflare/state";
 import { env } from "@/env";
 
 function toSseFrame(
@@ -124,8 +124,13 @@ export async function createDevUploadEventStream(
           }
 
           try {
-            const message = await asyncWaitForMessage(channel, 25000);
-            const event = JSON.parse(message.data) as UploadEventEnvelope;
+            const event = await waitForUploadState(input.fileKeyId, 25_000);
+            if (!event) {
+              controller.enqueue(
+                encoder.encode(toSseFrame("keepalive", { ts: Date.now() })),
+              );
+              continue;
+            }
             const chunk = await toDevChunk(event);
             controller.enqueue(encoder.encode(toSseFrame("chunk", chunk)));
 
@@ -142,13 +147,6 @@ export async function createDevUploadEventStream(
               error instanceof Error
                 ? error.message
                 : "Unknown SSE stream error";
-
-            if (err.includes("Timeout waiting for message")) {
-              controller.enqueue(
-                encoder.encode(toSseFrame("keepalive", { ts: Date.now() })),
-              );
-              continue;
-            }
 
             controller.enqueue(
               encoder.encode(toSseFrame("error", { message: err })),

@@ -1,200 +1,47 @@
 ---
 title: Deploying Silo
-description: How to deploy Silo to your own infrastructure.
+description: Deploy the complete Silo stack to Cloudflare with Alchemy.
 ---
-import Link from "next/link";
 
-## Overview
-Silo runs on [Cloudflare Workers](https://workers.dev) with [Cloudflare R2](https://developers.cloudflare.com/r2/) as the storage backend. 
-The frontend is [Next.js](https://nextjs.org) running on [Vercel](https://vercel.com).
+Silo deploys entirely to Cloudflare. The root `alchemy.run.ts` file provisions the OpenNext applications, ingest Worker, R2, Durable Objects, Queues, Hyperdrive, cron triggers, and domains.
 
-## Steps
+## Prerequisites
 
-### 1. Prerequisites 
-- A [Cloudflare account](https://dash.cloudflare.com/login)
-- A [Vercel account](https://vercel.com/login)
-- A Redis instance. You can get one for free from [Upstash](https://upstash.com).
-- A PostgreSQL database. You can get one for free from [Supabase](https://supabase.com)
-- Node.js `v24.15.0+` and `pnpm` (`npm i -g pnpm`)
-- The wrangler CLI (`npm i -g wrangler`)
+- Node.js and pnpm versions from the root `package.json`
+- a PostgreSQL database reachable by Cloudflare Hyperdrive
+- a Cloudflare account and API token
+- application, ingest, and docs domains in Cloudflare DNS
 
+## Configure
 
-### 2. Fork the repository
-Fork the repository to your own GitHub account. (also give it a star!)
+Copy `.env.example` to `.env.local`. For deployment, provide Cloudflare credentials, `ALCHEMY_PASSWORD`, database URLs, the three domains/URLs, and the authentication/signing secrets described in the repository migration runbook.
 
-<Link href="https://github.com/Badbird5907/silo/fork" target="_blank">
-  <button style={{
-    backgroundColor: "#347d39",
-    borderColor: "#cdd9e526",
-    color: "#ffffff",
-    boxShadow: "0 1px 1px 0 #01040999,0 1px 3px 0 #01040999",
-  }} className="px-4 py-1 rounded-xl text-white border">Fork the repo</button>
-</Link>
-
-### 3. Clone & install dependencies
-Clone the repository and install dependencies with pnpm.
-Replacd `your-org` with your GitHub username/organization.
+## Local development
 
 ```bash
-git clone https://github.com/your-org/silo.git
-cd silo
 pnpm install
+pnpm db:migrate
+pnpm dev
 ```
 
-### 4. Create CloudFlare resources
-Silo makes an R2 bucket and two Queues. Make sure to run all of these before deploying.
-```bash
-# R2 buckets (one for prod, one for local dev)
-wrangler r2 bucket create silo-uploads
-wrangler r2 bucket create silo-uploads-preview
- 
-# Queues (producer + dead-letter queue)
-# If you are on the free plan, queues have a 24 hour message retention period.
-# You must set the --message-retention-period-secs flag. Omit if you are on workers paid
-wrangler queues create silo-delete-prefix --message-retention-period-secs 86400
-wrangler queues create silo-delete-prefix-dlq --message-retention-period-secs 86400
-```
+Alchemy runs local versions of the Cloudflare bindings. PostgreSQL is the only Docker dependency; Silo no longer needs local Redis or MinIO.
 
-<Callout>
-The queue and bucket names are referenced in `wrangler.toml`
-</Callout>
-
-<Callout type="info">
-Enable Cloudflare image transforms for your zone before deploying. In the Cloudflare dashboard, go to Media > Images > Transformations, select your zone, and enable transformations for that zone.
-</Callout>
-
-### 5. Configure wrangler.toml
-Open `apps/cf-worker/wrangler.toml` and fill in your values.
-
-```toml
-[vars]
-WORKER_DOMAIN = "worker.your-domain.com"   # public hostname for the Worker
-PROJECT_ROUTE_MODE = "subdomain"           # "subdomain" or "path"
- 
-[env.production]
-vars.WORKER_DOMAIN = "worker.your-domain.com"
-vars.PROJECT_ROUTE_MODE = "subdomain"
-vars.NEXTJS_CALLBACK_URL = "https://your-silo-app.com"  # where the nextjs app is hosted (vercel)
-vars.ENV = "production"
-```
-
-<Callout type="info">
-Use `subdomain` mode for `project-slug.worker.your-domain.com` URLs (requires wildcard DNS/[Advanced Certificate Manager](https://www.cloudflare.com/application-services/products/advanced-certificate-manager/)),
-or `path` mode for `worker.your-domain.com/p/project-slug/...` URLs. Path mode always starts with `/p/*` 
-</Callout>
-
-### 6. Set secrets
-These secrets are required for production. Keep them long, random, and out of VCS. You can generate them with:
-```bash
-openssl rand -base64 32
-```
+## Deploy a stage
 
 ```bash
-# Secret used to authenticate internal callbacks
-wrangler secret put CALLBACK_SECRET --env production
-
-# Secret used to sign upload tokens (must match SIGNING_SECRET in your app)
-wrangler secret put SIGNING_SECRET --env production
-
-# Secret used by the Worker to bypass Vercel deployment protection
-# Save this value; you'll add it in Vercel in Step 6.
-wrangler secret put VERCEL_AUTOMATION_BYPASS_SECRET --env production
+pnpm infra:deploy -- --stage staging
 ```
 
-For local development, create `apps/cf-worker/.dev.vars` (already in `.gitignore`).
-```dotenv
-CALLBACK_SECRET=dev-callback-secret
-SIGNING_SECRET=dev-signing-secret
-VERCEL_AUTOMATION_BYPASS_SECRET=dev-vercel-bypass-secret
-```
-
-### 7. Deploy the Worker
-Run the deploy command from the repo root. Wrangler will bundle and upload the Worker to Cloudflare.
+For the first production deployment, leave `ATTACH_PRODUCTION_DOMAINS` unset so the Workers can be tested at their `workers.dev` URLs. Set it to `true` only during the planned domain cutover.
 
 ```bash
-# Deploy to production
-pnpm --filter cf-worker deploy --env production
-
-# Or deploy from the worker directory directly
-cd apps/cf-worker
-wrangler deploy --env production
+ATTACH_PRODUCTION_DOMAINS=true pnpm infra:deploy -- --stage production
 ```
 
-Wrangler will print the Worker's URL when the deployment is complete. Set your custom domain
-(e.g. `files.your-domain.com`) in the CF dashboard under Workers > Your Worker > Custom Domains
-
-<Callout type="warning">
-Make sure your domain's SSL/TLS mode is set to Full (Strict). Otherwise, the Worker may run into issues
-contacting the next app.
-</Callout>
-
-
-### 8. Deploy the Next.js app on Vercel
-In the [Vercel dashboard](https://vercel.com/new), import your GitHub repo as a new project. This repo is a turborepo, so make sure to set the
-Root Directory to `apps/nextjs`.
-
-<Callout type="warning">
-If install fails because workspace packages are missing, set the Install Command to: `cd ../.. && pnpm install` so pnpm links
-dependencies from the repo root correctly.
-</Callout>
-
-Under Settings > Environment Variables, add the Silo-related values for Production (and Preview if you use preview deployments).
-For local dev, keep the same keys in `.env.local` at the repo root.
-
-```dotenv
-# This is the database URL for the local postgres server running via docker
-POSTGRES_URL="postgresql://dev:devpass@localhost:5432/appdb"
-
-# The Upstash URL is used to connect to your Upstash project.
-# This is the preconfigured url for the local redis server running via docker
-UPSTASH_REDIS_REST_URL="http://localhost:8079"
-UPSTASH_REDIS_REST_TOKEN="dev_token"
-
-# You can generate the secret via 'openssl rand -base64 32'
-# @see https://www.better-auth.com/docs/installation
-AUTH_SECRET='supersecret'
-
-# Preconfigured GitHub OAuth provider, works out-of-the-box
-# @see https://www.better-auth.com/docs/authentication/github
-AUTH_GITHUB_ID=''
-AUTH_GITHUB_SECRET=''
-
-# Cloudflare Worker URL for file uploads/downloads
-WORKER_URL="http://localhost:8787"
-WORKER_DOMAIN="ingest.your-domain.com" # public hostname for the Worker
-PROJECT_ROUTE_MODE="subdomain" # "subdomain" => {projectSlug}.{WORKER_DOMAIN}, "path" => {WORKER_DOMAIN}/p/{projectSlug} (fixed /p prefix)
-
-# Signing secret for generating signed URLs (generate via 'openssl rand -hex 32')
-SIGNING_SECRET="your-secure-random-secret-here"
-CALLBACK_SECRET="your-secure-random-secret-here"
-CRON_SECRET="your-secure-random-secret-here"
-
-# Do we want to disable organization creation?
-NEXT_PUBLIC_DISABLE_ORG_CREATION=false
-
-# Do we want to disable signup?
-DISABLE_SIGNUP="false"
-```
-
-In Vercel, go to Settings > Deployment Protection > Protection Bypass for Automation, and add the same
-token you set for `VERCEL_AUTOMATION_BYPASS_SECRET` in step 6.
-
-Click "Deploy", then copy your production URL. It must match `NEXTJS_CALLBACK_URL` in `wrangler.toml` for the Worker.
-Make sure to update that value and redeploy the Worker if the Vercel URL ever changes.
-
-### 9. You're Done!
-You're done! You can now use Silo to upload and serve files from your Cloudflare R2 bucket!
-
-
-## Local Development
-Silo is set up to run locally using docker compose for the database and redis, wrangler for the worker, and nextjs frot he frontend.
+Run database migrations separately before application traffic is moved:
 
 ```bash
-# Start the Next.js app + docker
-pnpm run dev
-
-# Start the Worker in local dev mode
-pnpm run dev:worker
+pnpm db:migrate
 ```
 
-The worker binds to `http://lvh.me:8787` by default (configured via `WORKER_DOMAIN` in the `development` env). Your Next.js app should point `NEXT_PUBLIC_SILO_WORKER_URL` at that address.
+The full production drain, verification, rollback, and Vercel decommission procedure is in `docs/migrations/vercel-to-cloudflare.md` in the repository.

@@ -41,7 +41,7 @@ function sleep(ms: number): Promise<void> {
 
 async function fetchExpiredBatch(env: Bindings, limit: number) {
   const response = await fetch(
-    `${env.NEXTJS_CALLBACK_URL}/api/internal/expiry/list`,
+    `${env.CONTROL_PLANE_URL}/api/internal/expiry/list`,
     {
       method: "POST",
       headers: buildNextJsInternalHeaders(env, {
@@ -69,7 +69,7 @@ async function fetchExpiredBatch(env: Bindings, limit: number) {
 
 async function finalizeExpiredBatch(env: Bindings, fileIds: string[]) {
   const response = await fetch(
-    `${env.NEXTJS_CALLBACK_URL}/api/internal/expiry/finalize`,
+    `${env.CONTROL_PLANE_URL}/api/internal/expiry/finalize`,
     {
       method: "POST",
       headers: buildNextJsInternalHeaders(env, {

@@ -50,27 +50,21 @@
   },
   "globalEnv": [
     "POSTGRES_URL",
+    "POSTGRES_URL_DIRECT",
     "POSTGRES_MAX_CONNECTIONS",
     "AUTH_REDIRECT_PROXY_URL",
     "AUTH_SECRET",
+    "APP_URL",
     "SILO_URL",
     "SILO_TOKEN",
     "CLERK_SECRET_KEY",
     "PORT",
     "SIGNING_SECRET",
-    "UPSTASH_REDIS_REST_URL",
-    "UPSTASH_REDIS_REST_TOKEN",
     "WORKER_URL",
-    "WORKER_CALLBACK_SECRET",
+    "CALLBACK_SECRET",
     "WEBHOOK_DELIVERY_ENABLED",
+    "UPLOADS_ENABLED",
     "DEV_UPLOAD_SSE_ENABLED"
   ],
-  "globalPassThroughEnv": [
-    "NODE_ENV",
-    "CI",
-    "VERCEL",
-    "VERCEL_ENV",
-    "VERCEL_URL",
-    "npm_lifecycle_event"
-  ]
+  "globalPassThroughEnv": ["NODE_ENV", "CI", "npm_lifecycle_event"]
 }

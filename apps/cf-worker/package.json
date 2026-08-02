@@ -4,12 +4,7 @@
   "type": "module",
   "scripts": {
     "build:deps": "pnpm --filter @silo-storage/mime-types --filter @silo-storage/shared build",
-    "prewrangler:dev": "pnpm run build:deps",
-    "prebuild": "pnpm run build:deps",
-    "predeploy": "pnpm run build:deps",
-    "wrangler:dev": "wrangler dev",
-    "build": "wrangler deploy --dry-run --outdir=dist --env=\"\"",
-    "deploy": "wrangler deploy",
+    "build": "pnpm run build:deps && tsc --noEmit",
     "clean": "git clean -xdf .cache .turbo dist node_modules .wrangler",
     "format": "prettier --check . --ignore-path ../../.gitignore",
     "lint": "eslint",
@@ -25,15 +20,14 @@
   },
   "devDependencies": {
     "@cloudflare/workerd-windows-64": "^1.20260423.1",
-    "@cloudflare/workers-types": "^4.20250109.0",
+    "@cloudflare/workers-types": "^4.20260702.1",
     "@silo-storage/eslint-config": "workspace:*",
     "@silo-storage/prettier-config": "workspace:*",
     "@silo-storage/tsconfig": "workspace:*",
     "eslint": "catalog:",
     "prettier": "catalog:",
     "typescript": "catalog:",
-    "vitest": "^4.0.13",
-    "wrangler": "^4.63.0"
+    "vitest": "^4.0.13"
   },
   "prettier": "@silo-storage/prettier-config"
 }

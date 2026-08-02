@@ -410,7 +410,6 @@ export async function scheduleEnvironmentObjectDeletion(params: {
       body: JSON.stringify({
         prefix,
         cursor,
-        blocking: true,
       }),
     });
 

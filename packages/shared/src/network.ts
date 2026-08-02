@@ -62,9 +62,8 @@ export function normalizeClientIp(
 }
 
 export function getClientIpFromHeaders(headers: Headers): string | null {
-  const onVercel = headers.get("x-vercel-id");
   const cfConnectingIp = normalizeClientIp(headers.get("cf-connecting-ip"));
-  if (cfConnectingIp && !onVercel) {
+  if (cfConnectingIp) {
     return cfConnectingIp;
   }
 

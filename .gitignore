@@ -53,5 +53,8 @@ docker/*/data
 .env*.local
 
 .wrangler/
+.alchemy/
+.open-next/
+wrangler.jsonc
 .env*.local
 .env*.production

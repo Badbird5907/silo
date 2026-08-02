@@ -31,7 +31,7 @@ export async function verifyUploadSignature(
   env: Bindings,
 ): Promise<SignatureVerificationResponse> {
   const response = await fetch(
-    `${env.NEXTJS_CALLBACK_URL}/api/internal/verify-signature`,
+    `${env.CONTROL_PLANE_URL}/api/internal/verify-signature`,
     {
       method: "POST",
       headers: buildNextJsInternalHeaders(env, {
@@ -58,7 +58,7 @@ export async function sendUploadCallback(
   data: UploadCallbackData,
   env: Bindings,
 ): Promise<UploadCallbackResponse> {
-  const url = `${env.NEXTJS_CALLBACK_URL}/api/internal/callback`;
+  const url = `${env.CONTROL_PLANE_URL}/api/internal/callback`;
   console.log("[callback] cb:", url);
   console.log("[callback] d:", JSON.stringify(data, null, 2));
 
@@ -115,7 +115,7 @@ export async function lookupFileKey(
   env: Bindings,
 ): Promise<FileKeyInfo> {
   const response = await fetch(
-    `${env.NEXTJS_CALLBACK_URL}/api/internal/lookup-file-key`,
+    `${env.CONTROL_PLANE_URL}/api/internal/lookup-file-key`,
     {
       method: "POST",
       headers: buildNextJsInternalHeaders(env, {
@@ -180,7 +180,7 @@ export async function registerUploadSession(
   env: Bindings,
 ): Promise<void> {
   const response = await fetch(
-    `${env.NEXTJS_CALLBACK_URL}/api/internal/upload-session/start`,
+    `${env.CONTROL_PLANE_URL}/api/internal/upload-session/start`,
     {
       method: "POST",
       headers: buildNextJsInternalHeaders(env, {
@@ -220,7 +220,7 @@ export async function registerMultipartUploadSession(
   env: Bindings,
 ): Promise<void> {
   const response = await fetch(
-    `${env.NEXTJS_CALLBACK_URL}/api/internal/upload-session/multipart`,
+    `${env.CONTROL_PLANE_URL}/api/internal/upload-session/multipart`,
     {
       method: "POST",
       headers: buildNextJsInternalHeaders(env, {
@@ -278,7 +278,7 @@ export async function trackDownload(
   try {
     console.log("[analytics] Tracking download:", data.bytes + " bytes");
     const response = await fetch(
-      `${env.NEXTJS_CALLBACK_URL}/api/internal/track-download`,
+      `${env.CONTROL_PLANE_URL}/api/internal/track-download`,
       {
         method: "POST",
         headers: buildNextJsInternalHeaders(env, {
@@ -307,7 +307,7 @@ export async function reportMissingObject(
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const response = await fetch(
-        `${env.NEXTJS_CALLBACK_URL}/api/internal/files/repair-missing`,
+        `${env.CONTROL_PLANE_URL}/api/internal/files/repair-missing`,
         {
           method: "POST",
           headers: buildNextJsInternalHeaders(env, {

@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 
-import type { DeletePrefixQueueMessage } from "./services/r2/delete-prefix";
 import type { Bindings, Variables } from "./types/bindings";
 import { UploadStateDO } from "./durable-objects/upload-state-do";
 import { requireCallbackSecret } from "./middleware/auth";
@@ -31,7 +30,6 @@ import {
 import { runExpiryCleanup } from "./services/expiry-cleanup";
 import { runLifecycleJobs } from "./services/lifecycle-job-runner";
 import { runPendingUploadCleanup } from "./services/pending-upload-cleanup";
-import { deletePrefixChunk } from "./services/r2/delete-prefix";
 import { createErrorResponse } from "./utils/errors";
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -186,80 +184,6 @@ export default {
           task: tasks[index]?.name,
           error: result.reason as unknown,
         });
-      }
-    }
-  },
-  async queue(
-    batch: MessageBatch<DeletePrefixQueueMessage>,
-    env: Bindings,
-  ): Promise<void> {
-    const isDlqBatch = batch.queue === "silo-delete-prefix-dlq";
-
-    for (const message of batch.messages) {
-      const { prefix, cursor, requestId } = message.body;
-
-      if (!prefix) {
-        console.error("Invalid delete-prefix queue payload: missing prefix", {
-          requestId,
-        });
-        message.ack();
-        continue;
-      }
-
-      try {
-        const result = await deletePrefixChunk({
-          prefix,
-          cursor,
-          env,
-        });
-
-        console.info("Processed delete-prefix chunk", {
-          queue: batch.queue,
-          requestId,
-          prefix,
-          processed: result.processed,
-          deleted: result.deleted,
-          truncated: result.truncated,
-          cursor: result.cursor,
-        });
-
-        if (result.truncated && result.cursor) {
-          await env.DELETE_PREFIX_QUEUE.send({
-            ...message.body,
-            cursor: result.cursor,
-          });
-        }
-
-        message.ack();
-      } catch (error) {
-        console.error("Delete-prefix queue message failed", {
-          queue: batch.queue,
-          requestId,
-          prefix,
-          cursor,
-          error,
-        });
-
-        if (isDlqBatch) {
-          console.error("DLQ delete-prefix failure requeued", {
-            queue: batch.queue,
-            requestId,
-            prefix,
-            cursor,
-            failedAt: new Date().toISOString(),
-            error:
-              error instanceof Error
-                ? {
-                    name: error.name,
-                    message: error.message,
-                  }
-                : String(error),
-          });
-          message.retry();
-          continue;
-        }
-
-        message.retry();
       }
     }
   },

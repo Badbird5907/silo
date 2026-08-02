@@ -8,7 +8,6 @@ import {
   usageDaily,
   usageEvents,
 } from "@silo-storage/db/schema";
-import { publishMessage } from "@silo-storage/redis";
 import {
   auditEventCodes,
   clearUploadSessionAdapterData,
@@ -19,6 +18,7 @@ import {
 
 import type { AuditActor } from "./audit";
 import type { AuditLogDownloadPolicy } from "./retention";
+import { publishUploadEvent } from "../runtime";
 import {
   buildSystemAuditActor,
   recordAuditEvent,
@@ -343,9 +343,9 @@ export async function markUploadAsFailed(
     `upload.failed:${opts.fileKeyId}`,
   );
 
-  // publish to redis
+  // Notify local development listeners through the Cloudflare completion DO.
   try {
-    await publishMessage(`upload:${opts.fileKeyId}`, uploadFailedEvent);
+    await publishUploadEvent(opts.fileKeyId, uploadFailedEvent);
   } catch (pubError) {
     console.error("Failed to publish upload failure message:", pubError);
   }

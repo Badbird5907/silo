@@ -33,12 +33,12 @@ import {
   usageDaily,
   usageEvents,
 } from "@silo-storage/db/schema";
-import { publishMessage } from "@silo-storage/redis";
 import {
   createUploadEventEnvelope,
   normalizeFileKeyMetadata,
 } from "@silo-storage/shared";
 
+import { publishUploadState } from "@/cloudflare/state";
 import { env } from "@/env";
 import { isCallbackAuthorized } from "@/lib/internal/callback-auth";
 import { setCompletionRecord } from "@/lib/upload/completion";
@@ -707,7 +707,7 @@ export async function POST(request: Request) {
       );
 
       try {
-        await publishMessage(`upload:${data.fileKeyId}`, uploadCompletedEvent);
+        await publishUploadState(data.fileKeyId, uploadCompletedEvent);
       } catch (pubError) {
         console.error("Failed to publish upload completion message:", pubError);
       }

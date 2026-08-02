@@ -1,11 +1,14 @@
 import { createEnv } from "@t3-oss/env-nextjs";
-import { vercel } from "@t3-oss/env-nextjs/presets-zod";
 import { z } from "zod/v4";
 
 import { authEnv } from "@silo-storage/auth/env";
 
+const booleanEnvironmentValue = z
+  .union([z.boolean(), z.enum(["true", "false"])])
+  .transform((value) => value === true || value === "true");
+
 export const env = createEnv({
-  extends: [authEnv(), vercel()],
+  extends: [authEnv()],
   shared: {
     NODE_ENV: z
       .enum(["development", "production", "test"])
@@ -18,16 +21,17 @@ export const env = createEnv({
    * This way you can ensure the app isn't built with invalid env vars.
    */
   server: {
-    POSTGRES_URL: z.url(),
+    POSTGRES_URL: z.url().optional(),
     POSTGRES_URL_DIRECT: z.url().optional(),
+    APP_URL: z.url(),
     WORKER_URL: z.url(),
     WORKER_DOMAIN: z.string().min(1), // e.g., "files.evanyu.dev" (without protocol)
     PROJECT_ROUTE_MODE: z.enum(["subdomain", "path"]).default("subdomain"),
     SIGNING_SECRET: z.string().min(32),
     CALLBACK_SECRET: z.string().min(32),
-    CRON_SECRET: z.string().min(16).optional(),
-    WEBHOOK_DELIVERY_ENABLED: z.boolean().default(true),
-    DEV_UPLOAD_SSE_ENABLED: z.boolean().default(true),
+    WEBHOOK_DELIVERY_ENABLED: booleanEnvironmentValue.default(true),
+    UPLOADS_ENABLED: booleanEnvironmentValue.default(true),
+    DEV_UPLOAD_SSE_ENABLED: booleanEnvironmentValue.default(true),
     BETTER_AUTH_API_KEY: z.string().optional(),
   },
 

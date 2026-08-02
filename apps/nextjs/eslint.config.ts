@@ -9,7 +9,7 @@ import { reactConfig } from "@silo-storage/eslint-config/react";
 
 export default defineConfig(
   {
-    ignores: [".next/**"],
+    ignores: [".next/**", ".open-next/**", "cloudflare-worker.ts"],
   },
   baseConfig,
   reactConfig,

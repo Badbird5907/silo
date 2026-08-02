@@ -20,7 +20,7 @@ export async function lookupProject(
 
   try {
     const response = await fetch(
-      `${env.NEXTJS_CALLBACK_URL}/api/internal/lookup-project-slug`,
+      `${env.CONTROL_PLANE_URL}/api/internal/lookup-project-slug`,
       {
         method: "POST",
         headers: buildNextJsInternalHeaders(env, {
